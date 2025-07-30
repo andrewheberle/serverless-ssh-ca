@@ -1,0 +1,53 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "ssh-ca",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-07-26",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	/**
+	 * Enable custom routes
+	 */
+	/* "routes": [
+		{
+			"pattern": "ca.example.com",
+			"custom_domain": true
+		}
+	],
+	"workers_dev": false, */
+	"vars": {
+		"ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
+		"JWT_JWKS_URL": "https://idp.example.com/.well-known/jwks.json",
+		"JWT_AUD": "<jwtaudience>",
+		"JWT_ALGORITHMS": [
+			"RS256"
+		],
+		"SSH_CERTIFICATE_LIFETIME": "24 hours",
+		"SSH_CERTIFICATE_PRINCIPALS": [
+			"ssh-admin"
+		],
+		"SSH_CERTIFICATE_INCLUDE_SELF": false,
+		"SSH_CERTIFICATE_EXTENSIONS": [
+			"permit-X11-forwarding",
+			"permit-agent-forwarding",
+			"permit-port-forwarding",
+			"permit-pty",
+			"permit-user-rc",
+		]
+	},
+	"secrets_store_secrets": [
+		{
+			"binding": "PRIVATE_KEY",
+			"store_id": "<secret store id>",
+			"secret_name": "<secret name>"
+		}
+	]
+}

@@ -1,0 +1,20 @@
+{
+	"name": "serverless-ssh-ca",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"@types/sshpk": "^1.17.4",
+		"itty-router": "^5.0.20",
+		"itty-time": "^2.0.2",
+		"jose": "^6.0.12",
+		"sshpk": "^1.18.0",
+		"typescript": "^5.5.2",
+		"wrangler": "^4.26.0"
+	}
+}

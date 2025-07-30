@@ -1,0 +1,8 @@
+{
+	"files.associations": {
+		"wrangler.json": "jsonc"
+	},
+	"yaml.schemas": {
+		"https://www.schemastore.org/yamllint.json": "file:///c%3A/Users/andre/OneDrive/Documents/sites/ssh-ca/config.yml"
+	}
+}
