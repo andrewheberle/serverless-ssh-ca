@@ -44,6 +44,8 @@ github.com/lestrrat-go/jwx/v2 v2.0.21 h1:jAPKupy4uHgrHFEdjVjNkUgoBKtVDgrQPB/h55F
 github.com/lestrrat-go/jwx/v2 v2.0.21/go.mod h1:09mLW8zto6bWL9GbwnqAli+ArLf+5M33QLQPDggkUWM=
 github.com/openpubkey/openpubkey v0.16.0 h1:yR/9zuBfecANkrkNcE7teAEyPOg/XbHs61AQmsMhieY=
 github.com/openpubkey/openpubkey v0.16.0/go.mod h1:TnLOp59RU6DoaBSI5H4ssh60xigm/nVXqg+2pO8btDg=
+github.com/openpubkey/openpubkey v0.17.0 h1:A0nhgSxSe2dDrzG1jgzky4gmlyNTRmeMCaZK6n3Dv3k=
+github.com/openpubkey/openpubkey v0.17.0/go.mod h1:TnLOp59RU6DoaBSI5H4ssh60xigm/nVXqg+2pO8btDg=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
 github.com/pelletier/go-toml/v2 v2.2.3/go.mod h1:MfCQTFTvCcUyyvvwm1+G6H/jORL20Xlb6rzQu9GuUkc=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
