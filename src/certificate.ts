@@ -4,7 +4,9 @@ import { CertificateSignerPayload } from "./types"
 
 export async function createSignedCertificate(env: Env, id: string, payload: CertificateSignerPayload, principals?: string[]): Promise<Certificate> {
     // add identity
-    const identity = env.SSH_CERTIFICATE_INCLUDE_SELF ? [identityForUser(id)] : []
+    const identity = env.SSH_CERTIFICATE_INCLUDE_SELF
+        ? [identityForUser(id)]
+        : []
     if (principals !== undefined) {
         for (const p of principals) {
             identity.push(identityForUser(p))
@@ -16,8 +18,13 @@ export async function createSignedCertificate(env: Env, id: string, payload: Cer
     const pub = parseKey(atob(payload.public_key))
     const issuer = identityFromDN(env.ISSUER_DN)
     const key = parsePrivateKey(await env.PRIVATE_KEY.get())
-    const certificate = createCertificate(identity, pub, issuer, key, { lifetime: seconds(env.SSH_CERTIFICATE_LIFETIME) })
-    const extensions = (payload.extensions !== undefined ? payload.extensions : env.SSH_CERTIFICATE_EXTENSIONS).map((ext) => {
+    const lifetime = payload.lifetime !== undefined
+        ? Math.min(payload.lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
+        : seconds(env.SSH_CERTIFICATE_LIFETIME)
+    const certificate = createCertificate(identity, pub, issuer, key, { lifetime: lifetime })
+    const extensions = (payload.extensions !== undefined
+        ? payload.extensions
+        : env.SSH_CERTIFICATE_EXTENSIONS).map((ext) => {
         return {
             critical: false,
             name: ext,
