@@ -109,7 +109,8 @@ npm run deploy
 
 TODO: Add IdP config example here
 
-The claims that are supported in the identity token are as follows:
+A number of additional claims are supported/required in the identity token as
+follows:
 
 ```json
 {
