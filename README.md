@@ -44,21 +44,21 @@ cp wrangler.jsonc.example wrangler.jsonc
 
 ```jsonc
 "vars": {
-    # This is the issuer of your SSH certificates
+    // This is the issuer of your SSH certificates
     "ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
-    # This is the URL for the CA to verify the JWT provided by the client
+    // This is the URL for the CA to verify the JWT provided by the client
     "JWT_JWKS_URL": "https://example.com/.well-known/jwks.json",
-    # The expected audience of the JWT
+    // The expected audience of the JWT
     "JWT_AUD": "<jwtaudience>",
-    # The supported JWT algorithms
+    // The supported JWT algorithms
     "JWT_ALGORITHMS": ["RS256"],
-    # The lifetime of the issued SSH certificates
+    // The lifetime of the issued SSH certificates
     "SSH_CERTIFICATE_LIFETIME": "24 hours",
-    # A list of principals to add to the certificate
+    // A list of principals to add to the certificate
     "SSH_CERTIFICATE_PRINCIPALS": ["ssh-admin"],
-    # Whether to add the users own name as a valid principal
+    // Whether to add the users own name as a valid principal
     "SSH_CERTIFICATE_INCLUDE_USER": false,
-    # The list of SSH extensions to add to the certificate
+    // The list of SSH extensions to add to the certificate
     "SSH_CERTIFICATE_EXTENSIONS": [
         "permit-X11-forwarding",
         "permit-agent-forwarding",
@@ -75,9 +75,9 @@ cp wrangler.jsonc.example wrangler.jsonc
 "secrets_store_secrets": [
     {
         "binding": "PRIVATE_KEY",
-        # The ID of the secret store
+        // The ID of the secret store
         "store_id": "<secret store id>",
-        # Then name of the secret
+        // Then name of the secret
         "secret_name": "<secret name>"
     }
 ]
