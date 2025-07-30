@@ -149,7 +149,7 @@ ssh:
 The client can be built as follows:
 
 ```sh
-go install github.com/andrewheberle/severless-ssh-ca@latest
+go build ./cmd/ssh-ca-client/
 ```
 
 Assuming a local SSH agent is running, the client can be started as follows:
