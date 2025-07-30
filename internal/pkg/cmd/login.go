@@ -422,18 +422,27 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 		return nil, err
 	}
 
-	res, err := client.Post(c.sshConfig.CertificateAuthorityURL, "application/json", buf)
+	// build url
+	caCertUrl, err := url.JoinPath(c.sshConfig.CertificateAuthorityURL, "/api/v1/certificate")
 	if err != nil {
 		return nil, err
 	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
+
+	// do POST
+	res, err := client.Post(caCertUrl, "application/json", buf)
+	if err != nil {
+		return nil, err
 	}
 	defer res.Body.Close()
 
-	dec := json.NewDecoder(res.Body)
+	// ensure status code was 200 OK
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
+	}
 
+	// parse response body
 	var csr CertificateSignerResponse
+	dec := json.NewDecoder(res.Body)
 	if err := dec.Decode(&csr); err != nil {
 		return nil, err
 	}
