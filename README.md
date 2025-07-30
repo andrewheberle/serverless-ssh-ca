@@ -5,7 +5,7 @@ to provide signed certificates for SSH access running on Cloudflare Workers.
 
 ## Architecture
 
-The solutions comprises of the CA running as a Worker, Go based client and 
+The solutions comprises of the CA running as a Worker, a Go based client and 
 an external OIDC IdP.
 
 The IdP may be any OIDC compatible service that returns a JWT with at least
@@ -54,7 +54,7 @@ cp wrangler.jsonc.example wrangler.jsonc
     "JWT_ALGORITHMS": ["RS256"],
     // The lifetime of the issued SSH certificates
     "SSH_CERTIFICATE_LIFETIME": "24 hours",
-    // A list of principals to add to the certificate
+    // A list of additional principals to add to the certificate
     "SSH_CERTIFICATE_PRINCIPALS": ["ssh-admin"],
     // Whether to add the users own name as a valid principal
     "SSH_CERTIFICATE_INCLUDE_USER": false,
@@ -69,7 +69,7 @@ cp wrangler.jsonc.example wrangler.jsonc
 },
 ```
 
-3. Add the secret for your SSH certificate authority private key:
+3. Add the private key for your SSH CA to your Cloudflare Secrets Store:
 
 ```jsonc
 "secrets_store_secrets": [
@@ -77,7 +77,7 @@ cp wrangler.jsonc.example wrangler.jsonc
         "binding": "PRIVATE_KEY",
         // The ID of the secret store
         "store_id": "<secret store id>",
-        // Then name of the secret
+        // The name of the secret
         "secret_name": "<secret name>"
     }
 ]
@@ -109,8 +109,7 @@ npm run deploy
 
 TODO: Add IdP config example here
 
-A number of additional claims are supported/required in the identity token as
-follows:
+A number of additional claims are supported/required in the identity token as follows:
 
 ```json
 {
@@ -126,13 +125,11 @@ follows:
 
 The `email` claim is required and the `principals` claim is optional.
 
-Any addtional `principals` in the identity token will be added as `principals`
-to the issued certificate.
+Any addtional `principals` in the identity token will be added as `principals` to the issued certificate.
 
 ### Client
 
-The client requires a configuration file that defines the details of the OIDC
-IdP and where to find the SSH CA as follows:
+The client requires a configuration file that defines the details of the OIDC IdP and where to find the SSH CA as follows:
 
 ```yaml
 oidc:
@@ -143,7 +140,7 @@ oidc:
   redirect_url: http://localhost:3000/auth/callback
 ssh:
   name: id_ssh_user
-  ca_url: https://ca.example.com/api/v1/certificate
+  ca_url: https://ca.example.com/
 ```
 
 The client can be built as follows:
@@ -173,8 +170,7 @@ TrustedUserCAKeys /etc/ssh/ca.pub
 AuthorizedPrincipalsFile /etc/ssh/principals.d/%u
 ```
 
-The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can
-be retrieved as follows:
+The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be retrieved as follows:
 
 ```sh
 curl https://ca.example.com/api/v1/ca | sudo tee /etc/ssh/ca.pub
@@ -184,9 +180,9 @@ The `/etc/ssh/principals.d` directory should contain a file corresponding to
 a local user that contains a list of principals that should be allowed
 login.
 
-Using the example principals in `SSH_CERTIFICATE_PRINCIPALS` above, the
+Using the principals list in `SSH_CERTIFICATE_PRINCIPALS` above, the
 following file named `/etc/ssh/principals.d/admin` would allow login
-as the user `admin` for the bearer of an issued (and valid) certificate:
+as the SSH user `admin` for the bearer of an issued (and valid) certificate:
 
 ```
 ssh-admin
