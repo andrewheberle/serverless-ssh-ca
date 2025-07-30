@@ -23,8 +23,8 @@ export async function createSignedCertificate(env: Env, id: string, payload: Cer
         : seconds(env.SSH_CERTIFICATE_LIFETIME)
     const certificate = createCertificate(identity, pub, issuer, key, { lifetime: lifetime })
     const extensions = (payload.extensions !== undefined
-		? payload.extensions
-		: env.SSH_CERTIFICATE_EXTENSIONS).map((ext) => {
+        ? payload.extensions
+        : env.SSH_CERTIFICATE_EXTENSIONS).map((ext) => {
         return {
             critical: false,
             name: ext,
