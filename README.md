@@ -1,7 +1,7 @@
 # Serverless SSH CA in Workers
 
 This repository contains a serverless Certificate Authority that can be used
-to provide signed certificates for SSH access.
+to provide signed certificates for SSH access running on Cloudflare Workers.
 
 ## Architecture
 
