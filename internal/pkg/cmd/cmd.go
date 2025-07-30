@@ -50,7 +50,7 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ".ssh-ca", "config.yml"), "Path to configuration file")
+	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ".severless-ssh-ca", "config.yml"), "Path to configuration file")
 	cmd.PersistentFlags().IntVarP(&c.listenPort, "port", "p", 3000, "Listen port for OIDC auth flow")
 
 	return nil
