@@ -35,6 +35,7 @@ import (
 
 type loginCommand struct {
 	skipAgent bool
+	lifetime  time.Duration
 
 	srv          *http.Server
 	verifier     *oidc.IDTokenVerifier
@@ -49,7 +50,8 @@ type loginCommand struct {
 }
 
 type certificateSignerPayload struct {
-	PublicKey []byte `json:"public_key"`
+	Lifetime  time.Duration `json:"lifetime"`
+	PublicKey []byte        `json:"public_key"`
 }
 
 type CertificateSignerResponse struct {
@@ -68,6 +70,7 @@ func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.skipAgent, "skip-agent", false, "Skip adding SSH key and certificate to ssh-agent")
+	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 
 	return nil
 }
@@ -418,6 +421,7 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 	enc := json.NewEncoder(buf)
 	if err := enc.Encode(certificateSignerPayload{
 		PublicKey: publicKey,
+		Lifetime:  c.lifetime,
 	}); err != nil {
 		return nil, err
 	}
@@ -429,6 +433,7 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 	}
 
 	// do POST
+	slog.Info("sending request to CA", "url", caCertUrl)
 	res, err := client.Post(caCertUrl, "application/json", buf)
 	if err != nil {
 		return nil, err
