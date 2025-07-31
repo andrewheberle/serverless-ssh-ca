@@ -145,11 +145,10 @@ ssh:
   # private_key: encrypted (see below) base64 encoded ssh private key
 ```
 
-The client can be built as follows:
+The client can be installed as follows:
 
 ```sh
-cd client
-go build ./cmd/ssh-ca-client/
+go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client@latest
 ```
 
 Assuming a local SSH agent is running, the client can be started as follows:
