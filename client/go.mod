@@ -3,9 +3,9 @@ module github.com/andrewheberle/serverless-ssh-ca/client
 go 1.24.2
 
 require (
-	github.com/andrewheberle/simplecommand v0.3.0
+	github.com/andrewheberle/simplecommand v0.3.1
 	github.com/andrewheberle/sshagent v1.0.0
-	github.com/bep/simplecobra v0.6.0
+	github.com/bep/simplecobra v0.6.1
 	github.com/coreos/go-oidc/v3 v3.15.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
@@ -19,7 +19,7 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/andrewheberle/simpleviper v1.1.1 // indirect
+	github.com/andrewheberle/simpleviper v1.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
@@ -31,7 +31,7 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/cobra v1.9.1 // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/spf13/pflag v1.0.7 // indirect
 	github.com/spf13/viper v1.20.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
