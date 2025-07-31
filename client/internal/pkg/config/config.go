@@ -52,7 +52,7 @@ func LoadConfig(name string) (*ClientConfig, error) {
 }
 
 func (c *ClientConfig) Save() error {
-	name, err := func() (string, error) {
+	temp, err := func() (string, error) {
 		// save to a temp file first
 		t, err := os.CreateTemp(filepath.Dir(c.name), "config*")
 		if err != nil {
@@ -76,18 +76,18 @@ func (c *ClientConfig) Save() error {
 		return t.Name(), nil
 	}()
 
-	// ensure file is removed it it was created
-	if name != "" {
-		defer os.Remove(name)
+	// ensure temp file is removed it it was created
+	if temp != "" {
+		defer os.Remove(temp)
 	}
 
-	// check save was ok
+	// check save to temp was ok
 	if err != nil {
 		return err
 	}
 
 	// move into place
-	return os.Rename(c.name, name)
+	return os.Rename(temp, c.name)
 }
 
 func (c *ClientConfig) HasPrivateKey() bool {

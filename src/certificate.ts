@@ -3,7 +3,7 @@ import { Certificate, createCertificate, identityForUser, identityFromDN, parseK
 import { CertificateSignerPayload } from "./types"
 
 export async function createSignedCertificate(env: Env, id: string, payload: CertificateSignerPayload, principals?: string[]): Promise<Certificate> {
-    // add identity
+    // add identities
     const identity = env.SSH_CERTIFICATE_INCLUDE_SELF
         ? [identityForUser(id)]
         : []
@@ -15,13 +15,28 @@ export async function createSignedCertificate(env: Env, id: string, payload: Cer
     for (const p of env.SSH_CERTIFICATE_PRINCIPALS) {
         identity.push(identityForUser(p))
     }
+
+    // grab public key from payload and private key from secret store
     const pub = parseKey(atob(payload.public_key))
-    const issuer = identityFromDN(env.ISSUER_DN)
     const key = parsePrivateKey(await env.PRIVATE_KEY.get())
+
+    // lifetime is the smaller of what was provided in the payload or the default
     const lifetime = payload.lifetime !== undefined
         ? Math.min(payload.lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
         : seconds(env.SSH_CERTIFICATE_LIFETIME)
-    const certificate = createCertificate(identity, pub, issuer, key, { lifetime: lifetime })
+
+    // generate value for serial of certificate
+    const unixTimestamp = Math.floor(Date.now() / 1000)
+    const serial = Buffer.alloc(8)
+    serial.writeBigUInt64BE(BigInt(unixTimestamp))
+
+    // set issuer of certificate based on ISSUER_DN
+    const issuer = identityFromDN(env.ISSUER_DN)
+
+    // create certificate
+    const certificate = createCertificate(identity, pub, issuer, key, { lifetime: lifetime, serial: serial })
+
+    // add usage extensions
     const extensions = (payload.extensions !== undefined
         ? payload.extensions
         : env.SSH_CERTIFICATE_EXTENSIONS).map((ext) => {
@@ -31,8 +46,6 @@ export async function createSignedCertificate(env: Env, id: string, payload: Cer
             data: Buffer.alloc(0)
         }
     })
-
-    // add usage extensions
     if (certificate.signatures.openssh !== undefined) {
         certificate.signatures = {
             openssh: {

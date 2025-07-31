@@ -341,7 +341,7 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 	enc := json.NewEncoder(buf)
 	if err := enc.Encode(certificateSignerPayload{
 		PublicKey: publicKey,
-		Lifetime:  c.lifetime,
+		Lifetime:  time.Duration(c.lifetime.Seconds()),
 	}); err != nil {
 		return nil, err
 	}
