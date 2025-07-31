@@ -15,9 +15,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/andrewheberle/opkssh-renewer/pkg/sshagent"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/simplecommand"
+	"github.com/andrewheberle/sshagent"
 	"github.com/bep/simplecobra"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
@@ -132,6 +132,7 @@ func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args
 	// try refresh token
 	refresh, err := c.config.GetRefreshToken()
 	if err == nil && refresh != "" {
+		slog.Info("attempting renewal using refresh token")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 		tokenSource := c.oauth2Config.TokenSource(ctx, &oauth2.Token{
@@ -158,7 +159,7 @@ func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args
 		slog.Error("could not open browser, please visit URL manually", "url", loginUrl)
 	}
 
-	slog.Info("started up", "url", loginUrl)
+	slog.Info("starting interactive login flow", "url", loginUrl)
 
 	if err := c.srv.ListenAndServe(); err != nil {
 		if errors.Is(err, http.ErrServerClosed) {
