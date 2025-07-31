@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/andrewheberle/serverless-ssh-ca/internal/pkg/cmd"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/cmd"
 )
 
 func main() {

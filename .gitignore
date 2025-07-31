@@ -173,5 +173,3 @@ dist
 
 wrangler.jsonc
 worker-configuration.d.ts
-*.exe
-config.yml

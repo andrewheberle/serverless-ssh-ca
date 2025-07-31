@@ -48,8 +48,8 @@ cp wrangler.jsonc.example wrangler.jsonc
     "ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
     // This is the URL for the CA to verify the JWT provided by the client
     "JWT_JWKS_URL": "https://example.com/.well-known/jwks.json",
-    // The expected audience of the JWT
-    "JWT_AUD": "<jwtaudience>",
+    // The issuer of the JWT access token
+    "JWT_ISSUER": "https://example.com/",
     // The supported JWT algorithms
     "JWT_ALGORITHMS": ["RS256"],
     // The lifetime of the issued SSH certificates
@@ -136,28 +136,56 @@ oidc:
   issuer: OIDC Issuer
   client_id: OIDC Client ID
   scopes: ["openid", "email", "profile"]
-  access_type: offline
   redirect_url: http://localhost:3000/auth/callback
+  # refresh_token: encrypted (see below) base64 encoded refresh token
 ssh:
   name: id_ssh_user
   ca_url: https://ca.example.com/
+  # certificate: base64 encoded certificate that was issued last
+  # private_key: encrypted (see below) base64 encoded ssh private key
 ```
 
 The client can be built as follows:
 
 ```sh
+cd client
 go build ./cmd/ssh-ca-client/
 ```
 
 Assuming a local SSH agent is running, the client can be started as follows:
 
 ```sh
+# generate a SSH private key
+ssh-ca-client generate
+
+# perform a login to the IdP and request a signed certificate
 ssh-ca-client login
 ```
 
 This should automatically start a web browser to initiate the OIDC login flow,
 if not you may manually visit `http://localhost:3000/auth/login` to start this
 process.
+
+If provided by the OIDC IdP the refresh token will be saved for subsequent
+`ssh-ca-client login` invocations and an attempt will be maid to obtain a new
+auth token using the saved refresh token.
+
+#### Key, Token and Certificate Storage
+
+The users private key, the most recently issued certificate and the OIDC
+refresh token (if available) are written to the configuration file for
+subsequent use.
+
+Sensitive material such as the SSH private key and OIDC refresh token are
+encrypted on Windows using the Data Protection API (DPAPI) so the values are
+only decryptable by the same user that originally encrypted it.
+
+Although access to the config file by another user is possible, the values
+cannot be read (assuming DPAPI is secure).
+
+On other platforms, this is not the case and this data is simply stored as 
+BASE64 encoded strings, so security is less than ideal and filesystem
+permissions must be used to prevent unauthorised access.
 
 ### SSH Endpoints
 

@@ -2,44 +2,27 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
-	"gopkg.in/yaml.v3"
 )
-
-type ClienConfig struct {
-	Oidc ClientOIDCConfig `yaml:"oidc"`
-	Ssh  ClientSSHConfig  `yaml:"ssh"`
-}
-
-type ClientOIDCConfig struct {
-	Issuer          string   `yaml:"issuer"`
-	ClientID        string   `yaml:"client_id"`
-	ClientSecret    string   `yaml:"client_secret,omitempty"`
-	Scopes          []string `yaml:"scopes"`
-	AccessType      string   `yaml:"access_type,omitempty"`
-	Prompt          string   `yaml:"prompt,omitempty"`
-	RedirectURL     string   `yaml:"redirect_url"`
-	SendAccessToken bool     `yaml:"send_access_token,omitempty"`
-}
-
-type ClientSSHConfig struct {
-	Name                    string `yaml:"name"`
-	CertificateAuthorityURL string `yaml:"ca_url"`
-}
 
 type rootCommand struct {
 	configFile string
 	listenPort int
 
-	config ClienConfig
+	config *config.ClientConfig
 
 	*simplecommand.Command
 }
+
+var (
+	ErrNoPrivateKey = errors.New("no private key found, please run \"ssh-ca-client generate\"")
+)
 
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	c.Command.Init(cd)
@@ -50,7 +33,7 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ".severless-ssh-ca", "config.yml"), "Path to configuration file")
+	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ".serverless-ssh-ca", "config.yml"), "Path to configuration file")
 	cmd.PersistentFlags().IntVarP(&c.listenPort, "port", "p", 3000, "Listen port for OIDC auth flow")
 
 	return nil
@@ -59,16 +42,11 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	c.Command.PreRun(this, runner)
 
-	f, err := os.Open(c.configFile)
+	config, err := config.LoadConfig(c.configFile)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-
-	dec := yaml.NewDecoder(f)
-	if err := dec.Decode(&c.config); err != nil {
-		return fmt.Errorf("problem parsing config: %w", err)
-	}
+	c.config = config
 
 	return nil
 }
@@ -80,6 +58,12 @@ func Execute(ctx context.Context, args []string) error {
 	rootCmd.SubCommands = []simplecobra.Commander{
 		&loginCommand{
 			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
+		},
+		&generateCommand{
+			Command: simplecommand.New("generate", "Generate a SSH private key"),
+		},
+		&showCommand{
+			Command: simplecommand.New("show", "Show existing private/public key"),
 		},
 	}
 

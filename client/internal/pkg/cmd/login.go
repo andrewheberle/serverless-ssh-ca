@@ -4,23 +4,19 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/andrewheberle/opkssh-renewer/pkg/sshagent"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -34,15 +30,16 @@ import (
 )
 
 type loginCommand struct {
-	skipAgent bool
-	lifetime  time.Duration
+	skipAgent  bool
+	lifetime   time.Duration
+	showTokens bool
 
 	srv          *http.Server
 	verifier     *oidc.IDTokenVerifier
 	oauth2Config oauth2.Config
 	store        *sessions.CookieStore
 
-	sshConfig ClientSSHConfig
+	config *config.ClientConfig
 
 	keyPath string
 
@@ -70,6 +67,7 @@ func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.skipAgent, "skip-agent", false, "Skip adding SSH key and certificate to ssh-agent")
+	cmd.Flags().BoolVar(&c.showTokens, "show-tokens", false, "Display OIDC tokens after login process")
 	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 
 	return nil
@@ -82,18 +80,11 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if !ok {
 		return fmt.Errorf("problem accessing root command")
 	}
-	c.sshConfig = root.config.Ssh
+	c.config = root.config
 
-	// work out key path
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	c.keyPath = filepath.Join(home, ".ssh", c.sshConfig.Name)
-
-	// make sure .ssh dir exists
-	if err := os.MkdirAll(filepath.Dir(c.keyPath), 0600); err != nil {
-		return err
+	// check we have a key
+	if !c.config.HasPrivateKey() {
+		return ErrNoPrivateKey
 	}
 
 	config := root.config.Oidc
@@ -138,6 +129,30 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 }
 
 func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
+	// try refresh token
+	refresh, err := c.config.GetRefreshToken()
+	if err == nil && refresh != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		tokenSource := c.oauth2Config.TokenSource(ctx, &oauth2.Token{
+			RefreshToken: refresh,
+		})
+
+		// try to obtain a new auth token
+		token, err := tokenSource.Token()
+		if err == nil {
+			if err := c.doLogin(token); err == nil {
+				slog.Info("renewed certificate using refresh token")
+				return nil
+			}
+
+			slog.Error("could not do renewal process via refresh token", "error", err)
+		}
+
+		slog.Error("could not renew auth token using refresh token", "error", err)
+	}
+
+	// at this point do interactive login flow
 	loginUrl := fmt.Sprintf("http://%s/auth/login", c.srv.Addr)
 	if err := util.OpenUrl(loginUrl); err != nil {
 		slog.Error("could not open browser, please visit URL manually", "url", loginUrl)
@@ -234,144 +249,49 @@ func (c *loginCommand) callbackHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Info("completed auth flow")
 
 	// do this in a goroutine so our request returns
-	go func() {
-		cert, err := c.doSigningRequest(rawIDToken)
-		if err != nil {
-			slog.Error("could not complete request to SSH CA", "error", err)
-			return
-		}
-
-		if err := func() error {
-			f, err := os.Create(c.keyPath + "-cert.pub")
-			if err != nil {
-				slog.Error("could not open file", "error", err)
-				return err
-			}
-			defer f.Close()
-
-			if _, err := f.Write(cert.Certificate); err != nil {
-				slog.Error("could not open file", "error", err)
-				return err
-			}
-
-			return nil
-		}(); err != nil {
-			return
-		}
-
-		// finish here if skip option was provided
-		if c.skipAgent {
-			return
-		}
-
-		if err := c.addToAgent(); err != nil {
-			slog.Error("could not add to agent", "error", err)
-			return
-		}
-
-		slog.Info("added identity and signed certificate to ssh-agent")
-	}()
+	go c.doLogin(token)
 }
 
-func (c *loginCommand) getPublicKey() ([]byte, error) {
-	found, err := c.hasPrivateKey()
-	if err != nil {
-		return nil, err
+func (c *loginCommand) doLogin(token *oauth2.Token) error {
+	// show tokens now
+	if c.showTokens {
+		rawIDToken, _ := token.Extra("id_token").(string)
+		slog.Info("the following tokens were received",
+			"id_token", rawIDToken,
+			"access_token", token.AccessToken,
+			"refresh_token", token.RefreshToken,
+		)
 	}
 
-	if !found {
-		slog.Info("no exisiting idenity found")
-		pemBytes, err := c.generateKey()
-		if err != nil {
-			return nil, err
+	// if we got a refresh token then save it
+	if token.RefreshToken != "" {
+		if err := c.config.SetRefreshToken(token.RefreshToken); err != nil {
+			slog.Warn("could not save refresh token", "error", err)
+		} else {
+			slog.Info("saved the provided refresh token for subsequent renewals")
 		}
-
-		if err := func() error {
-			f, err := os.Create(c.keyPath)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			if _, err := f.Write(pemBytes); err != nil {
-				return err
-			}
-
-			return nil
-		}(); err != nil {
-			return nil, err
-		}
-
-		key, err := ssh.ParsePrivateKey(pemBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		return ssh.MarshalAuthorizedKey(key.PublicKey()), nil
 	}
 
-	// load existing key
-	pemBytes, err := os.ReadFile(c.keyPath)
+	cert, err := c.doSigningRequest(token.AccessToken)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	key, err := ssh.ParsePrivateKey(pemBytes)
-	if err != nil {
-		return nil, err
+	// add and save the config
+	if err := c.config.SetCertificateBytes(cert.Certificate); err != nil {
+		return err
 	}
 
-	return ssh.MarshalAuthorizedKey(key.PublicKey()), nil
-}
-
-func (c *loginCommand) hasPrivateKey() (bool, error) {
-	info, err := os.Stat(c.keyPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-
-		return false, err
+	// finish here if skip option was provided
+	if c.skipAgent {
+		return nil
 	}
 
-	if info.IsDir() {
-		return false, fmt.Errorf("found a directory named: %s", c.sshConfig.Name)
+	if err := c.addToAgent(); err != nil {
+		return err
 	}
 
-	return true, nil
-}
-
-func (c *loginCommand) generateKey() ([]byte, error) {
-	// set comment based on user@host if possible
-	user := "nobody"
-	host := "nowhere"
-	if u := os.Getenv("USERNAME"); u != "" {
-		user = u
-	} else if u := os.Getenv("USER"); u != "" {
-		user = u
-	}
-	if h := os.Getenv("COMPUTERNAME"); h != "" {
-		host = h
-	}
-
-	// generate ECDSA key
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	// encode to openssh format
-	privKey, err := ssh.MarshalPrivateKey(key, user+"@"+host)
-	if err != nil {
-		return nil, err
-	}
-
-	pemBytes := pem.EncodeToMemory(privKey)
-	if pemBytes == nil {
-		return nil, fmt.Errorf("could not encode key")
-	}
-
-	return pemBytes, nil
+	return nil
 }
 
 type customTransport struct {
@@ -411,7 +331,7 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 	}
 
 	// get public key
-	publicKey, err := c.getPublicKey()
+	publicKey, err := c.config.GetPublicKeyBytes()
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +347,7 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 	}
 
 	// build url
-	caCertUrl, err := url.JoinPath(c.sshConfig.CertificateAuthorityURL, "/api/v1/certificate")
+	caCertUrl, err := url.JoinPath(c.config.Ssh.CertificateAuthorityURL, "/api/v1/certificate")
 	if err != nil {
 		return nil, err
 	}
@@ -456,12 +376,22 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 }
 
 func (c *loginCommand) addToAgent() error {
-	cert, err := loadcert(c.keyPath + "-cert.pub")
+	keyBytes, err := c.config.GetPrivateKeyBytes()
 	if err != nil {
 		return err
 	}
 
-	key, err := loadKey(c.keyPath)
+	key, err := parseKey(keyBytes)
+	if err != nil {
+		return err
+	}
+
+	certBytes, err := c.config.GetCertificateBytes()
+	if err != nil {
+		return err
+	}
+
+	cert, err := parseCert(certBytes)
 	if err != nil {
 		return err
 	}
@@ -478,12 +408,23 @@ func (c *loginCommand) addToAgent() error {
 	})
 }
 
-func loadKey(name string) (*ecdsa.PrivateKey, error) {
-	pemBytes, err := os.ReadFile(name)
+func parseCert(certBytes []byte) (*ssh.Certificate, error) {
+	// Parse the certificate.
+	parsedKey, _, _, _, err := ssh.ParseAuthorizedKey(certBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read private key file %q: %w", name, err)
+		return nil, fmt.Errorf("failed to parse SSH public key/certificate: %w", err)
 	}
 
+	// Type assert to *ssh.Certificate. If it's not a certificate, this will fail.
+	cert, ok := parsedKey.(*ssh.Certificate)
+	if !ok {
+		return nil, fmt.Errorf("the provided key is not a SSH certificate, it is a %T", parsedKey)
+	}
+
+	return cert, nil
+}
+
+func parseKey(pemBytes []byte) (*ecdsa.PrivateKey, error) {
 	privateKey, err := ssh.ParseRawPrivateKey(pemBytes)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse private key file: %w", err)
@@ -491,39 +432,8 @@ func loadKey(name string) (*ecdsa.PrivateKey, error) {
 
 	ecdsaKey, ok := privateKey.(*ecdsa.PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("private key from %q is not an ECDSA key; its type is %T", name, privateKey)
+		return nil, fmt.Errorf("private key is not an ECDSA key; its type is %T", privateKey)
 	}
 
 	return ecdsaKey, nil
-}
-
-func loadpubkey(name string) (ssh.PublicKey, string, error) {
-	// Read the content of the file
-	keyBytes, err := os.ReadFile(name)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to read SSH key/certificate file %q: %w", name, err)
-	}
-
-	// Parse the certificate.
-	parsedKey, comment, _, _, err := ssh.ParseAuthorizedKey(keyBytes)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to parse SSH public key/certificate from %q: %w", name, err)
-	}
-
-	return parsedKey, comment, nil
-}
-
-func loadcert(name string) (*ssh.Certificate, error) {
-	parsedKey, _, err := loadpubkey(name)
-	if err != nil {
-		return nil, err
-	}
-
-	// Type assert to *ssh.Certificate. If it's not a certificate, this will fail.
-	cert, ok := parsedKey.(*ssh.Certificate)
-	if !ok {
-		return nil, fmt.Errorf("the provided key in %q is not an SSH certificate, it is a %T", name, parsedKey)
-	}
-
-	return cert, nil
 }

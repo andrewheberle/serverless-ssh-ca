@@ -19,7 +19,7 @@ export const verifyJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async (re
 
         // verify jwt against JWKS
         const JWKS = createRemoteJWKSet(new URL(env.JWT_JWKS_URL))
-        const { payload } = await jwtVerify<CertificateRequestJWTPayload>(jwt, JWKS, { audience: env.JWT_AUD, algorithms: env.JWT_ALGORITHMS })
+        const { payload } = await jwtVerify<CertificateRequestJWTPayload>(jwt, JWKS, { issuer: env.JWT_ISSUER, algorithms: env.JWT_ALGORITHMS })
 
         // add info to request
         request.email = payload.email
