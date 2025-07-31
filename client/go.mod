@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/sessions v1.4.0
 	github.com/openpubkey/openpubkey v0.17.0
 	golang.org/x/crypto v0.36.0
-	golang.org/x/oauth2 v0.28.0
+	golang.org/x/oauth2 v0.30.0
 	golang.zx2c4.com/wireguard/windows v0.5.3
 	sigs.k8s.io/yaml v1.6.0
 )
