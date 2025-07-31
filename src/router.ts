@@ -9,4 +9,3 @@ export const router = IttyRouter<IRequest, CFArgs>()
 router
     .all("/api/v1/*", apiv1.fetch)
     .all("*", () => error(404))
-
