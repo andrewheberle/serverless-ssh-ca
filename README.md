@@ -59,7 +59,6 @@ If a refresh token is available, the process looks like this when running `ssh-c
 
 ```mermaid
 sequenceDiagram
-    Note over IdP: External Service
     Client->>IdP: Request authentication token
     activate IdP
     IdP-->>Client: Token returned
