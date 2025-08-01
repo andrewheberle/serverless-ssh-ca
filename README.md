@@ -6,10 +6,10 @@ to provide signed certificates for SSH access running on Cloudflare Workers.
 ## Architecture
 
 The solutions comprises of the CA running as a Worker, a Go based client and 
-an external OIDC IdP.
+an external OIDC IdP (this not provided as part of this solution).
 
 The IdP may be any OIDC compatible service that returns a JWT with at least
-an `email` claim in the OIDC identity token, however at this time only
+an `email` claim in the OIDC access token, however at this time only
 Cloudflare Access has been tested.
 
 The flow to obtain a certificate is as follows:
