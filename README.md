@@ -6,10 +6,10 @@ to provide signed certificates for SSH access running on Cloudflare Workers.
 ## Architecture
 
 The solutions comprises of the CA running as a Worker, a Go based client and 
-an external OIDC IdP.
+an external OIDC IdP (this not provided as part of this solution).
 
 The IdP may be any OIDC compatible service that returns a JWT with at least
-an `email` claim in the OIDC identity token, however at this time only
+an `email` claim in the OIDC access token, however at this time only
 Cloudflare Access has been tested.
 
 The flow to obtain a certificate is as follows:
@@ -25,6 +25,54 @@ The flow to obtain a certificate is as follows:
    `/api/v1/certificate` endpoint
 6. The CA verifies the incoming JWT and assuming it is valid and verified, will respond with a signed certificate based on the provided public key
 7. The client saves the certificate and adds the SSH private key and certificate to the local SSH Agent.
+
+This flow is shown below once the user executes `ssh-ca-agent login`:
+
+```mermaid
+sequenceDiagram
+    User->>Client: GET /auth/login
+    activate Client
+    Client-->>User: Redirect to IdP
+    deactivate Client
+    activate User
+    User->>IdP: OIDC authentication flow
+    deactivate User
+    activate IdP
+    IdP-->>User: Redirect to Client
+    deactivate IdP
+    activate User
+    User->>Client: Completes OIDC redirect
+    deactivate User
+    activate Client
+    Client-->>User: Auth flow completed
+    deactivate Client
+    Client->>CA: POST /api/v1/certificate
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>SSH Agent: Add key and certificate to Agent
+    deactivate Client
+```
+
+If a refresh token is available, the process looks like this when running `ssh-ca-client login`:
+
+```mermaid
+sequenceDiagram
+    Client->>IdP: Request authentication token
+    activate IdP
+    IdP-->>Client: Token returned
+    deactivate IdP
+    Client->>CA: POST /api/v1/certificate
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>SSH Agent: Add key and certificate to Agent
+    deactivate Client
+```
+
+If the process to request a new authentication token fails using the refresh token, the standard authentication process is followed which requires user interaction.
 
 ## Deployment
 
