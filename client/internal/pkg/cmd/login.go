@@ -49,6 +49,7 @@ type loginCommand struct {
 type certificateSignerPayload struct {
 	Lifetime  time.Duration `json:"lifetime"`
 	PublicKey []byte        `json:"public_key"`
+	Identity  string        `json:"identity,omitempty"`
 }
 
 type CertificateSignerResponse struct {
@@ -254,9 +255,11 @@ func (c *loginCommand) callbackHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *loginCommand) doLogin(token *oauth2.Token) error {
+	// extract id token
+	rawIDToken, _ := token.Extra("id_token").(string)
+
 	// show tokens now
 	if c.showTokens {
-		rawIDToken, _ := token.Extra("id_token").(string)
 		slog.Info("the following tokens were received",
 			"id_token", rawIDToken,
 			"access_token", token.AccessToken,
@@ -273,7 +276,7 @@ func (c *loginCommand) doLogin(token *oauth2.Token) error {
 		}
 	}
 
-	cert, err := c.doSigningRequest(token.AccessToken)
+	cert, err := c.doSigningRequest(token.AccessToken, rawIDToken)
 	if err != nil {
 		return err
 	}
@@ -321,12 +324,12 @@ func (t *customTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerResponse, error) {
+func (c *loginCommand) doSigningRequest(access, id string) (*CertificateSignerResponse, error) {
 	client := &http.Client{
 		Timeout: time.Second * 3,
 		Transport: &customTransport{
 			Headers: map[string]string{
-				"Authorization": "Bearer " + token,
+				"Authorization": "Bearer " + access,
 			},
 		},
 	}
@@ -343,6 +346,7 @@ func (c *loginCommand) doSigningRequest(token string) (*CertificateSignerRespons
 	if err := enc.Encode(certificateSignerPayload{
 		PublicKey: publicKey,
 		Lifetime:  time.Duration(c.lifetime.Seconds()),
+		Identity:  id,
 	}); err != nil {
 		return nil, err
 	}
