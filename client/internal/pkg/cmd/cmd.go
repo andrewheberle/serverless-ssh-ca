@@ -13,7 +13,6 @@ import (
 
 type rootCommand struct {
 	configFile string
-	listenPort int
 
 	config *config.ClientConfig
 
@@ -34,7 +33,6 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ".serverless-ssh-ca", "config.yml"), "Path to configuration file")
-	cmd.PersistentFlags().IntVarP(&c.listenPort, "port", "p", 3000, "Listen port for OIDC auth flow")
 
 	return nil
 }
@@ -56,14 +54,17 @@ func Execute(ctx context.Context, args []string) error {
 		Command: simplecommand.New("ssh-ca-client", "A client for a serverless SSH CA"),
 	}
 	rootCmd.SubCommands = []simplecobra.Commander{
-		&loginCommand{
-			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
-		},
 		&generateCommand{
 			Command: simplecommand.New("generate", "Generate a SSH private key"),
 		},
+		&loginCommand{
+			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
+		},
 		&showCommand{
 			Command: simplecommand.New("show", "Show existing private/public key"),
+		},
+		&trayCommand{
+			Command: simplecommand.New("tray", "Start and run in the system tray"),
 		},
 		&versionCommand{
 			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client"),
