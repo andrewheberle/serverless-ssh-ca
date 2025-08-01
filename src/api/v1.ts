@@ -1,9 +1,10 @@
-import { error, IRequest, IttyRouter, StatusError, text } from "itty-router";
+import { IRequest, IttyRouter, StatusError, text } from "itty-router";
 import { CFArgs } from "../router";
 import { parsePrivateKey } from "sshpk";
-import { verifyJWT } from "../verify";
-import { CertificateSignerPayload, CertificateSignerResponse } from "../types";
-import { createSignedCertificate } from "../certificate";
+import { withValidJWT } from "../verify";
+import { CertificateSignerResponse } from "../types";
+import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate";
+import { withPayload } from "../payload";
 
 export const router = IttyRouter<IRequest, CFArgs>({ base: '/api/v1' })
 
@@ -20,20 +21,26 @@ router
             throw new StatusError(503)
         }
     })
-    .post("/certificate", verifyJWT, async (request, env, ctx) => {
-        if (request.email === undefined) {
-            return error(400)
-        }
-
+    .post("/certificate", withValidJWT, withPayload, async (request, env, ctx) => {
+        console.log(`Handling request for ${request.email}`)
         try {
-            const payload = await request.json<CertificateSignerPayload>()
-            const certificate = await createSignedCertificate(env, request.email.split("@")[0], payload, request.principals)
+            const opts: CreateCertificateOptions = {
+                lifetime: request.lifetime,
+                principals: request.principals,
+                extensions: request.extensions
+            }
+            const certificate = await createSignedCertificate(request.email.split("@")[0], request.public_key, opts)
             const response: CertificateSignerResponse = {
                 certificate: btoa(certificate.toString("openssh"))
             }
 
             return response
         } catch (err) {
+            if (err instanceof CertificateExtraExtensionsError) {
+                console.warn(err)
+                throw new StatusError(400)
+            }
+
             console.log(err)
             throw new StatusError(503)
         }

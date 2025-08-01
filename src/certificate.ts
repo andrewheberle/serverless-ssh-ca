@@ -1,14 +1,37 @@
 import { seconds } from "itty-time"
-import { Certificate, createCertificate, identityForUser, identityFromDN, parseKey, parsePrivateKey } from "sshpk"
-import { CertificateSignerPayload } from "./types"
+import { Certificate, createCertificate, identityForUser, identityFromDN, Key, parseKey, parsePrivateKey } from "sshpk"
+import { SSHExtension } from "./types"
+import { env } from "cloudflare:workers"
 
-export async function createSignedCertificate(env: Env, id: string, payload: CertificateSignerPayload, principals?: string[]): Promise<Certificate> {
+export type CreateCertificateOptions = {
+    lifetime?: number
+    principals?: string[]
+    extensions?: typeof env.SSH_CERTIFICATE_EXTENSIONS
+}
+
+const DefaultCreateCertificateOptions: CreateCertificateOptions = {
+    lifetime: seconds(env.SSH_CERTIFICATE_LIFETIME),
+    principals: [],
+    extensions: env.SSH_CERTIFICATE_EXTENSIONS
+}
+
+export class CertificateExtraExtensionsError extends Error {
+    constructor(message: string) {
+    super(message)
+    this.name = "CertificateExtraExtensionsError"
+
+    // This is necessary for proper stack trace in TypeScript
+    Object.setPrototypeOf(this, CertificateExtraExtensionsError.prototype)
+  }
+} 
+
+export async function createSignedCertificate(id: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
     // add identities
     const identity = env.SSH_CERTIFICATE_INCLUDE_SELF
         ? [identityForUser(id)]
         : []
-    if (principals !== undefined) {
-        for (const p of principals) {
+    if (options.principals !== undefined) {
+        for (const p of options.principals) {
             identity.push(identityForUser(p))
         }
     }
@@ -16,13 +39,12 @@ export async function createSignedCertificate(env: Env, id: string, payload: Cer
         identity.push(identityForUser(p))
     }
 
-    // grab public key from payload and private key from secret store
-    const pub = parseKey(atob(payload.public_key))
+    // grab private key from secret store
     const key = parsePrivateKey(await env.PRIVATE_KEY.get())
 
-    // lifetime is the smaller of what was provided in the payload or the default
-    const lifetime = payload.lifetime !== undefined
-        ? Math.min(payload.lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
+    // lifetime is the smaller of what was provided in the options or the default
+    const lifetime = options.lifetime !== undefined
+        ? Math.min(options.lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
         : seconds(env.SSH_CERTIFICATE_LIFETIME)
 
     // generate value for serial of certificate
@@ -34,18 +56,35 @@ export async function createSignedCertificate(env: Env, id: string, payload: Cer
     const issuer = identityFromDN(env.ISSUER_DN)
 
     // create certificate
-    const certificate = createCertificate(identity, pub, issuer, key, { lifetime: lifetime, serial: serial })
+    const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
 
     // add usage extensions
-    const extensions = (payload.extensions !== undefined
-        ? payload.extensions
-        : env.SSH_CERTIFICATE_EXTENSIONS).map((ext) => {
-        return {
-            critical: false,
-            name: ext,
-            data: Buffer.alloc(0)
+    const extensions: SSHExtension[] = []
+    if (options.extensions !== undefined) {
+        // if extensions are provided in request, ensure they do not include extra extensions beyond the defaults
+        for (const ext of options.extensions) {
+            if (!env.SSH_CERTIFICATE_EXTENSIONS.includes(ext)) {
+                throw new CertificateExtraExtensionsError(`${ext} is not allowed`)
+            }
+
+            // add to list of allowed extensions
+            extensions.push({
+                critical: false,
+                name: ext,
+                data: Buffer.alloc(0)
+            })
         }
-    })
+    } else {
+        env.SSH_CERTIFICATE_EXTENSIONS.forEach((ext: string) => {
+            extensions.push({
+                critical: false,
+                name: ext,
+                data: Buffer.alloc(0)
+            })
+        })
+
+    }
+
     if (certificate.signatures.openssh !== undefined) {
         certificate.signatures = {
             openssh: {
