@@ -23,7 +23,7 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
 
             // warn if both were undefined
             if (identity.payload.sub === undefined && request.sub === undefined) {
-                console.warn("sub claim was missing on tokens")
+                console.warn("The sub claim was missing on tokens")
             }
         }
 
@@ -37,10 +37,10 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
         request.extensions = payload.extensions
     } catch (err) {
         if (err instanceof JWSInvalid) {
-            console.warn("the identity token was invalid")
+            console.warn("The identity token was invalid")
             throw new StatusError(400)
         } else if (err instanceof JWTInvalid) {
-            console.warn("the identity token failed verification")
+            console.warn("The identity token failed verification")
             throw new StatusError(401)
         } else if (err instanceof StatusError) {
             throw err
