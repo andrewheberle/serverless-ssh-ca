@@ -13,7 +13,6 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/openpubkey/openpubkey v0.17.0
-	github.com/qmuntal/stateless v1.7.2
 	github.com/sergeymakinen/go-ico v1.0.0-beta.0
 	golang.org/x/crypto v0.40.0
 	golang.org/x/oauth2 v0.30.0

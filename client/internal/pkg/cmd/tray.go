@@ -4,6 +4,9 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
@@ -20,8 +23,11 @@ type trayCommand struct {
 	// command line args
 	lifetime   time.Duration
 	listenAddr string
+	logFile    string
 
-	app *tray.Application
+	app    *tray.Application
+	logger *slog.Logger
+	log    *os.File
 
 	*simplecommand.Command
 }
@@ -29,9 +35,15 @@ type trayCommand struct {
 func (c *trayCommand) Init(cd *simplecobra.Commandeer) error {
 	c.Command.Init(cd)
 
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
 	cmd := cd.CobraCommand
 	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
+	cmd.Flags().StringVar(&c.logFile, "log", filepath.Join(home, configDirName, "tray.log"), "Path to log file")
 
 	return nil
 }
@@ -58,11 +70,28 @@ func (c *trayCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	}
 	c.app = app
 
+	// set up logger
+	if c.logFile != "" {
+		f, err := os.OpenFile(c.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return err
+		}
+		c.log = f
+		c.logger = slog.New(slog.NewTextHandler(c.log, &slog.HandlerOptions{}))
+		slog.Info("logging to log file", "file", c.logFile)
+	} else {
+		// otherwise log to stdout
+		c.logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
+	}
+
 	return nil
 }
 
 func (c *trayCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
-	c.app.Run()
+	// make sure to close log file
+	defer c.log.Close()
+
+	c.app.RunLogged(c.logger)
 
 	return nil
 }

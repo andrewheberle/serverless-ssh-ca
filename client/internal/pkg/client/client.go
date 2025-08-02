@@ -48,6 +48,7 @@ type LoginHandler struct {
 	lifetime     time.Duration
 	redirectURL  *url.URL
 	done         chan error
+	logger       *slog.Logger
 }
 
 const (
@@ -97,6 +98,7 @@ func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, er
 		},
 		redirectURL: redirectURL,
 		done:        make(chan error),
+		logger:      slog.Default(),
 	}
 
 	// set from options
@@ -212,7 +214,7 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 			// shut down
 			lh.done <- lh.srv.Shutdown(ctx)
-			slog.Info("shut down")
+			lh.logger.Info("shut down")
 		}()
 	}()
 
@@ -224,7 +226,7 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	codeVerifier, ok := session.Values["code_verifier"].(string)
 	if !ok {
 		http.Error(w, "Missing code_verifier in session", http.StatusBadRequest)
-		slog.Error("Missing code_verifier in session")
+		lh.logger.Error("Missing code_verifier in session")
 		return
 	}
 
@@ -236,26 +238,26 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		http.Error(w, "Token exchange failed", http.StatusInternalServerError)
-		slog.Error("Token exchange failed", "error", err)
+		lh.logger.Error("Token exchange failed", "error", err)
 		return
 	}
 
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
 		http.Error(w, "No id_token found", http.StatusInternalServerError)
-		slog.Error("No id_token found")
+		lh.logger.Error("No id_token found")
 		return
 	}
 
 	if _, err := lh.verifier.Verify(ctx, rawIDToken); err != nil {
 		http.Error(w, "Failed to verify ID Token", http.StatusInternalServerError)
-		slog.Error("Failed to verify ID Token", "error", err)
+		lh.logger.Error("Failed to verify ID Token", "error", err)
 		return
 	}
 
 	// Signal complete
 	w.Write([]byte("You may now close this window"))
-	slog.Info("completed auth flow")
+	lh.logger.Info("completed auth flow")
 
 	// do this in a goroutine so our request returns
 	go lh.doLogin(token)
@@ -267,7 +269,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 
 	// show tokens now
 	if lh.showTokens {
-		slog.Info("the following tokens were received",
+		lh.logger.Info("the following tokens were received",
 			"id_token", rawIDToken,
 			"access_token", token.AccessToken,
 			"refresh_token", token.RefreshToken,
@@ -277,9 +279,9 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 	// if we got a refresh token then save it
 	if token.RefreshToken != "" {
 		if err := lh.config.SetRefreshToken(token.RefreshToken); err != nil {
-			slog.Warn("could not save refresh token", "error", err)
+			lh.logger.Warn("could not save refresh token", "error", err)
 		} else {
-			slog.Info("saved the provided refresh token for subsequent renewals")
+			lh.logger.Info("saved the provided refresh token for subsequent renewals")
 		}
 	}
 
@@ -431,7 +433,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	}
 
 	// do POST
-	slog.Info("sending request to CA", "url", caCertUrl)
+	lh.logger.Info("sending request to CA", "url", caCertUrl)
 	res, err := client.Post(caCertUrl, "application/json", buf)
 	if err != nil {
 		return nil, err
@@ -463,25 +465,25 @@ func (lh *LoginHandler) ExecuteLoginWithContext(ctx context.Context, addr string
 
 func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
 	// try refresh token
-	slog.Info("checking if login can be done using a refresh token")
+	lh.logger.Info("checking if login can be done using a refresh token")
 	if err := lh.Refresh(); err == nil {
-		slog.Info("sucessfully renewed certificate using refresh token")
+		lh.logger.Info("sucessfully renewed certificate using refresh token")
 		return nil
 	} else {
-		slog.Error("could not renew auth token using refresh token", "error", err)
+		lh.logger.Error("could not renew auth token using refresh token", "error", err)
 	}
 
 	// start web server now
-	slog.Info("starting web server", "address", addr)
+	lh.logger.Info("starting web server", "address", addr)
 	lh.Start(addr)
 
 	// at this point do interactive login flow
 	loginUrl := fmt.Sprintf("http://%s/auth/login", addr)
 	if err := util.OpenUrl(loginUrl); err != nil {
-		slog.Error("could not open browser, please visit URL manually", "url", loginUrl)
+		lh.logger.Error("could not open browser, please visit URL manually", "url", loginUrl)
 	}
 
-	slog.Info("starting interactive login flow", "url", loginUrl)
+	lh.logger.Info("starting interactive login flow", "url", loginUrl)
 
 	// wait here until done
 	if err := lh.Wait(ctx); err != nil {
@@ -500,6 +502,7 @@ func (lh *LoginHandler) HasCertificate() bool {
 }
 
 func (lh *LoginHandler) CertificateValid() bool {
+	//
 	// get cert bytes, error means invalid
 	certBytes, err := lh.config.GetCertificateBytes()
 	if err != nil {
@@ -514,4 +517,23 @@ func (lh *LoginHandler) CertificateValid() bool {
 
 	// make sure not expired
 	return time.Now().Unix() < int64(cert.ValidBefore)
+}
+
+func (lh *LoginHandler) CerificateExpiry() time.Time {
+	certBytes, err := lh.config.GetCertificateBytes()
+	if err != nil {
+		return time.Time{}
+	}
+
+	// parse the cert, errors mean invalid
+	cert, err := sshcert.ParseCert(certBytes)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return time.Unix(int64(cert.ValidBefore), 0)
+}
+
+func (lh *LoginHandler) SetLogger(logger *slog.Logger) {
+	lh.logger = logger
 }
