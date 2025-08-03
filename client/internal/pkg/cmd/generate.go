@@ -2,17 +2,13 @@ package cmd
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"encoding/pem"
 	"fmt"
 	"os"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/sshkey"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
-	"golang.org/x/crypto/ssh"
 )
 
 type generateCommand struct {
@@ -48,19 +44,6 @@ func (c *generateCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, a
 		return fmt.Errorf("not overwriting existing private key without force option set")
 	}
 
-	pemBytes, err := generateKey()
-	if err != nil {
-		return err
-	}
-
-	if err := c.config.SetPrivateKeyBytes(pemBytes); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func generateKey() ([]byte, error) {
 	// set comment based on user@host if possible
 	user := "nobody"
 	host := "nowhere"
@@ -73,22 +56,14 @@ func generateKey() ([]byte, error) {
 		host = h
 	}
 
-	// generate ECDSA key
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pemBytes, err := sshkey.GenerateKey(user + "@" + host)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// encode to openssh format
-	privKey, err := ssh.MarshalPrivateKey(key, user+"@"+host)
-	if err != nil {
-		return nil, err
+	if err := c.config.SetPrivateKeyBytes(pemBytes); err != nil {
+		return err
 	}
 
-	pemBytes := pem.EncodeToMemory(privKey)
-	if pemBytes == nil {
-		return nil, fmt.Errorf("could not encode key")
-	}
-
-	return pemBytes, nil
+	return nil
 }

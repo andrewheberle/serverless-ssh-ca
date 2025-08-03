@@ -91,14 +91,21 @@ func (c *ClientConfig) Save() error {
 }
 
 func (c *ClientConfig) HasPrivateKey() bool {
-	return c.Ssh.PrivateKey != nil
+	// get key
+	pemBytes, err := c.GetPrivateKeyBytes()
+	if err != nil {
+		return false
+	}
+
+	// parse key
+	if _, err := ssh.ParsePrivateKey(pemBytes); err != nil {
+		return false
+	}
+
+	return true
 }
 
 func (c *ClientConfig) GetPrivateKeyBytes() ([]byte, error) {
-	if !c.HasPrivateKey() {
-		return nil, ErrNoPrivateKey
-	}
-
 	// unprotect key
 	pemBytes, err := protect.Decrypt(c.Ssh.PrivateKey, "key")
 	if err != nil {
@@ -114,7 +121,9 @@ func (c *ClientConfig) SetPrivateKeyBytes(pemBytes []byte) error {
 		return err
 	}
 
+	// set key and also clear certificate
 	c.Ssh.PrivateKey = protected
+	c.Ssh.Certificate = nil
 
 	// save config
 	if err := c.Save(); err != nil {

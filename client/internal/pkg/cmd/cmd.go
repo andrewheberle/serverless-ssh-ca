@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -13,7 +12,6 @@ import (
 
 type rootCommand struct {
 	configFile string
-	listenPort int
 
 	config *config.ClientConfig
 
@@ -24,6 +22,8 @@ var (
 	ErrNoPrivateKey = errors.New("no private key found, please run \"ssh-ca-client generate\"")
 )
 
+const ConfigDirName = ".serverless-ssh-ca"
+
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	c.Command.Init(cd)
 
@@ -33,8 +33,7 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ".serverless-ssh-ca", "config.yml"), "Path to configuration file")
-	cmd.PersistentFlags().IntVarP(&c.listenPort, "port", "p", 3000, "Listen port for OIDC auth flow")
+	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
 
 	return nil
 }
@@ -42,6 +41,12 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	c.Command.PreRun(this, runner)
 
+	// make sure config dir exists
+	if err := os.MkdirAll(filepath.Dir(c.configFile), 0755); err != nil {
+		return err
+	}
+
+	// load config
 	config, err := config.LoadConfig(c.configFile)
 	if err != nil {
 		return err
@@ -51,35 +56,4 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	return nil
 }
 
-func Execute(ctx context.Context, args []string) error {
-	rootCmd := &rootCommand{
-		Command: simplecommand.New("ssh-ca-client", "A client for a serverless SSH CA"),
-	}
-	rootCmd.SubCommands = []simplecobra.Commander{
-		&loginCommand{
-			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
-		},
-		&generateCommand{
-			Command: simplecommand.New("generate", "Generate a SSH private key"),
-		},
-		&showCommand{
-			Command: simplecommand.New("show", "Show existing private/public key"),
-		},
-		&versionCommand{
-			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client"),
-		},
-	}
-
-	// Set up simplecobra
-	x, err := simplecobra.New(rootCmd)
-	if err != nil {
-		return err
-	}
-
-	// run command with the provided args
-	if _, err := x.Execute(context.Background(), args); err != nil {
-		return err
-	}
-
-	return nil
-}
+// Execute function is in cli.go or tray.go depending on build tags
