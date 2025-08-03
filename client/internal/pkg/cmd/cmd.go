@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -23,7 +22,7 @@ var (
 	ErrNoPrivateKey = errors.New("no private key found, please run \"ssh-ca-client generate\"")
 )
 
-const configDirName = ".serverless-ssh-ca"
+const ConfigDirName = ".serverless-ssh-ca"
 
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	c.Command.Init(cd)
@@ -34,7 +33,7 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, configDirName, "config.yml"), "Path to configuration file")
+	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
 
 	return nil
 }
@@ -51,38 +50,4 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	return nil
 }
 
-func Execute(ctx context.Context, args []string) error {
-	rootCmd := &rootCommand{
-		Command: simplecommand.New("ssh-ca-client", "A client for a serverless SSH CA"),
-	}
-	rootCmd.SubCommands = []simplecobra.Commander{
-		&generateCommand{
-			Command: simplecommand.New("generate", "Generate a SSH private key"),
-		},
-		&loginCommand{
-			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
-		},
-		&showCommand{
-			Command: simplecommand.New("show", "Show existing private/public key"),
-		},
-		&trayCommand{
-			Command: simplecommand.New("tray", "Start and run in the system tray"),
-		},
-		&versionCommand{
-			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client"),
-		},
-	}
-
-	// Set up simplecobra
-	x, err := simplecobra.New(rootCmd)
-	if err != nil {
-		return err
-	}
-
-	// run command with the provided args
-	if _, err := x.Execute(context.Background(), args); err != nil {
-		return err
-	}
-
-	return nil
-}
+// Execute function is in cli.go or trag.go depending on build tags

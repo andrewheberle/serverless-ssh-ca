@@ -1,9 +1,10 @@
+//go:build tray
+
 package cmd
 
 import (
 	"context"
 	"embed"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ type trayCommand struct {
 	lifetime   time.Duration
 	listenAddr string
 	logFile    string
+	configFile string
 
 	app    *tray.Application
 	logger *slog.Logger
@@ -43,7 +45,8 @@ func (c *trayCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd := cd.CobraCommand
 	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
-	cmd.Flags().StringVar(&c.logFile, "log", filepath.Join(home, configDirName, "tray.log"), "Path to log file")
+	cmd.Flags().StringVar(&c.logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
+	cmd.Flags().StringVar(&c.configFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
 
 	return nil
 }
@@ -51,13 +54,8 @@ func (c *trayCommand) Init(cd *simplecobra.Commandeer) error {
 func (c *trayCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	c.Command.PreRun(this, runner)
 
-	root, ok := this.Root.Command.(*rootCommand)
-	if !ok {
-		return fmt.Errorf("problem accessing root command")
-	}
-
 	// set up login client
-	lh, err := client.NewLoginHandler(root.configFile, client.WithLifetime(c.lifetime))
+	lh, err := client.NewLoginHandler(c.configFile, client.WithLifetime(c.lifetime))
 	if err != nil {
 		return err
 	}
@@ -80,8 +78,8 @@ func (c *trayCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		c.logger = slog.New(slog.NewTextHandler(c.log, &slog.HandlerOptions{}))
 		slog.Info("logging to log file", "file", c.logFile)
 	} else {
-		// otherwise log to stdout
-		c.logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))
+		// otherwise no logging
+		c.logger = slog.New(slog.DiscardHandler)
 	}
 
 	return nil
@@ -92,6 +90,25 @@ func (c *trayCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args 
 	defer c.log.Close()
 
 	c.app.RunLogged(c.logger)
+
+	return nil
+}
+
+func Execute(ctx context.Context, args []string) error {
+	rootCmd := &trayCommand{
+		Command: simplecommand.New("ssh-ca-client", "A GUI based client for a serverless SSH CA"),
+	}
+
+	// Set up simplecobra
+	x, err := simplecobra.New(rootCmd)
+	if err != nil {
+		return err
+	}
+
+	// run command with the provided args
+	if _, err := x.Execute(context.Background(), args); err != nil {
+		return err
+	}
 
 	return nil
 }

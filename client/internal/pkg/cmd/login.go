@@ -75,6 +75,12 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 }
 
 func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
+	// try refresh first
+	if err := c.client.Refresh(); err == nil {
+		return nil
+	}
+
+	// otherwise do interactive login
 	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
 

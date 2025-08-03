@@ -13,7 +13,6 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/openpubkey/openpubkey v0.17.0
-	github.com/sergeymakinen/go-ico v1.0.0-beta.0
 	golang.org/x/crypto v0.40.0
 	golang.org/x/oauth2 v0.30.0
 	golang.zx2c4.com/wireguard/windows v0.5.3
@@ -45,6 +44,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sergeymakinen/go-bmp v1.0.0 // indirect
+	github.com/sergeymakinen/go-ico v1.0.0-beta.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect

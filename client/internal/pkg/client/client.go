@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/sshkey"
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/sshcert"
 	"github.com/andrewheberle/sshagent"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
@@ -464,15 +464,6 @@ func (lh *LoginHandler) ExecuteLoginWithContext(ctx context.Context, addr string
 }
 
 func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
-	// try refresh token
-	lh.logger.Info("checking if login can be done using a refresh token")
-	if err := lh.Refresh(); err == nil {
-		lh.logger.Info("sucessfully renewed certificate using refresh token")
-		return nil
-	} else {
-		lh.logger.Error("could not renew auth token using refresh token", "error", err)
-	}
-
 	// start web server now
 	lh.logger.Info("starting web server", "address", addr)
 	lh.Start(addr)
