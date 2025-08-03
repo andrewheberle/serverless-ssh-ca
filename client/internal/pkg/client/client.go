@@ -38,17 +38,18 @@ type CertificateSignerResponse struct {
 }
 
 type LoginHandler struct {
-	showTokens   bool
-	skipAgent    bool
-	srv          *http.Server
-	verifier     *oidc.IDTokenVerifier
-	oauth2Config oauth2.Config
-	store        *sessions.CookieStore
-	config       *config.ClientConfig
-	lifetime     time.Duration
-	redirectURL  *url.URL
-	done         chan error
-	logger       *slog.Logger
+	showTokens      bool
+	skipAgent       bool
+	srv             *http.Server
+	verifier        *oidc.IDTokenVerifier
+	oauth2Config    oauth2.Config
+	store           *sessions.CookieStore
+	config          *config.ClientConfig
+	lifetime        time.Duration
+	redirectURL     *url.URL
+	done            chan error
+	logger          *slog.Logger
+	allowWithoutKey bool
 }
 
 const (
@@ -65,11 +66,6 @@ func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, er
 	config, err := config.LoadConfig(name)
 	if err != nil {
 		return nil, err
-	}
-
-	// check we have a key
-	if !config.HasPrivateKey() {
-		return nil, ErrNoPrivateKey
 	}
 
 	// set up oidc provider
@@ -104,6 +100,11 @@ func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, er
 	// set from options
 	for _, o := range opts {
 		o(lh)
+	}
+
+	// check we have a key and this is fatal
+	if !config.HasPrivateKey() && !lh.allowWithoutKey {
+		return nil, ErrNoPrivateKey
 	}
 
 	// set up last resort http server

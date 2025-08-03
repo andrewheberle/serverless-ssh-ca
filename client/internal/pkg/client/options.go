@@ -30,3 +30,9 @@ func WithServer(srv *http.Server) LoginHandlerOption {
 		lh.srv = srv
 	}
 }
+
+func AllowWithoutKey() LoginHandlerOption {
+	return func(lh *LoginHandler) {
+		lh.allowWithoutKey = true
+	}
+}

@@ -41,6 +41,12 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	c.Command.PreRun(this, runner)
 
+	// make sure config dir exists
+	if err := os.MkdirAll(filepath.Dir(c.configFile), 0755); err != nil {
+		return err
+	}
+
+	// load config
 	config, err := config.LoadConfig(c.configFile)
 	if err != nil {
 		return err
@@ -50,4 +56,4 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	return nil
 }
 
-// Execute function is in cli.go or trag.go depending on build tags
+// Execute function is in cli.go or tray.go depending on build tags

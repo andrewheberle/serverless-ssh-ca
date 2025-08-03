@@ -12,7 +12,7 @@
   "RT_MANIFEST": {
     "#1": {
       "0409": {
-        "description": "",
+        "description": "Client application for Serverless SSH CA",
         "minimum-os": "win7",
         "execution-level": "as invoker",
         "ui-access": false,

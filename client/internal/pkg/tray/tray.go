@@ -222,7 +222,8 @@ func (app *Application) eventloop() {
 
 		select {
 		case <-t.C:
-
+			// this is just to stop here
+			continue
 		case <-app.mRenew.ClickedCh:
 			// start by disabling menu item so we aren't overlapping
 			app.mRenew.Disable()
@@ -238,20 +239,20 @@ func (app *Application) eventloop() {
 			}
 
 			app.notify("Certificate Issued", "A new certificate was issued and added to the local ssh-agent", "ok")
-			continue
+			app.state = stateCertificateOK
 		case <-app.mGenerate.ClickedCh:
 			// start by disabling menu item so we aren't overlapping
 			app.mGenerate.Disable()
 
 			// do key generation
 			if err := app.generate(); err != nil {
-				app.logger.Error("could not generate certificate", "error", err)
+				app.logger.Error("could not generate private key", "error", err)
 				app.notify("Error", "The generation of a private key failed", "error")
 				continue
 			}
 
 			app.notify("Key Generated", "A private key was sucessfully generated", "ok")
-			continue
+			app.state = stateKeyOK
 		case <-app.mQuit.ClickedCh:
 			app.logger.Info("application shutting down")
 			t.Stop()

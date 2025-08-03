@@ -36,7 +36,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// run command with the provided args
-	if _, err := x.Execute(context.Background(), args); err != nil {
+	if _, err := x.Execute(ctx, args); err != nil {
 		return err
 	}
 

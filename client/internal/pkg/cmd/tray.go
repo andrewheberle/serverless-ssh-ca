@@ -8,107 +8,85 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
+	"github.com/allan-simon/go-singleinstance"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/tray"
-	"github.com/andrewheberle/simplecommand"
-	"github.com/bep/simplecobra"
 	"github.com/gen2brain/beeep"
+	"github.com/spf13/pflag"
 )
 
 //go:embed icons
 var resources embed.FS
 
-type trayCommand struct {
-	// command line args
-	lifetime   time.Duration
-	listenAddr string
-	logFile    string
-	configFile string
-
-	app    *tray.Application
-	logger *slog.Logger
-	log    *os.File
-
-	*simplecommand.Command
-}
-
-func (c *trayCommand) Init(cd *simplecobra.Commandeer) error {
-	c.Command.Init(cd)
-
+func Execute(ctx context.Context, args []string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
 
-	cmd := cd.CobraCommand
-	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
-	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
-	cmd.Flags().StringVar(&c.logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
-	cmd.Flags().StringVar(&c.configFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
+	var lifetime time.Duration
+	var listenAddr, logFile, configFile string
 
-	return nil
-}
+	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
+	pflag.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
+	pflag.StringVar(&logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
+	pflag.StringVar(&configFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
+	pflag.Parse()
 
-func (c *trayCommand) PreRun(this, runner *simplecobra.Commandeer) error {
-	c.Command.PreRun(this, runner)
+	// make sure config dir exists
+	if err := os.MkdirAll(filepath.Dir(configFile), 0755); err != nil {
+		return err
+	}
+
+	// set location to write panics
+	crash, err := os.Create(filepath.Join(filepath.Dir(logFile), "crash.log"))
+	if err != nil {
+		return err
+	}
+	defer crash.Close()
+	debug.SetCrashOutput(crash, debug.CrashOptions{})
 
 	// set up login client
-	lh, err := client.NewLoginHandler(c.configFile, client.WithLifetime(c.lifetime))
+	lh, err := client.NewLoginHandler(configFile, client.WithLifetime(lifetime), client.AllowWithoutKey())
 	if err != nil {
 		return err
 	}
 
 	// set up tray app
 	beeep.AppName = "Serverless SSH CA Client"
-	app, err := tray.New(beeep.AppName, c.listenAddr, resources, lh)
+	app, err := tray.New(beeep.AppName, listenAddr, resources, lh)
 	if err != nil {
 		return err
 	}
-	c.app = app
 
 	// set up logger
-	if c.logFile != "" {
-		f, err := os.OpenFile(c.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	var logger *slog.Logger
+	if logFile != "" {
+		log, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return err
 		}
-		c.log = f
-		c.logger = slog.New(slog.NewTextHandler(c.log, &slog.HandlerOptions{}))
-		slog.Info("logging to log file", "file", c.logFile)
+		defer log.Close()
+
+		logger = slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{}))
+		slog.Info("logging to log file", "file", logFile)
 	} else {
 		// otherwise no logging
-		c.logger = slog.New(slog.DiscardHandler)
+		logger = slog.New(slog.DiscardHandler)
 	}
 
-	return nil
-}
-
-func (c *trayCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
-	// make sure to close log file
-	defer c.log.Close()
-
-	c.app.RunLogged(c.logger)
-
-	return nil
-}
-
-func Execute(ctx context.Context, args []string) error {
-	rootCmd := &trayCommand{
-		Command: simplecommand.New("ssh-ca-client", "A GUI based client for a serverless SSH CA"),
-	}
-
-	// Set up simplecobra
-	x, err := simplecobra.New(rootCmd)
+	// make sure we are only running once
+	lockFile, err := singleinstance.CreateLockFile(filepath.Join(home, ConfigDirName, "tray.lock"))
 	if err != nil {
+		logger.Error("could not take lock", "error", err)
 		return err
 	}
+	defer lockFile.Close()
 
-	// run command with the provided args
-	if _, err := x.Execute(context.Background(), args); err != nil {
-		return err
-	}
+	app.RunLogged(logger)
 
 	return nil
 }
