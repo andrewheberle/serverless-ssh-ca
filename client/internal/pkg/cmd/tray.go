@@ -22,6 +22,7 @@ import (
 var resources embed.FS
 
 func Execute(ctx context.Context, args []string) error {
+	// find home dir
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -42,7 +43,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set location to write panics
-	crash, err := os.Create(filepath.Join(filepath.Dir(logFile), "crash.log"))
+	crash, err := os.Create(filepath.Join(home, ConfigDirName, "crash.log"))
 	if err != nil {
 		return err
 	}
