@@ -15,7 +15,7 @@ router
             const pub = key.toPublic()
             pub.comment = env.ISSUER_DN
 
-            return text(pub.toString("ssh"))
+            return text(`${pub.toString("ssh")}\n`)
         } catch (err) {
             console.log(err)
             throw new StatusError(503)

@@ -7,47 +7,38 @@
 	"name": "ssh-ca",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-07-26",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"observability": {
-		"enabled": true
-	},
-	/**
-	 * Enable custom routes
-	 */
+	"compatibility_flags": ["nodejs_compat"],
 	/* "routes": [
 		{
-			"pattern": "ca.example.com",
+			"pattern": "ssh-ca.example.com",
 			"custom_domain": true
 		}
 	],
 	"workers_dev": false, */
+	"observability": {
+		"enabled": true
+	},
 	"vars": {
 		"ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
 		"JWT_JWKS_URL": "https://idp.example.com/.well-known/jwks.json",
-		"JWT_ISSUER": "https://idp.example.com/",
-		"JWT_ALGORITHMS": [
-			"RS256"
-		],
+		"JWT_ISSUER": "https://idp.example.com",
+		"JWT_ALGORITHMS": ["RS256"],
 		"SSH_CERTIFICATE_LIFETIME": "24 hours",
-		"SSH_CERTIFICATE_PRINCIPALS": [
-			"ssh-admin"
-		],
+		"SSH_CERTIFICATE_PRINCIPALS": ["ssh-admin"],
 		"SSH_CERTIFICATE_INCLUDE_SELF": false,
 		"SSH_CERTIFICATE_EXTENSIONS": [
-			"permit-X11-forwarding",
-			"permit-agent-forwarding",
-			"permit-port-forwarding",
-			"permit-pty",
-			"permit-user-rc",
-		]
+            "permit-X11-forwarding",
+            "permit-agent-forwarding",
+            "permit-port-forwarding",
+            "permit-pty",
+            "permit-user-rc",
+        ]
 	},
 	"secrets_store_secrets": [
 		{
 			"binding": "PRIVATE_KEY",
-			"store_id": "<secret store id>",
-			"secret_name": "<secret name>"
+			"store_id": "demo",
+			"secret_name": "ssh-ca-private-key"
 		}
 	]
 }

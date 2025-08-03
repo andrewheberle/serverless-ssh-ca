@@ -1,5 +1,7 @@
 # Serverless SSH CA in Workers
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca)
+
 This repository contains a serverless Certificate Authority that can be used
 to provide signed certificates for SSH access running on Cloudflare Workers.
 
@@ -82,13 +84,7 @@ Once you have cloned this repository, firstly install the dependencies:
 npm install
 ```
 
-1. After installation copy your own `wrangler` file:
-
-```sh
-cp wrangler.jsonc.example wrangler.jsonc
-```
-
-2. Edit the variables in `wrangler.jsonc`:
+1. Edit the variables in `wrangler.jsonc`:
 
 ```jsonc
 "vars": {
@@ -117,7 +113,7 @@ cp wrangler.jsonc.example wrangler.jsonc
 },
 ```
 
-3. Add the private key for your SSH CA to your Cloudflare Secrets Store:
+2. Add the private key for your SSH CA to your Cloudflare Secrets Store:
 
 ```jsonc
 "secrets_store_secrets": [
@@ -139,13 +135,13 @@ ssh-keygen -t ecdsa -b 256 -f path/to/ca_key
 
 Other key types and sizes apart from ECDSA should work fine but are untested.
 
-4. Generate the Worker types for your deployment:
+3. Generate the Worker types for your deployment:
 
 ```sh
 npm run cf-typegen
 ```
 
-5. Deploy your Worker:
+4. Deploy your Worker:
 
 ```sh
 npm run deploy
@@ -157,23 +153,7 @@ npm run deploy
 
 TODO: Add IdP config example here
 
-A number of additional claims are supported/required in the identity token as follows:
-
-```json
-{
-    "email": "user@example.com",
-    "principals": [
-        "list",
-        "of",
-        "additional",
-        "principals"
-    ]
-}
-```
-
-The `email` claim is required and the `principals` claim is optional.
-
-Any addtional `principals` in the identity token will be added as `principals` to the issued certificate.
+The `email` claim is required in the access token JWT sent by the client.
 
 ### Client
 
@@ -188,7 +168,7 @@ oidc:
   # refresh_token: encrypted (see below) base64 encoded refresh token
 ssh:
   name: id_ssh_user
-  ca_url: https://ca.example.com/
+  ca_url: https://ssh-ca.example.com/
   # certificate: base64 encoded certificate that was issued last
   # private_key: encrypted (see below) base64 encoded ssh private key
 ```
@@ -248,7 +228,7 @@ AuthorizedPrincipalsFile /etc/ssh/principals.d/%u
 The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be retrieved as follows:
 
 ```sh
-curl https://ca.example.com/api/v1/ca | sudo tee /etc/ssh/ca.pub
+curl https://ssh-ca.example.com/api/v1/ca | sudo tee /etc/ssh/ca.pub
 ```
 
 The `/etc/ssh/principals.d` directory should contain a file corresponding to

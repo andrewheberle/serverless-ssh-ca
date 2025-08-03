@@ -1,7 +1,37 @@
 {
 	"name": "serverless-ssh-ca",
-	"version": "0.0.0",
 	"private": true,
+	"cloudflare": {
+		"bindings": {
+			"ISSUER_DN": {
+				"description": "This is the issuer name for your SSH certificates" 
+			},
+			"JWT_JWKS_URL": {
+				"description": "This is the URL for the JWKS so the CA can verify the JWT provided by the client"
+			},
+			"JWT_ISSUER": {
+				"description": "The issuer of the JWT access and identity tokens provided by the client"
+			},
+			"JWT_ALGORITHMS": {
+				"description": "The supported JWT algorithms"
+			},
+			"SSH_CERTIFICATE_LIFETIME": {
+				"description": "The lifetime of the issued SSH certificates, although the client may request a shorter duration"
+			},
+			"SSH_CERTIFICATE_PRINCIPALS": {
+				"description": "A list of additional principals to add to the SSH certificate"
+			},
+			"SSH_CERTIFICATE_INCLUDE_SELF": {
+				"description": "Whether to add the users own name as a valid principal (based on the part before the @ symbol in the JWT email claim"
+			},
+			"SSH_CERTIFICATE_EXTENSIONS": {
+				"description": "The list of SSH extensions to add to the certificate, although the client may request a smaller list"
+			},
+			"PRIVATE_KEY": {
+				"description": "The ECDSA private key to use in OpenSSH format"
+			}
+		}
+	},
 	"scripts": {
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
