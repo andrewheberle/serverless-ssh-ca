@@ -43,7 +43,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set location to write panics
-	crash, err := os.Create(filepath.Join(home, ConfigDirName, "crash.log"))
+	crash, err := os.Create(filepath.Join(filepath.Dir(configFile), "crash.log"))
 	if err != nil {
 		return err
 	}
