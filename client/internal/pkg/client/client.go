@@ -554,11 +554,3 @@ func (lh *LoginHandler) CerificateExpiry() time.Time {
 func (lh *LoginHandler) SetLogger(logger *slog.Logger) {
 	lh.logger = logger
 }
-
-func generateStateOauthCookie(w http.ResponseWriter) string {
-	b := make([]byte, 128)
-	rand.Read(b)
-	state := base64.URLEncoding.EncodeToString(b)
-
-	return state
-}
