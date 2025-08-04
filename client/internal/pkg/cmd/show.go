@@ -19,7 +19,9 @@ type showCommand struct {
 }
 
 func (c *showCommand) Init(cd *simplecobra.Commandeer) error {
-	c.Command.Init(cd)
+	if err := c.Command.Init(cd); err != nil {
+		return err
+	}
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.private, "private", false, "Display private key")
@@ -29,7 +31,9 @@ func (c *showCommand) Init(cd *simplecobra.Commandeer) error {
 }
 
 func (c *showCommand) PreRun(this, runner *simplecobra.Commandeer) error {
-	c.Command.PreRun(this, runner)
+	if err := c.Command.PreRun(this, runner); err != nil {
+		return err
+	}
 
 	root, ok := this.Root.Command.(*rootCommand)
 	if !ok {
