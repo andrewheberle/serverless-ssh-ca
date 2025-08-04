@@ -10,13 +10,11 @@ version: 2
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
-    - go generate ./...
-
+    
 builds:
   - id: cli
+    binary: ssh-ca-client-cli
     env:
       - CGO_ENABLED=0
     goarch:
@@ -26,12 +24,15 @@ builds:
       - windows
     main: ./cmd/ssh-ca-client
   - id: gui
+    binary: ssh-ca-client
     env:
       - CGO_ENABLED=0
     goarch:
       - amd64
     goos:
       - windows
+    hooks:
+      pre: go generate ./cmd/ssh-ca-client/tray.go
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui
