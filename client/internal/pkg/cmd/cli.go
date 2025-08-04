@@ -11,7 +11,7 @@ import (
 
 func Execute(ctx context.Context, args []string) error {
 	rootCmd := &rootCommand{
-		Command: simplecommand.New("ssh-ca-client", "A CLI based client for a serverless SSH CA"),
+		Command: simplecommand.New("ssh-ca-client-cli", "A CLI based client for a serverless SSH CA"),
 	}
 	rootCmd.SubCommands = []simplecobra.Commander{
 		&generateCommand{

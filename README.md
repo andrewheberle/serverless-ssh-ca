@@ -194,7 +194,7 @@ if not you may manually visit `http://localhost:3000/auth/login` to start this
 process.
 
 If provided by the OIDC IdP the refresh token will be saved for subsequent
-`ssh-ca-client login` invocations and an attempt will be maid to obtain a new
+`ssh-ca-client login` invocations and an attempt will be made to obtain a new
 auth token using the saved refresh token.
 
 #### Key, Token and Certificate Storage
@@ -245,4 +245,4 @@ ssh-admin
 
 # Attributions
 
-The icons used by the client are made by Pixel perfect from [www.flaticon.com](https://www.flaticon.com).
+The icons used by the client are made by Freepik from [www.flaticon.com](https://www.flaticon.com).

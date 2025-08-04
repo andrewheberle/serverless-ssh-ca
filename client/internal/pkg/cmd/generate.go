@@ -20,7 +20,9 @@ type generateCommand struct {
 }
 
 func (c *generateCommand) Init(cd *simplecobra.Commandeer) error {
-	c.Command.Init(cd)
+	if err := c.Command.Init(cd); err != nil {
+		return err
+	}
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.force, "force", false, "Force replacing and existing key")
@@ -29,7 +31,9 @@ func (c *generateCommand) Init(cd *simplecobra.Commandeer) error {
 }
 
 func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
-	c.Command.PreRun(this, runner)
+	if err := c.Command.PreRun(this, runner); err != nil {
+		return err
+	}
 
 	root, ok := this.Root.Command.(*rootCommand)
 	if !ok {

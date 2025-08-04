@@ -65,8 +65,11 @@ interactive authentication flow.
 
 ## As a GUI
 
-If the client is built with the `tray` build tag and `-ldflags -H=windowsgui` it can be run as a GUI application that sits in the system tray (this is quite Windows-centric at this time) and allows generation of a private key and request/renewal of certificates.
+If the client is built with the `tray` build tag and `-ldflags -H=windowsgui`
+it can be run as a GUI application that sits in the system tray (this is quite
+Windows-centric at this time) and allows generation of a private key and
+request/renewal of certificates.
 
 # Attributions
 
-The icons used by the client are made by Pixel perfect from [www.flaticon.com](https://www.flaticon.com).
+The icons used by the client are made by Freepik from [www.flaticon.com](https://www.flaticon.com).
