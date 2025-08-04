@@ -1,3 +1,5 @@
 *.exe
 *.syso
 config.yml
+# Added by goreleaser init:
+dist/
