@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -184,16 +185,23 @@ func (lh *LoginHandler) RedirectPath() string {
 }
 
 func (lh *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
+	// store codeVerifier in session
 	codeVerifier, codeChallenge := generatePKCE()
-
-	// Store codeVerifier in session
 	session, _ := lh.store.Get(r, "auth-session")
 	session.Values["code_verifier"] = codeVerifier
+
+	// generate random state string and add to session
+	b := make([]byte, 128)
+	rand.Read(b)
+	state := base64.URLEncoding.EncodeToString(b)
+	session.Values["state"] = state
+
+	// save to session
 	session.Save(r, w)
 
 	// generate redirect url for auth flow
 	authCodeURL := lh.oauth2Config.AuthCodeURL(
-		"state",
+		state,
 		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
@@ -222,8 +230,25 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	code := r.URL.Query().Get("code")
 
-	// Retrieve codeVerifier from session
+	// load session state
 	session, _ := lh.store.Get(r, "auth-session")
+
+	// get state value
+	expectedState, ok := session.Values["state"].(string)
+	if !ok {
+		http.Error(w, "Missing state in session", http.StatusBadRequest)
+		lh.logger.Error("Missing state in session")
+		return
+	}
+
+	// verify state
+	if expectedState != r.FormValue("state") {
+		http.Error(w, "State mismatch", http.StatusBadRequest)
+		lh.logger.Error("State mismatch")
+		return
+	}
+
+	// retrieve codeVerifier from session
 	codeVerifier, ok := session.Values["code_verifier"].(string)
 	if !ok {
 		http.Error(w, "Missing code_verifier in session", http.StatusBadRequest)

@@ -242,3 +242,7 @@ as the SSH user `admin` for the bearer of an issued (and valid) certificate:
 ```
 ssh-admin
 ```
+
+# Attributions
+
+The icons used by the client are made by Pixel perfect from [www.flaticon.com](https://www.flaticon.com).

@@ -62,3 +62,11 @@ a request to the CA for a SSH certificate.
 If a refresh token was provided by the OIDC IdP, this will be used initially to
 attempt a renewal of the authentication token so the process can avoid an
 interactive authentication flow.
+
+## As a GUI
+
+If the client is built with the `tray` build tag and `-ldflags -H=windowsgui` it can be run as a GUI application that sits in the system tray (this is quite Windows-centric at this time) and allows generation of a private key and request/renewal of certificates.
+
+# Attributions
+
+The icons used by the client are made by Pixel perfect from [www.flaticon.com](https://www.flaticon.com).

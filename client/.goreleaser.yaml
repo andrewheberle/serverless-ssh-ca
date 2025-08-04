@@ -1,0 +1,71 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    
+builds:
+  - id: cli
+    binary: ssh-ca-client-cli
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+    goos:
+      - linux
+      - windows
+    main: ./cmd/ssh-ca-client
+  - id: gui
+    binary: ssh-ca-client
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+    goos:
+      - windows
+    hooks:
+      pre:
+        - go install github.com/tc-hib/go-winres@v0.3.3
+        - go generate ./cmd/ssh-ca-client/tray.go
+    main: ./cmd/ssh-ca-client
+    ldflags:
+      - -H=windowsgui
+    tags:
+      - tray
+
+archives:
+  - allow_different_binary_count: true
+    formats: [tar.gz]
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+checksum:
+  name_template: 'checksums.txt'
+
+release:
+  draft: true
+  make_latest: true
