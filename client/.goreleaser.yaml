@@ -32,7 +32,9 @@ builds:
     goos:
       - windows
     hooks:
-      pre: go generate ./cmd/ssh-ca-client/tray.go
+      pre:
+        - go install github.com/tc-hib/go-winres@v0.3.3
+        - go generate ./cmd/ssh-ca-client/tray.go
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui
@@ -60,10 +62,9 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+checksum:
+  name_template: 'checksums.txt'
 
 release:
-  footer: >-
-
-    ---
-
-    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
+  draft: true
+  make_latest: true
