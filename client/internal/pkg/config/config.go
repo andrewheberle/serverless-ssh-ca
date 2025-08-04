@@ -59,7 +59,9 @@ func (c *ClientConfig) Save() error {
 			// creation failed
 			return "", err
 		}
-		defer t.Close()
+		defer func() {
+			_ = t.Close()
+		}()
 
 		// marshal yaml
 		y, err := yaml.Marshal(c)
@@ -78,7 +80,9 @@ func (c *ClientConfig) Save() error {
 
 	// ensure temp file is removed it it was created
 	if temp != "" {
-		defer os.Remove(temp)
+		defer func() {
+			_ = os.Remove(temp)
+		}()
 	}
 
 	// check save to temp was ok

@@ -192,12 +192,20 @@ func (lh *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// generate random state string and add to session
 	b := make([]byte, 128)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		http.Error(w, "Could not generate random bytes", http.StatusInternalServerError)
+		lh.logger.Error("Could not generate random bytes", "error", err)
+		return
+	}
 	state := base64.URLEncoding.EncodeToString(b)
 	session.Values["state"] = state
 
 	// save to session
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		http.Error(w, "Could not save session state", http.StatusInternalServerError)
+		lh.logger.Error("Could not save session state", "error", err)
+		return
+	}
 
 	// generate redirect url for auth flow
 	authCodeURL := lh.oauth2Config.AuthCodeURL(
@@ -282,11 +290,15 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Signal complete
-	w.Write([]byte("You may now close this window"))
+	_, _ = w.Write([]byte("You may now close this window"))
 	lh.logger.Info("completed auth flow")
 
 	// do this in a goroutine so our request returns
-	go lh.doLogin(token)
+	go func() {
+		if err := lh.doLogin(token); err != nil {
+			lh.logger.Error("error during doLogin", "error", err)
+		}
+	}()
 }
 
 func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
@@ -464,7 +476,9 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	// ensure status code was 200 OK
 	if res.StatusCode != http.StatusOK {

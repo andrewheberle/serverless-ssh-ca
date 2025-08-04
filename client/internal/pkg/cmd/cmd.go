@@ -25,7 +25,9 @@ var (
 const ConfigDirName = ".serverless-ssh-ca"
 
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
-	c.Command.Init(cd)
+	if err := c.Command.Init(cd); err != nil {
+		return err
+	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -39,7 +41,9 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 }
 
 func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
-	c.Command.PreRun(this, runner)
+	if err := c.Command.PreRun(this, runner); err != nil {
+		return err
+	}
 
 	// make sure config dir exists
 	if err := os.MkdirAll(filepath.Dir(c.configFile), 0755); err != nil {

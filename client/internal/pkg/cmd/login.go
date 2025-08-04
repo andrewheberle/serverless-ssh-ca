@@ -18,15 +18,7 @@ type loginCommand struct {
 
 	client *client.LoginHandler
 
-	keyPath string
-
 	*simplecommand.Command
-}
-
-type certificateSignerPayload struct {
-	Lifetime  time.Duration `json:"lifetime"`
-	PublicKey []byte        `json:"public_key"`
-	Identity  string        `json:"identity,omitempty"`
 }
 
 type CertificateSignerResponse struct {
@@ -34,7 +26,9 @@ type CertificateSignerResponse struct {
 }
 
 func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
-	c.Command.Init(cd)
+	if err := c.Command.Init(cd); err != nil {
+		return err
+	}
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.skipAgent, "skip-agent", false, "Skip adding SSH key and certificate to ssh-agent")
@@ -46,7 +40,9 @@ func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 }
 
 func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
-	c.Command.PreRun(this, runner)
+	if err := c.Command.PreRun(this, runner); err != nil {
+		return err
+	}
 
 	root, ok := this.Root.Command.(*rootCommand)
 	if !ok {
