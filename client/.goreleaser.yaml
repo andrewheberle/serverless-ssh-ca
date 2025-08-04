@@ -42,7 +42,8 @@ builds:
       - tray
 
 archives:
-  - formats: [tar.gz]
+  - allow_different_binary_count: true
+    formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
