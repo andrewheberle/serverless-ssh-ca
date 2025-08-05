@@ -12,35 +12,6 @@ import (
 	"github.com/getlantern/systray"
 )
 
-type appState string
-
-const (
-	// states
-	stateInit               appState = "Init"
-	stateKeyMissing         appState = "KeyMissing"
-	stateKeyOK              appState = "KeyOK"
-	stateCertificateOK      appState = "CertificateOK"
-	stateCertificateMissing appState = "CertificateMissing"
-	stateCertificateExpired appState = "CertificateExpired"
-)
-
-type Application struct {
-	client *client.LoginHandler
-	done   chan bool
-	title  string
-	addr   string
-
-	trayIcons         map[string][]byte
-	notificationIcons map[string][]byte
-	state             appState
-
-	mGenerate *systray.MenuItem
-	mRenew    *systray.MenuItem
-	mQuit     *systray.MenuItem
-
-	logger *slog.Logger
-}
-
 func New(title, addr string, fs embed.FS, client *client.LoginHandler) (*Application, error) {
 	app := &Application{
 		addr:              addr,
@@ -100,9 +71,12 @@ func (app *Application) onReady() {
 	// set title and icon
 	systray.SetTitle(app.title)
 
-	// buildmenu
+	// build menu
 	app.mRenew = systray.AddMenuItem("Renew", "Renew certificate")
 	app.mGenerate = systray.AddMenuItem("Generate", "Generate private key")
+	systray.AddSeparator()
+	app.mExpiry = systray.AddMenuItem("Unknown", "Current expiry unknown")
+	app.mExpiry.Disable()
 	systray.AddSeparator()
 	app.mQuit = systray.AddMenuItem("Quit", "Close application")
 
@@ -135,6 +109,7 @@ func (app *Application) setState() {
 		app.logger.Info("no private key found")
 		app.mGenerate.Enable()
 		app.mRenew.Disable()
+		app.mExpiry.SetTitle("No certificate")
 		systray.SetTooltip("No private key found")
 		systray.SetIcon(app.trayIcons["error"])
 	case stateKeyOK:
@@ -169,6 +144,7 @@ func (app *Application) setState() {
 
 		app.mRenew.SetTitle("Renew")
 		app.mRenew.Enable()
+		app.mExpiry.SetTitle("Certificate expired")
 		systray.SetTooltip("Certificate expired")
 		systray.SetIcon(app.trayIcons["warning"])
 	case stateCertificateMissing:
@@ -183,6 +159,7 @@ func (app *Application) setState() {
 		}
 		app.mRenew.SetTitle("Request")
 		app.mRenew.Enable()
+		app.mExpiry.SetTitle("No certificate")
 		systray.SetTooltip("No certificate found")
 		systray.SetIcon(app.trayIcons["warning"])
 	case stateCertificateOK:
@@ -210,6 +187,7 @@ func (app *Application) setState() {
 		}
 		app.mRenew.SetTitle("Renew Early")
 		app.mRenew.Enable()
+		app.mExpiry.SetTitle(fmt.Sprintf("%s left", timeLeft(app.client.CerificateExpiry())))
 		systray.SetTooltip(fmt.Sprintf("Current certificate valid (%s left)", timeLeft(app.client.CerificateExpiry())))
 		systray.SetIcon(app.trayIcons["ok"])
 	}
