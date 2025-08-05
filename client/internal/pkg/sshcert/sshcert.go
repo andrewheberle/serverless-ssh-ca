@@ -7,6 +7,11 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// ParseCert will parse the provided byte slice (in OpenSSH certficate format)
+// and return a [*ssh.Certificate].
+//
+// Any parsing errors will result in a nil [*ssh.Certificate] returned along
+// with the error.
 func ParseCert(certBytes []byte) (*ssh.Certificate, error) {
 	// Parse the certificate.
 	parsedKey, _, _, _, err := ssh.ParseAuthorizedKey(certBytes)
