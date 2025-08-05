@@ -12,6 +12,18 @@ import (
 	"github.com/getlantern/systray"
 )
 
+type appState string
+
+const (
+	// states
+	stateInit               appState = "Init"
+	stateKeyMissing         appState = "KeyMissing"
+	stateKeyOK              appState = "KeyOK"
+	stateCertificateOK      appState = "CertificateOK"
+	stateCertificateMissing appState = "CertificateMissing"
+	stateCertificateExpired appState = "CertificateExpired"
+)
+
 type Application struct {
 	client *client.LoginHandler
 	done   chan bool
