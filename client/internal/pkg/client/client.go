@@ -184,6 +184,12 @@ func (lh *LoginHandler) RedirectPath() string {
 	return lh.redirectURL.Path
 }
 
+// The Login method is intended for use as the handler function for
+// the intial login URL of the OIDC auth flow process as part of the Serverless
+// SSH CA.
+//
+// This will start the OIDC auth flow process and redirect the user to
+// the configured OIDC IdP.
 func (lh *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// store codeVerifier in session
 	codeVerifier, codeChallenge := generatePKCE()
@@ -218,6 +224,9 @@ func (lh *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authCodeURL, http.StatusFound)
 }
 
+// The Callback method is intended for use as the handler function for
+// the callback URL of the OIDC auth flow process as part of the Serverless
+// SSH CA
 func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		// Put this in a go func so that it will not block process
