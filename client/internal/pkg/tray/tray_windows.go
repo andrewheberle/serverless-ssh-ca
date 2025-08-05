@@ -12,6 +12,24 @@ import (
 	"github.com/getlantern/systray"
 )
 
+type Application struct {
+	client *client.LoginHandler
+	done   chan bool
+	title  string
+	addr   string
+
+	trayIcons         map[string][]byte
+	notificationIcons map[string][]byte
+	state             appState
+
+	mExpiry   *systray.MenuItem
+	mGenerate *systray.MenuItem
+	mRenew    *systray.MenuItem
+	mQuit     *systray.MenuItem
+
+	logger *slog.Logger
+}
+
 func New(title, addr string, fs embed.FS, client *client.LoginHandler) (*Application, error) {
 	app := &Application{
 		addr:              addr,
