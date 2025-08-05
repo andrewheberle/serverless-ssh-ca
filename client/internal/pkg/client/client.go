@@ -351,7 +351,7 @@ func (lh *LoginHandler) addToAgent() error {
 		return err
 	}
 
-	key, err := sshcert.ParseKey(keyBytes)
+	key, err := sshkey.ParseKey(keyBytes)
 	if err != nil {
 		return err
 	}
