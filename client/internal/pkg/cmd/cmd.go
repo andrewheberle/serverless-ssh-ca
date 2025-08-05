@@ -13,7 +13,7 @@ import (
 type rootCommand struct {
 	configFile string
 
-	config *config.ClientConfig
+	config *config.Config
 
 	*simplecommand.Command
 }

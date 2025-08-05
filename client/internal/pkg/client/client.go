@@ -45,7 +45,7 @@ type LoginHandler struct {
 	verifier        *oidc.IDTokenVerifier
 	oauth2Config    oauth2.Config
 	store           *sessions.CookieStore
-	config          *config.ClientConfig
+	config          *config.Config
 	lifetime        time.Duration
 	redirectURL     *url.URL
 	done            chan error
@@ -70,13 +70,13 @@ func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, er
 	}
 
 	// set up oidc provider
-	provider, err := oidc.NewProvider(context.Background(), config.Oidc.Issuer)
+	provider, err := oidc.NewProvider(context.Background(), config.Oidc().Issuer)
 	if err != nil {
 		return nil, err
 	}
 
 	// set redirectURL
-	redirectURL, err := url.Parse(config.Oidc.RedirectURL)
+	redirectURL, err := url.Parse(config.Oidc().RedirectURL)
 	if err != nil {
 		return nil, err
 	}
@@ -86,12 +86,12 @@ func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, er
 		config:   config,
 		lifetime: DefaultLifetime,
 		store:    sessions.NewCookieStore(securecookie.GenerateRandomKey(32)),
-		verifier: provider.Verifier(&oidc.Config{ClientID: config.Oidc.ClientID}),
+		verifier: provider.Verifier(&oidc.Config{ClientID: config.Oidc().ClientID}),
 		oauth2Config: oauth2.Config{
-			ClientID:    config.Oidc.ClientID,
-			RedirectURL: config.Oidc.RedirectURL,
+			ClientID:    config.Oidc().ClientID,
+			RedirectURL: config.Oidc().RedirectURL,
 			Endpoint:    provider.Endpoint(),
-			Scopes:      config.Oidc.Scopes,
+			Scopes:      config.Oidc().Scopes,
 		},
 		redirectURL: redirectURL,
 		done:        make(chan error),
@@ -465,7 +465,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	}
 
 	// build url
-	caCertUrl, err := url.JoinPath(lh.config.Ssh.CertificateAuthorityURL, "/api/v1/certificate")
+	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL(), "/api/v1/certificate")
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +529,8 @@ func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
 }
 
 func (lh *LoginHandler) HasCertificate() bool {
-	return lh.config.Ssh.Certificate != nil
+	_, err := lh.config.GetCertificateBytes()
+	return err == nil
 }
 
 func (lh *LoginHandler) CertificateValid() bool {

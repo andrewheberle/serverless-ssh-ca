@@ -13,7 +13,7 @@ type showCommand struct {
 	private     bool
 	certificate bool
 
-	config *config.ClientConfig
+	config *config.Config
 
 	*simplecommand.Command
 }
@@ -64,8 +64,11 @@ func (c *showCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args 
 
 	fmt.Printf("SSH Public Key: %s", pemBytes)
 
-	if c.certificate && c.config.Ssh.Certificate != nil {
-		fmt.Printf("SSH Certificate: %s", c.config.Ssh.Certificate)
+	if c.certificate {
+		certBytes, err := c.config.GetCertificateBytes()
+		if err == nil {
+			fmt.Printf("SSH Certificate: %s", certBytes)
+		}
 	}
 
 	return nil

@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/protect"
 	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/yaml"
 )
 
+type Config struct {
+	name   string
+	mu     sync.RWMutex
+	config ClientConfig
+}
 type ClientConfig struct {
-	name string
 	Oidc ClientOIDCConfig `json:"oidc"`
 	Ssh  ClientSSHConfig  `json:"ssh"`
 }
@@ -37,21 +42,31 @@ var (
 	ErrNoCertificate = errors.New("no certificate found")
 )
 
-func LoadConfig(name string) (*ClientConfig, error) {
+func LoadConfig(name string) (*Config, error) {
 	y, err := os.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}
 
-	config := &ClientConfig{name: name}
-	if err := yaml.Unmarshal(y, config); err != nil {
+	var config ClientConfig
+	if err := yaml.Unmarshal(y, &config); err != nil {
 		return nil, fmt.Errorf("problem parsing config: %w", err)
 	}
 
-	return config, nil
+	return &Config{
+		name:   name,
+		config: config,
+	}, nil
 }
 
-func (c *ClientConfig) Save() error {
+func (c *Config) Save() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.save()
+}
+
+func (c *Config) save() error {
 	temp, err := func() (string, error) {
 		// save to a temp file first
 		t, err := os.CreateTemp(filepath.Dir(c.name), "config*")
@@ -64,7 +79,7 @@ func (c *ClientConfig) Save() error {
 		}()
 
 		// marshal yaml
-		y, err := yaml.Marshal(c)
+		y, err := yaml.Marshal(c.config)
 		if err != nil {
 			return t.Name(), err
 		}
@@ -94,9 +109,26 @@ func (c *ClientConfig) Save() error {
 	return os.Rename(temp, c.name)
 }
 
-func (c *ClientConfig) HasPrivateKey() bool {
+func (c *Config) Oidc() ClientOIDCConfig {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.config.Oidc
+}
+
+func (c *Config) CertificateAuthorityURL() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.config.Ssh.CertificateAuthorityURL
+}
+
+func (c *Config) HasPrivateKey() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	// get key
-	pemBytes, err := c.GetPrivateKeyBytes()
+	pemBytes, err := c.getPrivateKeyBytes()
 	if err != nil {
 		return false
 	}
@@ -109,9 +141,16 @@ func (c *ClientConfig) HasPrivateKey() bool {
 	return true
 }
 
-func (c *ClientConfig) GetPrivateKeyBytes() ([]byte, error) {
+func (c *Config) GetPrivateKeyBytes() ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.getPrivateKeyBytes()
+}
+
+func (c *Config) getPrivateKeyBytes() ([]byte, error) {
 	// unprotect key
-	pemBytes, err := protect.Decrypt(c.Ssh.PrivateKey, "key")
+	pemBytes, err := protect.Decrypt(c.config.Ssh.PrivateKey, "key")
 	if err != nil {
 		return nil, err
 	}
@@ -119,31 +158,41 @@ func (c *ClientConfig) GetPrivateKeyBytes() ([]byte, error) {
 	return pemBytes, nil
 }
 
-func (c *ClientConfig) SetPrivateKeyBytes(pemBytes []byte) error {
+func (c *Config) SetPrivateKeyBytes(pemBytes []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	protected, err := protect.Encrypt(pemBytes, "key")
 	if err != nil {
 		return err
 	}
 
 	// set key and also clear certificate
-	c.Ssh.PrivateKey = protected
-	c.Ssh.Certificate = nil
+	c.config.Ssh.PrivateKey = protected
+	c.config.Ssh.Certificate = nil
 
 	// save config
-	if err := c.Save(); err != nil {
+	if err := c.save(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *ClientConfig) GetPublicKeyBytes() ([]byte, error) {
+func (c *Config) GetPublicKeyBytes() ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.getPublicKeyBytes()
+}
+
+func (c *Config) getPublicKeyBytes() ([]byte, error) {
 	if !c.HasPrivateKey() {
 		return nil, ErrNoPrivateKey
 	}
 
 	// get key
-	pemBytes, err := c.GetPrivateKeyBytes()
+	pemBytes, err := c.getPrivateKeyBytes()
 	if err != nil {
 		return nil, err
 	}
@@ -158,32 +207,41 @@ func (c *ClientConfig) GetPublicKeyBytes() ([]byte, error) {
 	return ssh.MarshalAuthorizedKey(key.PublicKey()), nil
 }
 
-func (c *ClientConfig) GetCertificateBytes() ([]byte, error) {
-	if c.Ssh.Certificate == nil {
+func (c *Config) GetCertificateBytes() ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.config.Ssh.Certificate == nil {
 		return nil, ErrNoCertificate
 	}
 
-	return c.Ssh.Certificate, nil
+	return c.config.Ssh.Certificate, nil
 }
 
-func (c *ClientConfig) SetCertificateBytes(pemBytes []byte) error {
-	c.Ssh.Certificate = pemBytes
+func (c *Config) SetCertificateBytes(pemBytes []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.config.Ssh.Certificate = pemBytes
 
 	// save config
-	if err := c.Save(); err != nil {
+	if err := c.save(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *ClientConfig) GetRefreshToken() (string, error) {
-	if c.Oidc.RefreshToken == nil {
+func (c *Config) GetRefreshToken() (string, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.config.Oidc.RefreshToken == nil {
 		return "", ErrNoCertificate
 	}
 
 	// unprotect token
-	token, err := protect.Decrypt(c.Oidc.RefreshToken, "token")
+	token, err := protect.Decrypt(c.config.Oidc.RefreshToken, "token")
 	if err != nil {
 		return "", err
 	}
@@ -191,16 +249,19 @@ func (c *ClientConfig) GetRefreshToken() (string, error) {
 	return string(token), nil
 }
 
-func (c *ClientConfig) SetRefreshToken(token string) error {
+func (c *Config) SetRefreshToken(token string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	protected, err := protect.Encrypt([]byte(token), "token")
 	if err != nil {
 		return err
 	}
 
-	c.Oidc.RefreshToken = protected
+	c.config.Oidc.RefreshToken = protected
 
 	// save config
-	if err := c.Save(); err != nil {
+	if err := c.save(); err != nil {
 		return err
 	}
 

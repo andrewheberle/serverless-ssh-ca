@@ -14,7 +14,7 @@ import (
 type generateCommand struct {
 	force bool
 
-	config *config.ClientConfig
+	config *config.Config
 
 	*simplecommand.Command
 }
