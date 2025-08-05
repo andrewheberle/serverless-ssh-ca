@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "ssh-ca",
+	"name": "serverless-ssh-ca",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-07-26",
 	"compatibility_flags": ["nodejs_compat"],
@@ -27,12 +27,12 @@
 		"SSH_CERTIFICATE_PRINCIPALS": ["ssh-admin"],
 		"SSH_CERTIFICATE_INCLUDE_SELF": false,
 		"SSH_CERTIFICATE_EXTENSIONS": [
-            "permit-X11-forwarding",
-            "permit-agent-forwarding",
-            "permit-port-forwarding",
-            "permit-pty",
-            "permit-user-rc",
-        ]
+			"permit-X11-forwarding",
+			"permit-agent-forwarding",
+			"permit-port-forwarding",
+			"permit-pty",
+			"permit-user-rc",
+		]
 	},
 	"secrets_store_secrets": [
 		{
