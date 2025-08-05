@@ -153,15 +153,17 @@ func (lh *LoginHandler) GenerateKey() error {
 func (lh *LoginHandler) Start(address string) {
 	lh.srv.Addr = address
 	go func() {
-		// run in a gorutine so this returns immediately
+		// run in a goroutine so this returns immediately
 		lh.done <- lh.srv.ListenAndServe()
 	}()
 }
 
+// Wait will block until the provided context completes or the login handler
+// HTTP service completes.
 func (lh *LoginHandler) Wait(ctx context.Context) error {
 	select {
-	case <-lh.done:
-		return nil
+	case err := <-lh.done:
+		return err
 	case <-ctx.Done():
 		return ctx.Err()
 	}
