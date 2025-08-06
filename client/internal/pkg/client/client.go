@@ -42,6 +42,7 @@ type LoginHandler struct {
 	showTokens      bool
 	skipAgent       bool
 	srv             *http.Server
+	started         bool
 	verifier        *oidc.IDTokenVerifier
 	oauth2Config    oauth2.Config
 	store           *sessions.CookieStore
@@ -60,8 +61,14 @@ const (
 var (
 	ErrNoPrivateKey   = config.ErrNoPrivateKey
 	ErrNoRefreshToken = errors.New("no refresh token found")
+	ErrAlreadyStarted = errors.New("server has already started")
+	ErrNotStarted     = errors.New("server has not been started")
+
+	// DefaultLogger is the default [*slog.Logger] used
+	DefaultLogger = slog.Default()
 )
 
+// NewLoginHandler creates a new handler
 func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, error) {
 	// load config
 	config, err := config.LoadConfig(name)
@@ -95,7 +102,7 @@ func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, er
 		},
 		redirectURL: redirectURL,
 		done:        make(chan error),
-		logger:      slog.Default(),
+		logger:      DefaultLogger,
 	}
 
 	// set from options
@@ -123,10 +130,12 @@ func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, er
 	return lh, nil
 }
 
+// HasPrivateKey returns true or false if a SSH private key exists
 func (lh *LoginHandler) HasPrivateKey() bool {
 	return lh.config.HasPrivateKey()
 }
 
+// GenerateKey will generate a new SSH private key
 func (lh *LoginHandler) GenerateKey() error {
 	// set comment based on user@host if possible
 	user := "nobody"
@@ -150,17 +159,34 @@ func (lh *LoginHandler) GenerateKey() error {
 	return lh.config.SetPrivateKeyBytes(pemBytes)
 }
 
-func (lh *LoginHandler) Start(address string) {
+// Start performs ListenAndServe() for the login handler HTTP service
+// however unlike [*http.Server.ListenAndServe()] this will return
+// immediately so you should run [*LoginHandler.Wait()] after.
+//
+// If the server has already started this will return [ErrAlreadyStarted]
+func (lh *LoginHandler) Start(address string) error {
+	if lh.started {
+		return ErrAlreadyStarted
+	}
+
 	lh.srv.Addr = address
 	go func() {
 		// run in a goroutine so this returns immediately
 		lh.done <- lh.srv.ListenAndServe()
 	}()
+
+	return nil
 }
 
 // Wait will block until the provided context completes or the login handler
-// HTTP service completes.
+// HTTP service is stopped via [*LoginHandler.Shutdown()].
+//
+// If the service has not been started this will return [ErrNotStarted]
 func (lh *LoginHandler) Wait(ctx context.Context) error {
+	if !lh.started {
+		return ErrNotStarted
+	}
+
 	select {
 	case err := <-lh.done:
 		return err
@@ -169,6 +195,7 @@ func (lh *LoginHandler) Wait(ctx context.Context) error {
 	}
 }
 
+// Shutdown gracefullt shuts down the HTTP service
 func (lh *LoginHandler) Shutdown() error {
 	// shut down the service
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
@@ -182,6 +209,7 @@ func (lh *LoginHandler) Shutdown() error {
 	return err
 }
 
+// RedirectPath returns the redirect path for the configured OIDC IdP
 func (lh *LoginHandler) RedirectPath() string {
 	return lh.redirectURL.Path
 }
@@ -389,6 +417,7 @@ func (lh *LoginHandler) addToAgent() error {
 	})
 }
 
+// Refresh attempts to refresh the authentication and identity token
 func (lh *LoginHandler) Refresh() error {
 	// try refresh token
 	refresh, err := lh.config.GetRefreshToken()
@@ -506,10 +535,15 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	return &csr, nil
 }
 
+// ExecuteLogin performs [*LoginHandler.Start()], attempts to open the users
+// browser to start the OIDC auth flow, followed by [*LoginHandler.Wait()]
 func (lh *LoginHandler) ExecuteLogin(addr string) error {
 	return lh.executeLogin(context.Background(), addr)
 }
 
+// ExecuteLoginWithContext is identitical to [*LoginHandler.ExecuteLogin()]
+// however the provided context is used rather than the default of
+// [context.Background()]
 func (lh *LoginHandler) ExecuteLoginWithContext(ctx context.Context, addr string) error {
 	return lh.executeLogin(ctx, addr)
 }
@@ -517,7 +551,9 @@ func (lh *LoginHandler) ExecuteLoginWithContext(ctx context.Context, addr string
 func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
 	// start web server now
 	lh.logger.Info("starting web server", "address", addr)
-	lh.Start(addr)
+	if err := lh.Start(addr); err != nil {
+		return err
+	}
 
 	// at this point do interactive login flow
 	loginUrl := fmt.Sprintf("http://%s/auth/login", addr)
@@ -577,6 +613,8 @@ func (lh *LoginHandler) CerificateExpiry() time.Time {
 	return time.Unix(int64(cert.ValidBefore), 0)
 }
 
+// SetLogger sets the [*slog.Logger] used after the [*LoginHandler] has been
+// created by [NewHandler]
 func (lh *LoginHandler) SetLogger(logger *slog.Logger) {
 	lh.logger = logger
 }
