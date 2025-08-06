@@ -25,10 +25,10 @@ export class CertificateExtraExtensionsError extends Error {
   }
 } 
 
-export async function createSignedCertificate(id: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
+export async function createSignedCertificate(email: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
     // add identities
     const identity = env.SSH_CERTIFICATE_INCLUDE_SELF
-        ? [identityForUser(id)]
+        ? [identityForUser(email.split("@")[0])]
         : []
     if (options.principals !== undefined) {
         for (const p of options.principals) {
@@ -89,7 +89,7 @@ export async function createSignedCertificate(id: string, public_key: Key, optio
         certificate.signatures = {
             openssh: {
                 nonce: certificate.signatures.openssh.nonce,
-                keyId: id,
+                keyId: email,
                 signature: certificate.signatures.openssh.signature,
                 exts: extensions,
             }

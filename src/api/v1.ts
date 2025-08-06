@@ -29,7 +29,7 @@ router
                 principals: request.principals,
                 extensions: request.extensions
             }
-            const certificate = await createSignedCertificate(request.email.split("@")[0], request.public_key, opts)
+            const certificate = await createSignedCertificate(request.email, request.public_key, opts)
             const response: CertificateSignerResponse = {
                 certificate: btoa(certificate.toString("openssh"))
             }
