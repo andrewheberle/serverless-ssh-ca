@@ -23,10 +23,14 @@ ssh:
   ca_url: https://ca.example.com/
 ```
 
-The default location for this config file is `$HOME/.ssh-serverless-ca/config`
+The default location for this config file is `$HOME/.ssh-serverless-ca/config.yml`
 however this may also be provided using the `--config` command line flag.
 
-## Running
+If one of the requested scopes is `offline_access` and this is supported by the
+OIDC IdP then the client can use the provided refresh token for subsequent
+certificate renewals.
+
+## Running via the CLI
 
 The client can be run in the following ways:
 
@@ -35,13 +39,13 @@ The client can be run in the following ways:
 To generate a new private key, run as follows:
 
 ```sh
-ssh-ca-client generate
+ssh-ca-client-cli generate
 ```
 
 ### Show Existing Key/Public Key/Certificate
 
 ```sh
-ssh-ca-client show [--private] [--certificate]
+ssh-ca-client-cli show [--private] [--certificate]
 ```
 
 By default the client only displays the users public key, however the
@@ -52,7 +56,7 @@ By default the client only displays the users public key, however the
 To request a certificate from the CA, run the client as follows:
 
 ```sh
-ssh-ca-client login
+ssh-ca-client-cli login
 ```
 
 This will trigger an interactive OIDC authentication flow via the users
@@ -69,6 +73,8 @@ If the client is built with the `tray` build tag and `-ldflags -H=windowsgui`
 it can be run as a GUI application that sits in the system tray (this is quite
 Windows-centric at this time) and allows generation of a private key and
 request/renewal of certificates.
+
+At this time the GUI is only built and packaged for Windows.
 
 # Attributions
 
