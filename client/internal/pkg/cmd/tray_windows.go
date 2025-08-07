@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"embed"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -108,7 +109,10 @@ func Execute(ctx context.Context, args []string) error {
 
 		go func() {
 			if err := lh.RunPageantProxy(ctx); err != nil {
-				logger.Error("error from pageant proxy", "error", err)
+				// dont log an error if the error indicates the context was cancelled
+				if !errors.Is(err, context.Canceled) {
+					logger.Error("error from pageant proxy", "error", err)
+				}
 			}
 		}()
 	}
