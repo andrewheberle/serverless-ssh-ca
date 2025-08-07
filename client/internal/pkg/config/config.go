@@ -82,7 +82,7 @@ func loadUserConfig(name string) (UserConfig, error) {
 	y, err := os.ReadFile(name)
 	if err != nil {
 		// the user config missing is not fatal
-		if errors.Is(os.ErrNotExist, err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return UserConfig{}, nil
 		}
 
