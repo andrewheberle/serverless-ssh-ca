@@ -25,7 +25,7 @@ func TestEncrypt(t *testing.T) {
 				return
 			}
 
-			plain, err := Decrypt(protected, tt.out)
+			plain, _ := Decrypt(protected, tt.out)
 			if !reflect.DeepEqual(plain, tt.data) && tt.wantSame {
 				t.Errorf("Encrypt() = %v, Decrypt() = %v", plain, tt.data)
 			}
