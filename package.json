@@ -22,7 +22,7 @@
 				"description": "A list of additional principals to add to the SSH certificate"
 			},
 			"SSH_CERTIFICATE_INCLUDE_SELF": {
-				"description": "Whether to add the users own name as a valid principal (based on the part before the @ symbol in the JWT email claim"
+				"description": "Whether to add the users own name as a valid principal (based on the part before the @ symbol in the JWT email claim)"
 			},
 			"SSH_CERTIFICATE_EXTENSIONS": {
 				"description": "The list of SSH extensions to add to the certificate, although the client may request a smaller list"
