@@ -29,12 +29,13 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	var lifetime time.Duration
-	var listenAddr, logFile, systemConfigFile, userConfigFile string
+	var listenAddr, logFile, crashFile, systemConfigFile, userConfigFile string
 	var proxy bool
 
 	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	pflag.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	pflag.StringVar(&logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
+	pflag.StringVar(&crashFile, "crash", filepath.Join(home, ConfigDirName, "crash.log"), "Path to log file for panics/crashes")
 	pflag.StringVar(&systemConfigFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
 	pflag.StringVar(&userConfigFile, "user", filepath.Join(home, ConfigDirName, "user.yml"), "Path to user configuration file")
 	pflag.BoolVar(&proxy, "proxy", false, "Enably proxying of PuTTY Agent (pageant) requests")
@@ -46,7 +47,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set location to write panics
-	crash, err := os.Create(filepath.Join(filepath.Dir(userConfigFile), "crash.log"))
+	crash, err := os.Create(crashFile)
 	if err != nil {
 		return err
 	}
@@ -101,6 +102,7 @@ func Execute(ctx context.Context, args []string) error {
 
 	// start pageant proxy if requested
 	if proxy {
+		logger.Info("attempting to start pageant proxy process")
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
