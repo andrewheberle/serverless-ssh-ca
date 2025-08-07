@@ -61,7 +61,7 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	}
 
 	// set up login client
-	lh, err := client.NewLoginHandler(root.configFile, opts...)
+	lh, err := client.NewLoginHandler(root.systemConfigFile, root.userConfigFile, opts...)
 	if err != nil {
 		return err
 	}

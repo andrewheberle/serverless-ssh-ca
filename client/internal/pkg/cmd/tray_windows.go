@@ -29,21 +29,22 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	var lifetime time.Duration
-	var listenAddr, logFile, configFile string
+	var listenAddr, logFile, systemConfigFile, userConfigFile string
 
 	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	pflag.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	pflag.StringVar(&logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
-	pflag.StringVar(&configFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
+	pflag.StringVar(&systemConfigFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
+	pflag.StringVar(&userConfigFile, "user", filepath.Join(home, ConfigDirName, "user.yml"), "Path to user configuration file")
 	pflag.Parse()
 
 	// make sure config dir exists
-	if err := os.MkdirAll(filepath.Dir(configFile), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(userConfigFile), 0755); err != nil {
 		return err
 	}
 
 	// set location to write panics
-	crash, err := os.Create(filepath.Join(filepath.Dir(configFile), "crash.log"))
+	crash, err := os.Create(filepath.Join(filepath.Dir(userConfigFile), "crash.log"))
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func Execute(ctx context.Context, args []string) error {
 	debug.SetCrashOutput(crash, debug.CrashOptions{})
 
 	// set up login client
-	lh, err := client.NewLoginHandler(configFile, client.WithLifetime(lifetime), client.AllowWithoutKey())
+	lh, err := client.NewLoginHandler(systemConfigFile, userConfigFile, client.WithLifetime(lifetime), client.AllowWithoutKey())
 	if err != nil {
 		return err
 	}

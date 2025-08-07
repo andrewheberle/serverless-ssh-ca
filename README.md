@@ -157,36 +157,34 @@ The `email` claim is required in the access token JWT sent by the client.
 
 ### Client
 
-The client requires a configuration file that defines the details of the OIDC IdP and where to find the SSH CA as follows:
+The client requires a configuration file that defines the details of the OIDC
+IdP and where to find the SSH CA as follows:
 
 ```yaml
-oidc:
-  issuer: OIDC Issuer
-  client_id: OIDC Client ID
-  scopes: ["openid", "email", "profile"]
-  redirect_url: http://localhost:3000/auth/callback
-  # refresh_token: encrypted (see below) base64 encoded refresh token
-ssh:
-  name: id_ssh_user
-  ca_url: https://ssh-ca.example.com/
-  # certificate: base64 encoded certificate that was issued last
-  # private_key: encrypted (see below) base64 encoded ssh private key
+issuer: OIDC Issuer
+client_id: OIDC Client ID
+scopes: ["openid", "email", "profile"]
+redirect_url: http://localhost:3000/auth/callback
+ca_url: https://ssh-ca.example.com/
 ```
 
-The client can be installed as follows:
+The default location of this configuration file is `$HOME/.ssh-serverless-ca/config.yml`
+however this can be overridden using the `--config` command line option.
 
-```sh
-go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client@latest
-```
+#### Installation
+
+Please download the client for your OS from the releases page.
+
+#### Usage
 
 Assuming a local SSH agent is running, the client can be started as follows:
 
 ```sh
 # generate a SSH private key
-ssh-ca-client generate
+ssh-ca-client-cli generate
 
 # perform a login to the IdP and request a signed certificate
-ssh-ca-client login
+ssh-ca-client-cli login
 ```
 
 This should automatically start a web browser to initiate the OIDC login flow,
@@ -200,8 +198,8 @@ auth token using the saved refresh token.
 #### Key, Token and Certificate Storage
 
 The users private key, the most recently issued certificate and the OIDC
-refresh token (if available) are written to the configuration file for
-subsequent use.
+refresh token (if available) are written to a user specific configuration file
+for subsequent use.
 
 Sensitive material such as the SSH private key and OIDC refresh token are
 encrypted on Windows using the Data Protection API (DPAPI) so the values are
@@ -225,7 +223,8 @@ TrustedUserCAKeys /etc/ssh/ca.pub
 AuthorizedPrincipalsFile /etc/ssh/principals.d/%u
 ```
 
-The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be retrieved as follows:
+The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be
+retrieved as follows:
 
 ```sh
 curl https://ssh-ca.example.com/api/v1/ca | sudo tee /etc/ssh/ca.pub

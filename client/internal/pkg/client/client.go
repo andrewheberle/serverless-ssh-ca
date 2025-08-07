@@ -69,9 +69,9 @@ var (
 )
 
 // NewLoginHandler creates a new handler
-func NewLoginHandler(name string, opts ...LoginHandlerOption) (*LoginHandler, error) {
+func NewLoginHandler(system, user string, opts ...LoginHandlerOption) (*LoginHandler, error) {
 	// load config
-	config, err := config.LoadConfig(name)
+	config, err := config.LoadConfig(system, user)
 	if err != nil {
 		return nil, err
 	}
