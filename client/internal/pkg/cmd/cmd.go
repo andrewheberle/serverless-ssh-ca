@@ -11,7 +11,8 @@ import (
 )
 
 type rootCommand struct {
-	configFile string
+	systemConfigFile string
+	userConfigFile   string
 
 	config *config.Config
 
@@ -35,7 +36,8 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.PersistentFlags().StringVar(&c.configFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
+	cmd.PersistentFlags().StringVar(&c.systemConfigFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
+	cmd.PersistentFlags().StringVar(&c.userConfigFile, "user", filepath.Join(home, ConfigDirName, "user.yml"), "Path to user configuration file")
 
 	return nil
 }
@@ -45,13 +47,13 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return err
 	}
 
-	// make sure config dir exists
-	if err := os.MkdirAll(filepath.Dir(c.configFile), 0755); err != nil {
+	// make sure user config dir exists
+	if err := os.MkdirAll(filepath.Dir(c.userConfigFile), 0755); err != nil {
 		return err
 	}
 
 	// load config
-	config, err := config.LoadConfig(c.configFile)
+	config, err := config.LoadConfig(c.systemConfigFile, c.userConfigFile)
 	if err != nil {
 		return err
 	}

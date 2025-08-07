@@ -13,28 +13,31 @@ import (
 )
 
 type Config struct {
-	name   string
-	mu     sync.RWMutex
-	config ClientConfig
+	mu               sync.RWMutex
+	systemConfigName string
+	system           SystemConfig
+	userConfigName   string
+	user             UserConfig
 }
-type ClientConfig struct {
-	Oidc ClientOIDCConfig `json:"oidc"`
-	Ssh  ClientSSHConfig  `json:"ssh"`
-}
-
 type ClientOIDCConfig struct {
-	Issuer       string   `json:"issuer"`
-	ClientID     string   `json:"client_id"`
-	Scopes       []string `json:"scopes"`
-	AccessType   string   `json:"access_type,omitempty"`
-	RedirectURL  string   `json:"redirect_url"`
-	RefreshToken []byte   `json:"refresh_token,omitempty"`
+	Issuer      string   `json:"issuer"`
+	ClientID    string   `json:"client_id"`
+	Scopes      []string `json:"scopes"`
+	RedirectURL string   `json:"redirect_url"`
 }
 
-type ClientSSHConfig struct {
-	CertificateAuthorityURL string `json:"ca_url"`
-	PrivateKey              []byte `json:"private_key,omitempty"`
-	Certificate             []byte `json:"certificate,omitempty"`
+type SystemConfig struct {
+	Issuer                  string   `json:"issuer"`
+	ClientID                string   `json:"client_id"`
+	Scopes                  []string `json:"scopes"`
+	RedirectURL             string   `json:"redirect_url"`
+	CertificateAuthorityURL string   `json:"ca_url"`
+}
+
+type UserConfig struct {
+	Certificate  []byte `json:"certificate,omitempty"`
+	RefreshToken []byte `json:"refresh_token,omitempty"`
+	PrivateKey   []byte `json:"private_key,omitempty"`
 }
 
 var (
@@ -42,21 +45,57 @@ var (
 	ErrNoCertificate = errors.New("no certificate found")
 )
 
-func LoadConfig(name string) (*Config, error) {
-	y, err := os.ReadFile(name)
+func LoadConfig(system, user string) (*Config, error) {
+	s, err := loadSystemConfig(system)
 	if err != nil {
 		return nil, err
 	}
 
-	var config ClientConfig
-	if err := yaml.Unmarshal(y, &config); err != nil {
-		return nil, fmt.Errorf("problem parsing config: %w", err)
+	u, err := loadUserConfig(user)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Config{
-		name:   name,
-		config: config,
+		systemConfigName: system,
+		system:           s,
+		userConfigName:   user,
+		user:             u,
 	}, nil
+}
+
+func loadSystemConfig(name string) (SystemConfig, error) {
+	y, err := os.ReadFile(name)
+	if err != nil {
+		return SystemConfig{}, err
+	}
+
+	var config SystemConfig
+	if err := yaml.Unmarshal(y, &config); err != nil {
+		return SystemConfig{}, fmt.Errorf("problem parsing system config: %w", err)
+	}
+
+	return config, nil
+}
+
+func loadUserConfig(name string) (UserConfig, error) {
+	y, err := os.ReadFile(name)
+	if err != nil {
+		// the user config missing is not fatal
+		if errors.Is(os.ErrNotExist, err) {
+			return UserConfig{}, nil
+		}
+
+		// otherwise return the error
+		return UserConfig{}, err
+	}
+
+	var config UserConfig
+	if err := yaml.Unmarshal(y, &config); err != nil {
+		return UserConfig{}, fmt.Errorf("problem parsing user config: %w", err)
+	}
+
+	return config, nil
 }
 
 func (c *Config) Save() error {
@@ -66,10 +105,11 @@ func (c *Config) Save() error {
 	return c.save()
 }
 
+// this saves the user part of the config
 func (c *Config) save() error {
 	temp, err := func() (string, error) {
 		// save to a temp file first
-		t, err := os.CreateTemp(filepath.Dir(c.name), "config*")
+		t, err := os.CreateTemp(filepath.Dir(c.userConfigName), "user*")
 		if err != nil {
 			// creation failed
 			return "", err
@@ -79,7 +119,7 @@ func (c *Config) save() error {
 		}()
 
 		// marshal yaml
-		y, err := yaml.Marshal(c.config)
+		y, err := yaml.Marshal(c.user)
 		if err != nil {
 			return t.Name(), err
 		}
@@ -106,21 +146,26 @@ func (c *Config) save() error {
 	}
 
 	// move into place
-	return os.Rename(temp, c.name)
+	return os.Rename(temp, c.userConfigName)
 }
 
 func (c *Config) Oidc() ClientOIDCConfig {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return c.config.Oidc
+	return ClientOIDCConfig{
+		Issuer:      c.system.Issuer,
+		ClientID:    c.system.ClientID,
+		Scopes:      c.system.Scopes,
+		RedirectURL: c.system.RedirectURL,
+	}
 }
 
 func (c *Config) CertificateAuthorityURL() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return c.config.Ssh.CertificateAuthorityURL
+	return c.system.CertificateAuthorityURL
 }
 
 func (c *Config) HasPrivateKey() bool {
@@ -150,7 +195,7 @@ func (c *Config) GetPrivateKeyBytes() ([]byte, error) {
 
 func (c *Config) getPrivateKeyBytes() ([]byte, error) {
 	// unprotect key
-	pemBytes, err := protect.Decrypt(c.config.Ssh.PrivateKey, "key")
+	pemBytes, err := protect.Decrypt(c.user.PrivateKey, "key")
 	if err != nil {
 		return nil, err
 	}
@@ -168,8 +213,8 @@ func (c *Config) SetPrivateKeyBytes(pemBytes []byte) error {
 	}
 
 	// set key and also clear certificate
-	c.config.Ssh.PrivateKey = protected
-	c.config.Ssh.Certificate = nil
+	c.user.PrivateKey = protected
+	c.user.Certificate = nil
 
 	// save config
 	if err := c.save(); err != nil {
@@ -211,18 +256,18 @@ func (c *Config) GetCertificateBytes() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if c.config.Ssh.Certificate == nil {
+	if c.user.Certificate == nil {
 		return nil, ErrNoCertificate
 	}
 
-	return c.config.Ssh.Certificate, nil
+	return c.user.Certificate, nil
 }
 
 func (c *Config) SetCertificateBytes(pemBytes []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.config.Ssh.Certificate = pemBytes
+	c.user.Certificate = pemBytes
 
 	// save config
 	if err := c.save(); err != nil {
@@ -236,12 +281,12 @@ func (c *Config) GetRefreshToken() (string, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if c.config.Oidc.RefreshToken == nil {
+	if c.user.RefreshToken == nil {
 		return "", ErrNoCertificate
 	}
 
 	// unprotect token
-	token, err := protect.Decrypt(c.config.Oidc.RefreshToken, "token")
+	token, err := protect.Decrypt(c.user.RefreshToken, "token")
 	if err != nil {
 		return "", err
 	}
@@ -258,7 +303,7 @@ func (c *Config) SetRefreshToken(token string) error {
 		return err
 	}
 
-	c.config.Oidc.RefreshToken = protected
+	c.user.RefreshToken = protected
 
 	// save config
 	if err := c.save(); err != nil {

@@ -14,13 +14,11 @@ go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client@l
 The client requires the IdP and CA details set as follows:
 
 ```yaml
-oidc:
-  issuer: OIDC Issuer
-  client_id: OIDC Client ID
-  scopes: ["openid", "email", "profile"]
-  redirect_url: http://localhost:3000/auth/callback
-ssh:
-  ca_url: https://ca.example.com/
+issuer: OIDC Issuer
+client_id: OIDC Client ID
+scopes: ["openid", "email", "profile"]
+redirect_url: http://localhost:3000/auth/callback
+ca_url: https://ca.example.com/
 ```
 
 The default location for this config file is `$HOME/.ssh-serverless-ca/config.yml`
@@ -29,6 +27,14 @@ however this may also be provided using the `--config` command line flag.
 If one of the requested scopes is `offline_access` and this is supported by the
 OIDC IdP then the client can use the provided refresh token for subsequent
 certificate renewals.
+
+The client saves persistent user data such as the user private key, refresh
+token (if provided) and certificate into a user specific configuration file,
+which by default is `$HOME/.ssh-serverless-ca/user.yaml` however this can be
+overidden using the `--user` command line flag.
+
+This allows the use of a shared/system configuration file that defines the
+OIDC and SSH CA configuration with user specific data kept seperate.
 
 ## Running via the CLI
 
