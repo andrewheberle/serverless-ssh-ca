@@ -82,6 +82,18 @@ request/renewal of certificates.
 
 At this time the GUI is only built and packaged for Windows.
 
+The GUI supports the following command line flags:
+
+| Flag       | Type            | Description                                       | Default                               | 
+|------------|-----------------|---------------------------------------------------|---------------------------------------|
+| `--life`   | `time.Duration` | Lifetime of SSH certificate                       | `24h`                                 |
+| `--addr`   | `string`        | Listen address for OIDC auth flow                 | `localhost:3000`                      |
+| `--log`    | `string`        | Path to log file                                  | `$HOME/.ssh-serverless-ca/tray.log`   |
+| `--crash`  | `string`        | Path to log file for panics/crashes               | `$HOME/.ssh-serverless-ca/crash.log`  |
+| `--config` | `string`        | Path to configuration file                        | `$HOME/.ssh-serverless-ca/config.yml` |
+| `--user`   | `string`        | Path to user configuration file                   | `$HOME/.ssh-serverless-ca/user.yml`   |
+| `--proxy`  | `bool`          | Enably proxying of PuTTY Agent (pageant) requests | `false`                               |
+
 # Attributions
 
 The icons used by the client are made by Freepik from [www.flaticon.com](https://www.flaticon.com).

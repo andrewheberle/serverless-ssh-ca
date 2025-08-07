@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
+	"github.com/ndbeals/winssh-pageant/pageant"
 	"github.com/openpubkey/openpubkey/util"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/oauth2"
@@ -39,19 +40,21 @@ type CertificateSignerResponse struct {
 }
 
 type LoginHandler struct {
-	showTokens      bool
-	skipAgent       bool
-	srv             *http.Server
-	started         bool
-	verifier        *oidc.IDTokenVerifier
-	oauth2Config    oauth2.Config
-	store           *sessions.CookieStore
-	config          *config.Config
-	lifetime        time.Duration
-	redirectURL     *url.URL
-	done            chan error
-	logger          *slog.Logger
-	allowWithoutKey bool
+	showTokens       bool
+	skipAgent        bool
+	srv              *http.Server
+	started          bool
+	verifier         *oidc.IDTokenVerifier
+	oauth2Config     oauth2.Config
+	store            *sessions.CookieStore
+	config           *config.Config
+	lifetime         time.Duration
+	redirectURL      *url.URL
+	done             chan error
+	pageantProxyDone chan bool
+	logger           *slog.Logger
+	allowWithoutKey  bool
+	pageantProxy     bool
 }
 
 const (
@@ -59,10 +62,11 @@ const (
 )
 
 var (
-	ErrNoPrivateKey   = config.ErrNoPrivateKey
-	ErrNoRefreshToken = errors.New("no refresh token found")
-	ErrAlreadyStarted = errors.New("server has already started")
-	ErrNotStarted     = errors.New("server has not been started")
+	ErrNoPrivateKey           = config.ErrNoPrivateKey
+	ErrNoRefreshToken         = errors.New("no refresh token found")
+	ErrAlreadyStarted         = errors.New("server has already started")
+	ErrNotStarted             = errors.New("server has not been started")
+	ErrPageantProxyNotEnabled = errors.New("pageant proxy not enabled")
 
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
@@ -100,9 +104,10 @@ func NewLoginHandler(system, user string, opts ...LoginHandlerOption) (*LoginHan
 			Endpoint:    provider.Endpoint(),
 			Scopes:      config.Oidc().Scopes,
 		},
-		redirectURL: redirectURL,
-		done:        make(chan error),
-		logger:      DefaultLogger,
+		redirectURL:      redirectURL,
+		done:             make(chan error),
+		pageantProxyDone: make(chan bool),
+		logger:           DefaultLogger,
 	}
 
 	// set from options
@@ -204,9 +209,41 @@ func (lh *LoginHandler) Shutdown() error {
 	// shutdown and send result to channel
 	err := lh.srv.Shutdown(ctx)
 	lh.done <- err
+	close(lh.done)
 
 	// also return result
 	return err
+}
+
+// RunPageantProxy will proxy PuTTY Agent connections to the native OpenSSH
+// SSH Agent.
+//
+// This will block until the provided context is complete or
+// [*LoginHandler.ShutdownPageantProxy()] is run.
+func (lh *LoginHandler) RunPageantProxy(ctx context.Context) error {
+	if !lh.pageantProxy {
+		return ErrPageantProxyNotEnabled
+	}
+
+	// start as a goroutine
+	go func() {
+		p := pageant.NewDefaultHandler(`\\.\pipe\openssh-ssh-agent`, true)
+		p.Run()
+	}()
+
+	// block here until context is finished or ShutdownPageantProxy is run
+	select {
+	case <-lh.pageantProxyDone:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// ShutdownPageantProxy will shutdown a running PuTTY Agent proxy.
+func (lh *LoginHandler) ShutdownPageantProxy() {
+	lh.pageantProxyDone <- true
+	close(lh.pageantProxyDone)
 }
 
 // RedirectPath returns the redirect path for the configured OIDC IdP
