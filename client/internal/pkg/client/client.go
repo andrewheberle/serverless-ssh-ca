@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
@@ -20,7 +21,6 @@ import (
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/sshkey"
 	"github.com/andrewheberle/sshagent"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/google/uuid"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"github.com/ndbeals/winssh-pageant/pageant"
@@ -55,6 +55,7 @@ type LoginHandler struct {
 	logger           *slog.Logger
 	allowWithoutKey  bool
 	pageantProxy     bool
+	mu               sync.RWMutex
 }
 
 const (
@@ -170,11 +171,15 @@ func (lh *LoginHandler) GenerateKey() error {
 //
 // If the server has already started this will return [ErrAlreadyStarted]
 func (lh *LoginHandler) Start(address string) error {
+	lh.mu.Lock()
+	defer lh.mu.Unlock()
+
 	if lh.started {
 		return ErrAlreadyStarted
 	}
 
 	lh.srv.Addr = address
+	lh.started = true
 	go func() {
 		// run in a goroutine so this returns immediately
 		lh.done <- lh.srv.ListenAndServe()
@@ -188,6 +193,9 @@ func (lh *LoginHandler) Start(address string) error {
 //
 // If the service has not been started this will return [ErrNotStarted]
 func (lh *LoginHandler) Wait(ctx context.Context) error {
+	lh.mu.RLock()
+	defer lh.mu.RUnlock()
+
 	if !lh.started {
 		return ErrNotStarted
 	}
@@ -482,7 +490,11 @@ func (lh *LoginHandler) Refresh() error {
 }
 
 func generatePKCE() (string, string) {
-	codeVerifier := uuid.New().String()
+	b := make([]byte, 90)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	codeVerifier := base64.URLEncoding.EncodeToString(b)
 	hash := sha256.Sum256([]byte(codeVerifier))
 	codeChallenge := base64.RawURLEncoding.EncodeToString(hash[:])
 	return codeVerifier, codeChallenge

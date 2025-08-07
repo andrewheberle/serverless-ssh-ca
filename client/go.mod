@@ -10,7 +10,6 @@ require (
 	github.com/coreos/go-oidc/v3 v3.15.0
 	github.com/gen2brain/beeep v0.11.1
 	github.com/getlantern/systray v1.2.2
-	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec

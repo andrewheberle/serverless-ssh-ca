@@ -23,7 +23,6 @@ func Execute(ctx context.Context, args []string) error {
 		&showCommand{
 			Command: simplecommand.New("show", "Show existing private/public key"),
 		},
-
 		&versionCommand{
 			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client"),
 		},

@@ -14,9 +14,9 @@ The IdP may be any OIDC compatible service that returns a JWT with at least
 an `email` claim in the OIDC access token, however at this time only
 Cloudflare Access has been tested.
 
-The flow to obtain a certificate is as follows:
+The flow to obtain a certificate using the CLI version is as follows:
 
-1. The user initiates `ssh-ca-client login`
+1. The user initiates `ssh-ca-client-cli login`
 2. If required a new SSH key is generated and the a browser is opened to
    visit `http://localhost:3000/auth/login`
 3. The client redirects the user to the configured IdP
@@ -25,10 +25,12 @@ The flow to obtain a certificate is as follows:
 5. The client uses the JWT from the IdP as `Authorization: Bearer <TOKEN>`
    in a `POST` request containing the users SSH public key to the CA's
    `/api/v1/certificate` endpoint
-6. The CA verifies the incoming JWT and assuming it is valid and verified, will respond with a signed certificate based on the provided public key
-7. The client saves the certificate and adds the SSH private key and certificate to the local SSH Agent.
+6. The CA verifies the incoming JWT and assuming it is valid and verified, will 
+   respond with a signed certificate based on the provided public key
+7. The client saves the certificate and adds the SSH private key and
+   certificate to the local SSH Agent.
 
-This flow is shown below once the user executes `ssh-ca-agent login`:
+This flow is shown below once the user executes `ssh-ca-client-cli login`:
 
 ```mermaid
 sequenceDiagram
@@ -46,9 +48,11 @@ sequenceDiagram
     User->>Client: Completes OIDC redirect
     deactivate User
     activate Client
+    activate Client
     Client-->>User: Auth flow completed
     deactivate Client
     Client->>CA: POST /api/v1/certificate
+    deactivate Client
     activate CA
     CA-->>Client: Signed certificate
     deactivate CA
@@ -57,7 +61,8 @@ sequenceDiagram
     deactivate Client
 ```
 
-If a refresh token is available, the process looks like this when running `ssh-ca-client login`:
+If a refresh token is available, the process looks like this when running
+`ssh-ca-client-cli login`:
 
 ```mermaid
 sequenceDiagram
@@ -65,7 +70,9 @@ sequenceDiagram
     activate IdP
     IdP-->>Client: Token returned
     deactivate IdP
+    activate Client
     Client->>CA: POST /api/v1/certificate
+    deactivate Client
     activate CA
     CA-->>Client: Signed certificate
     deactivate CA
@@ -74,7 +81,9 @@ sequenceDiagram
     deactivate Client
 ```
 
-If the process to request a new authentication token fails using the refresh token, the standard authentication process is followed which requires user interaction.
+If the process to request a new authentication token fails using the refresh
+token, the standard authentication process is followed which requires user
+interaction.
 
 ## Deployment
 
@@ -151,9 +160,19 @@ npm run deploy
 
 ### Identity Provider
 
-TODO: Add IdP config example here
+This example shows the configuration in Cloudflare Access, however other
+OIDC IdP's should be generally equivalent:
 
-The `email` claim is required in the access token JWT sent by the client.
+![Basic OIDC Settings](images/oidc-example_01.png)
+
+The `Redirect URL` must match the configured value in the client.
+
+Transfer the IdP settings as follows:
+
+![IdP Settings](images/oidc-example_02.png)
+
+The `openid` and `email` scopes are required, with enabling of refresh tokens
+(the `offline_access` scope) being optional, but recommended.
 
 ### Client
 
