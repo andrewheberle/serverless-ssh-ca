@@ -1,7 +1,5 @@
-oidc:
-  issuer: https://idp.example.com/
-  client_id: OIDC Client ID
-  scopes: ["openid", "email", "profile", "offline_access"]
-  redirect_url: http://localhost:3000/auth/callback
-ssh:
-  ca_url: https://ca.example.com/
+issuer: https://idp.example.com/
+client_id: OIDC Client ID
+scopes: ["openid", "email", "profile", "offline_access"]
+redirect_url: http://localhost:3000/auth/callback
+ca_url: https://ca.example.com/
