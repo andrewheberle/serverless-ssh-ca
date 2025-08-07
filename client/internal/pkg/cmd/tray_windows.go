@@ -30,12 +30,14 @@ func Execute(ctx context.Context, args []string) error {
 
 	var lifetime time.Duration
 	var listenAddr, logFile, systemConfigFile, userConfigFile string
+	var proxy bool
 
 	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	pflag.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	pflag.StringVar(&logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
 	pflag.StringVar(&systemConfigFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
 	pflag.StringVar(&userConfigFile, "user", filepath.Join(home, ConfigDirName, "user.yml"), "Path to user configuration file")
+	pflag.BoolVar(&proxy, "proxy", false, "Enably proxying of PuTTY Agent (pageant) requests")
 	pflag.Parse()
 
 	// make sure config dir exists
@@ -51,8 +53,17 @@ func Execute(ctx context.Context, args []string) error {
 	defer crash.Close()
 	debug.SetCrashOutput(crash, debug.CrashOptions{})
 
+	// set options
+	opts := []client.LoginHandlerOption{
+		client.WithLifetime(lifetime),
+		client.AllowWithoutKey(),
+	}
+	if proxy {
+		opts = append(opts, client.WithPageantProxy())
+	}
+
 	// set up login client
-	lh, err := client.NewLoginHandler(systemConfigFile, userConfigFile, client.WithLifetime(lifetime), client.AllowWithoutKey())
+	lh, err := client.NewLoginHandler(systemConfigFile, userConfigFile, opts...)
 	if err != nil {
 		return err
 	}
@@ -87,6 +98,18 @@ func Execute(ctx context.Context, args []string) error {
 		return err
 	}
 	defer lockFile.Close()
+
+	// start pageant proxy if requested
+	if proxy {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go func() {
+			if err := lh.RunPageantProxy(ctx); err != nil {
+				logger.Error("error from pageant proxy", "error", err)
+			}
+		}()
+	}
 
 	app.RunLogged(logger)
 

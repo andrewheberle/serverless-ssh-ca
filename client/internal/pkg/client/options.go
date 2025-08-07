@@ -55,3 +55,9 @@ func WithLogger(logger *slog.Logger) LoginHandlerOption {
 		lh.logger = logger
 	}
 }
+
+func WithPageantProxy() LoginHandlerOption {
+	return func(lh *LoginHandler) {
+		lh.pageantProxy = true
+	}
+}
