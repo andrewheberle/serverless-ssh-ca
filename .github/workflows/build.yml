@@ -34,7 +34,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist-artifact
-          path: client/dist/
+          path: client/dist/**/*.exe
           retention-days: 2
   msi-build:
     name: Package as an MSI
@@ -59,6 +59,9 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: dist-artifact
+          path: client/dist
+      - name: Show downloaded artifacts
+        run: Get-Child-Item -Recurse client/dist
       - name: Build MSI
         run: |
           cd client
