@@ -56,8 +56,6 @@ jobs:
         with:
           name: dist-artifact
           path: client/dist
-      - name: Show downloaded artifacts
-        run: Get-ChildItem -Recurse client/dist
       - name: Add WiX Toolset to path
         run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Install go-msi
@@ -66,3 +64,4 @@ jobs:
         run: |
           cd client
           go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client.msi" --version "$(git describe --tags)"
+          Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client.msi").Hash) ssh-ca-client.msi" | Out-File -FilePath ".\dist\ssh-ca-client.msi.sha256sum"
