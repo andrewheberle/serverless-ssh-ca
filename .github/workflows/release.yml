@@ -40,7 +40,7 @@ jobs:
           path: client/dist/
           retention-days: 7
   msi-release:
-    name: Build and package as an MSI
+    name: Package as an MSI
     runs-on: windows-latest
     needs: goreleaser-release
     steps:
@@ -65,7 +65,7 @@ jobs:
       - name: Build MSI
         run: |
           cd client
-          go-msi make --arch amd64 --out tmp --src templates --msi ssh-ca-client.msi --version "$(git describe --tags)"
+          go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client.msi" --version "$(git describe --tags)"
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
