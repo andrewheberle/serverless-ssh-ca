@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/protect"
+	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/protect"
 	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/yaml"
 )

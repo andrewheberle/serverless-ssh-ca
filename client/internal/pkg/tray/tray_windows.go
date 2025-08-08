@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
@@ -140,7 +141,7 @@ func (app *Application) setState() {
 		app.mGenerate.Enable()
 		app.mRenew.Disable()
 		app.mExpiry.SetTitle("No certificate")
-		systray.SetTooltip("No private key found")
+		setTooltip("No private key found")
 		systray.SetIcon(app.trayIcons["error"])
 	case stateKeyOK:
 		// we have a key so check the state of the certificate
@@ -175,7 +176,7 @@ func (app *Application) setState() {
 		app.mRenew.SetTitle("Renew")
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle("Certificate expired")
-		systray.SetTooltip("Certificate expired")
+		setTooltip("Certificate expired")
 		systray.SetIcon(app.trayIcons["warning"])
 	case stateCertificateMissing:
 		// check we haven't renewed
@@ -190,7 +191,7 @@ func (app *Application) setState() {
 		app.mRenew.SetTitle("Request")
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle("No certificate")
-		systray.SetTooltip("No certificate found")
+		setTooltip("No certificate found")
 		systray.SetIcon(app.trayIcons["warning"])
 	case stateCertificateOK:
 		// check we haven't expired
@@ -215,10 +216,10 @@ func (app *Application) setState() {
 			// finish now
 			break
 		}
-		app.mRenew.SetTitle("Renew Early")
+		app.mRenew.SetTitle("Renew")
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle(fmt.Sprintf("%s left", timeLeft(app.client.CerificateExpiry())))
-		systray.SetTooltip(fmt.Sprintf("Current certificate valid (%s left)", timeLeft(app.client.CerificateExpiry())))
+		setTooltip("Current certificate valid")
 		systray.SetIcon(app.trayIcons["ok"])
 	}
 }
@@ -294,4 +295,18 @@ func (app *Application) notify(title string, message string, icon string) {
 func timeLeft(t time.Time) string {
 	timeLeft := time.Until(t)
 	return fmt.Sprintf("%02dh%02dm", int(timeLeft.Hours()), int(timeLeft.Minutes())%60)
+}
+
+func setTooltip(message string) {
+	version := "Unknown"
+
+	// get version if available
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		version = info.Main.Version
+	}
+
+	// set tooltip
+	tooltip := fmt.Sprintf("SSH CA Client (%s) - %s", version, message)
+	systray.SetTooltip(tooltip)
 }
