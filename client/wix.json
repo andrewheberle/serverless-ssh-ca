@@ -1,0 +1,38 @@
+{
+  "product": "Serverless SSH CA Client",
+  "company": "andrewheberle",
+  "license": "..\\LICENSE",
+  "upgrade-code": "75b8e17f-138e-447e-bf35-c093ab5293e8",
+  "files": {
+    "guid": "66807fd7-177d-4462-822a-24211b9fb0f1",
+    "items": [
+      "dist\\gui_windows_amd64_v1\\ssh-ca-client.exe",
+      "dist\\cli_windows_amd64_v1\\ssh-ca-client-cli.exe"
+    ]
+  },
+  "env": {
+    "guid": "bb3ae565-9b86-4568-9491-cc08809e551a",
+    "vars": [
+      {
+        "name": "PATH",
+        "value": "[INSTALLDIR]",
+        "permanent": "no",
+        "system": "no",
+        "action": "set",
+        "part": "last"
+      }
+    ]
+  },
+  "shortcuts": {
+    "guid": "4d117172-5c8f-4389-ba93-58c9f35e6a0f",
+    "items": [
+      {
+        "name": "Serverless SSH CA Client",
+        "description": "Serverless SSH CA Client",
+        "target": "[INSTALLDIR]\\ssh-ca-client.exe",
+        "wdir": "INSTALLDIR",
+        "arguments": "--proxy"
+      }
+    ]
+  }
+}
