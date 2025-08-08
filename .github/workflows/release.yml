@@ -38,7 +38,7 @@ jobs:
         with:
           name: dist-artifact
           path: client/dist/
-          retention-days: 5
+          retention-days: 7
   msi-release:
     name: Build and package as an MSI
     runs-on: windows-latest

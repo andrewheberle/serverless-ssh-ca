@@ -30,3 +30,36 @@ jobs:
           version: "~> v2"
           args: release --clean --snapshot
           workdir: client
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifact
+          path: client/dist/
+          retention-days: 2
+  msi-build:
+    name: Build and package as an MSI
+    runs-on: windows-latest
+    needs: goreleaser-build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: client/go.mod
+          cache: false
+      - name: Add WiX Toolset to path
+        run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Install go-msi
+        run: go install github.com/mh-cbon/go-msi@latest
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: dist-artifact
+      - name: Build MSI
+        run: |
+          cd client
+          go-msi make --arch amd64 --msi ssh-ca-client.msi --version "$(git describe --tags)"
