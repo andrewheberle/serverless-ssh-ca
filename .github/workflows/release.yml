@@ -42,6 +42,8 @@ jobs:
   msi-release:
     name: Package as an MSI
     runs-on: windows-latest
+    permissions:
+      contents: write
     needs: goreleaser-release
     steps:
       - name: Checkout
@@ -67,10 +69,10 @@ jobs:
         run: |
           cd client
           go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client.msi" --version "$(git describe --tags)"
-                    Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client.msi").Hash) ssh-ca-client.msi" | Out-File -FilePath ".\dist\ssh-ca-client.msi.sha256sum"
+          Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client.msi").Hash) ssh-ca-client.msi" | Out-File -FilePath ".\dist\ssh-ca-client.msi.sha256sum"
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/ssh-ca-client.msi
-            dist/ssh-ca-client.msi.sha256sum
+            client/dist/ssh-ca-client.msi
+            client/dist/ssh-ca-client.msi.sha256sum
