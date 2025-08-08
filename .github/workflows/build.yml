@@ -57,9 +57,7 @@ jobs:
           name: dist-artifact
           path: client/dist
       - name: Show downloaded artifacts
-        run: |
-          [System.Environment]::CurrentDirectory
-          Get-Child-Item -Recurse client/dist
+        run: Get-ChildItem -Recurse client/dist
       - name: Add WiX Toolset to path
         run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Install go-msi
