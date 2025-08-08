@@ -40,7 +40,7 @@ OIDC and SSH CA configuration with user specific data kept seperate.
 
 The client can be run in the following ways:
 
-### Generating A Key
+### Generating a Key
 
 To generate a new private key, run as follows:
 
