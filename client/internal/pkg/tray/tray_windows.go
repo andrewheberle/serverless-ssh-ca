@@ -3,9 +3,11 @@ package tray
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
@@ -26,10 +28,11 @@ const (
 )
 
 type Application struct {
-	client *client.LoginHandler
-	done   chan bool
-	title  string
-	addr   string
+	client  *client.LoginHandler
+	done    chan bool
+	title   string
+	addr    string
+	renewAt time.Duration
 
 	trayIcons         map[string][]byte
 	notificationIcons map[string][]byte
@@ -40,16 +43,26 @@ type Application struct {
 	mRenew    *systray.MenuItem
 	mQuit     *systray.MenuItem
 
+	mu             sync.Mutex
+	refreshBackOff int
+	refreshFailure int
+
 	logger *slog.Logger
 }
 
-func New(title, addr string, fs embed.FS, client *client.LoginHandler) (*Application, error) {
+var (
+	ErrRenewSkipped = errors.New("renew skipped")
+	ErrRenewRunning = errors.New("a renew was already in progress")
+)
+
+func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt time.Duration) (*Application, error) {
 	app := &Application{
 		addr:              addr,
 		client:            client,
 		done:              make(chan bool),
 		logger:            slog.New(slog.DiscardHandler),
 		notificationIcons: make(map[string][]byte),
+		renewAt:           renewAt,
 		state:             stateInit,
 		title:             title,
 		trayIcons:         make(map[string][]byte),
@@ -199,13 +212,16 @@ func (app *Application) setState() {
 			app.logger.Info("current certificate expired")
 
 			// try to refresh
-			if err := app.refresh(); err == nil {
+			if err := app.refreshWithBackoff(); err == nil {
+				app.logger.Info("refresh of certificate succeeded")
 				// send notification
 				app.notify("Cerificate Refreshed", "The current certificate was successfully refreshed", "ok")
 				// re-run to handle change
 				app.setState()
 				// finish now
 				break
+			} else {
+				app.logger.Error("could not refresh expired certificate", "error", err)
 			}
 
 			app.state = stateCertificateExpired
@@ -216,6 +232,26 @@ func (app *Application) setState() {
 			// finish now
 			break
 		}
+
+		// check if the renewAt threshold has been reached
+		if time.Until(app.client.CerificateExpiry()) < app.renewAt {
+			app.logger.Info("current certificate close to expiry")
+
+			// try to refresh
+			if err := app.refreshWithBackoff(); err == nil {
+				app.logger.Info("refresh of certificate succeeded")
+				// send notification
+				app.notify("Cerificate Refreshed", "The current certificate was successfully refreshed", "ok")
+				// re-run to handle change
+				app.setState()
+				// finish now
+				break
+			} else {
+				// just log error
+				app.logger.Error("could not refresh certificate close to expiry", "error", err)
+			}
+		}
+
 		app.mRenew.SetTitle("Renew")
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle(fmt.Sprintf("%s left", timeLeft(app.client.CerificateExpiry())))
@@ -271,11 +307,62 @@ func (app *Application) eventloop() {
 	}
 }
 
+func (app *Application) refreshWithBackoff() error {
+	// try to take lock and error immediately if we cant
+	if !app.mu.TryLock() {
+		return ErrRenewRunning
+	}
+	defer app.mu.Unlock()
+
+	if app.refreshBackOff > 0 {
+		// reduce our backoff counter
+		app.refreshBackOff--
+
+		// exit
+		return ErrRenewSkipped
+	}
+
+	// we are ok to attempt a refresh
+	if err := app.client.Refresh(); err != nil {
+		// increment our failure count and set a backoff of double our failure count
+		app.refreshFailure++
+		app.refreshBackOff = app.refreshFailure * 2
+
+		return err
+	}
+
+	// reset on success
+	app.refreshFailure = 0
+	app.refreshBackOff = 0
+
+	return nil
+}
+
 func (app *Application) refresh() error {
-	return app.client.Refresh()
+	// try to take lock and error immediately if we cant
+	if !app.mu.TryLock() {
+		return ErrRenewRunning
+	}
+	defer app.mu.Unlock()
+
+	if err := app.client.Refresh(); err != nil {
+		return err
+	}
+
+	// reset on success
+	app.refreshFailure = 0
+	app.refreshBackOff = 0
+
+	return nil
 }
 
 func (app *Application) renew() error {
+	// try to take lock and error immediately if we cant
+	if !app.mu.TryLock() {
+		return ErrRenewRunning
+	}
+	defer app.mu.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 

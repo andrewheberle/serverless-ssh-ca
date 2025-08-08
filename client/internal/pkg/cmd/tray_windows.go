@@ -6,6 +6,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -29,11 +30,12 @@ func Execute(ctx context.Context, args []string) error {
 		return err
 	}
 
-	var lifetime time.Duration
+	var lifetime, renewAt time.Duration
 	var listenAddr, logFile, crashFile, systemConfigFile, userConfigFile string
 	var proxy bool
 
 	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
+	pflag.DurationVar(&renewAt, "renew", time.Hour, "Renew once remaining time gets below this value")
 	pflag.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	pflag.StringVar(&logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
 	pflag.StringVar(&crashFile, "crash", filepath.Join(home, ConfigDirName, "crash.log"), "Path to log file for panics/crashes")
@@ -41,6 +43,11 @@ func Execute(ctx context.Context, args []string) error {
 	pflag.StringVar(&userConfigFile, "user", filepath.Join(home, ConfigDirName, "user.yml"), "Path to user configuration file")
 	pflag.BoolVar(&proxy, "proxy", false, "Enably proxying of PuTTY Agent (pageant) requests")
 	pflag.Parse()
+
+	// check renewAt is not larger than lifetime
+	if renewAt > lifetime {
+		return fmt.Errorf("--renew cannot be larger than --life")
+	}
 
 	// make sure config dir exists
 	if err := os.MkdirAll(filepath.Dir(userConfigFile), 0755); err != nil {
@@ -72,7 +79,7 @@ func Execute(ctx context.Context, args []string) error {
 
 	// set up tray app
 	beeep.AppName = "Serverless SSH CA Client"
-	app, err := tray.New(beeep.AppName, listenAddr, resources, lh)
+	app, err := tray.New(beeep.AppName, listenAddr, resources, lh, renewAt)
 	if err != nil {
 		return err
 	}
