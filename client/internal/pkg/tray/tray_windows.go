@@ -221,7 +221,11 @@ func (app *Application) setState() {
 				// finish now
 				break
 			} else {
-				app.logger.Error("could not refresh expired certificate", "error", err)
+				if errors.Is(err, ErrRenewSkipped) {
+					app.logger.Error("expired certificate was not renewed due to recent failures", "failures", app.refreshFailure, "backoff", app.refreshBackOff)
+				} else {
+					app.logger.Error("could not refresh expired certificate", "error", err, "failures", app.refreshFailure, "backoff", app.refreshBackOff)
+				}
 			}
 
 			app.state = stateCertificateExpired
@@ -248,7 +252,11 @@ func (app *Application) setState() {
 				break
 			} else {
 				// just log error
-				app.logger.Error("could not refresh certificate close to expiry", "error", err)
+				if errors.Is(err, ErrRenewSkipped) {
+					app.logger.Error("certificate near expiry was not renewed due to recent failures", "failures", app.refreshFailure, "backoff", app.refreshBackOff)
+				} else {
+					app.logger.Error("could not refresh certificate close to expiry", "error", err, "failures", app.refreshFailure, "backoff", app.refreshBackOff)
+				}
 			}
 		}
 
