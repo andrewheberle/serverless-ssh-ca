@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
@@ -42,13 +43,17 @@ type Application struct {
 	mRenew    *systray.MenuItem
 	mQuit     *systray.MenuItem
 
+	mu             sync.Mutex
 	refreshBackOff int
 	refreshFailure int
 
 	logger *slog.Logger
 }
 
-var ErrRenewSkipped = errors.New("renew skipped")
+var (
+	ErrRenewSkipped = errors.New("renew skipped")
+	ErrRenewRunning = errors.New("a renew was already in progress")
+)
 
 func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt time.Duration) (*Application, error) {
 	app := &Application{
@@ -303,6 +308,12 @@ func (app *Application) eventloop() {
 }
 
 func (app *Application) refreshWithBackoff() error {
+	// try to take lock and error immediately if we cant
+	if !app.mu.TryLock() {
+		return ErrRenewRunning
+	}
+	defer app.mu.Unlock()
+
 	if app.refreshBackOff > 0 {
 		// reduce our backoff counter
 		app.refreshBackOff--
@@ -328,6 +339,12 @@ func (app *Application) refreshWithBackoff() error {
 }
 
 func (app *Application) refresh() error {
+	// try to take lock and error immediately if we cant
+	if !app.mu.TryLock() {
+		return ErrRenewRunning
+	}
+	defer app.mu.Unlock()
+
 	if err := app.client.Refresh(); err != nil {
 		return err
 	}
@@ -340,6 +357,12 @@ func (app *Application) refresh() error {
 }
 
 func (app *Application) renew() error {
+	// try to take lock and error immediately if we cant
+	if !app.mu.TryLock() {
+		return ErrRenewRunning
+	}
+	defer app.mu.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
