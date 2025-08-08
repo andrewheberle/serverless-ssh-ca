@@ -374,7 +374,15 @@ func (app *Application) renew() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	return app.client.ExecuteLoginWithContext(ctx, app.addr)
+	if err := app.client.ExecuteLoginWithContext(ctx, app.addr); err != nil {
+		return err
+	}
+
+	// reset on success
+	app.refreshFailure = 0
+	app.refreshBackOff = 0
+
+	return nil
 }
 
 func (app *Application) generate() error {
