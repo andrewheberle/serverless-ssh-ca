@@ -87,6 +87,7 @@ The GUI supports the following command line flags:
 | Flag       | Type            | Description                                       | Default                               | 
 |------------|-----------------|---------------------------------------------------|---------------------------------------|
 | `--life`   | `time.Duration` | Lifetime of SSH certificate                       | `24h`                                 |
+| `--renew`  | `time.Duration` | Renew once remaining time gets below this value   | `1h`                                  |
 | `--addr`   | `string`        | Listen address for OIDC auth flow                 | `localhost:3000`                      |
 | `--log`    | `string`        | Path to log file                                  | `$HOME/.ssh-serverless-ca/tray.log`   |
 | `--crash`  | `string`        | Path to log file for panics/crashes               | `$HOME/.ssh-serverless-ca/crash.log`  |
