@@ -23,24 +23,32 @@ import (
 //go:embed icons
 var resources embed.FS
 
+func configDirs() (user, system string, err error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", "", err
+	}
+
+	return filepath.Join(dir, "Serverless SSH CA Client"), filepath.Join(os.Getenv("ProgramData"), "Serverless SSH CA Client"), nil
+}
+
 func Execute(ctx context.Context, args []string) error {
-	// find home dir
-	home, err := os.UserHomeDir()
+	// find config dirs
+	user, system, err := configDirs()
 	if err != nil {
 		return err
 	}
 
 	var lifetime, renewAt time.Duration
-	var listenAddr, logFile, crashFile, systemConfigFile, userConfigFile string
+	var listenAddr, logDir, systemConfigFile, userConfigFile string
 	var proxy bool
 
 	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	pflag.DurationVar(&renewAt, "renew", time.Hour, "Renew once remaining time gets below this value")
 	pflag.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
-	pflag.StringVar(&logFile, "log", filepath.Join(home, ConfigDirName, "tray.log"), "Path to log file")
-	pflag.StringVar(&crashFile, "crash", filepath.Join(home, ConfigDirName, "crash.log"), "Path to log file for panics/crashes")
-	pflag.StringVar(&systemConfigFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
-	pflag.StringVar(&userConfigFile, "user", filepath.Join(home, ConfigDirName, "user.yml"), "Path to user configuration file")
+	pflag.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
+	pflag.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
+	pflag.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
 	pflag.BoolVar(&proxy, "proxy", false, "Enably proxying of PuTTY Agent (pageant) requests")
 	pflag.Parse()
 
@@ -49,12 +57,18 @@ func Execute(ctx context.Context, args []string) error {
 		return fmt.Errorf("--renew cannot be larger than --life")
 	}
 
-	// make sure config dir exists
-	if err := os.MkdirAll(filepath.Dir(userConfigFile), 0755); err != nil {
+	// make sure user config dir exists
+	if err := os.MkdirAll(user, 0755); err != nil {
+		return err
+	}
+
+	// make sure log dir exists
+	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return err
 	}
 
 	// set location to write panics
+	crashFile := filepath.Join(logDir, "crash.log")
 	crash, err := os.Create(crashFile)
 	if err != nil {
 		return err
@@ -85,23 +99,18 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set up logger
-	var logger *slog.Logger
-	if logFile != "" {
-		log, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-		defer log.Close()
-
-		logger = slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{}))
-		slog.Info("logging to log file", "file", logFile)
-	} else {
-		// otherwise no logging
-		logger = slog.New(slog.DiscardHandler)
+	logFile := filepath.Join(logDir, "tray.log")
+	log, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
 	}
+	defer log.Close()
+
+	logger := slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{}))
+	slog.Info("logging to log file", "file", logFile)
 
 	// make sure we are only running once
-	lockFile, err := singleinstance.CreateLockFile(filepath.Join(home, ConfigDirName, "tray.lock"))
+	lockFile, err := singleinstance.CreateLockFile(filepath.Join(user, "tray.lock"))
 	if err != nil {
 		logger.Error("could not take lock", "error", err)
 		return err
