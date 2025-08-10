@@ -23,16 +23,20 @@ import (
 //go:embed icons
 var resources embed.FS
 
+const appName = "Serverless SSH CA Client"
+
 func configDirs() (user, system string, err error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", "", err
 	}
 
-	return filepath.Join(dir, "Serverless SSH CA Client"), filepath.Join(os.Getenv("ProgramData"), "Serverless SSH CA Client"), nil
+	return filepath.Join(dir, appName), filepath.Join(os.Getenv("ProgramData"), appName), nil
 }
 
 func Execute(ctx context.Context, args []string) error {
+	beeep.AppName = appName
+
 	// find config dirs
 	user, system, err := configDirs()
 	if err != nil {
@@ -41,7 +45,7 @@ func Execute(ctx context.Context, args []string) error {
 
 	var lifetime, renewAt time.Duration
 	var listenAddr, logDir, systemConfigFile, userConfigFile string
-	var proxy bool
+	var disableProxy bool
 
 	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	pflag.DurationVar(&renewAt, "renew", time.Hour, "Renew once remaining time gets below this value")
@@ -49,7 +53,7 @@ func Execute(ctx context.Context, args []string) error {
 	pflag.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
 	pflag.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
 	pflag.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
-	pflag.BoolVar(&proxy, "proxy", false, "Enably proxying of PuTTY Agent (pageant) requests")
+	pflag.BoolVar(&disableProxy, "disable-proxy", false, "Disable proxying of PuTTY Agent (pageant) requests")
 	pflag.Parse()
 
 	// check renewAt is not larger than lifetime
@@ -81,7 +85,7 @@ func Execute(ctx context.Context, args []string) error {
 		client.WithLifetime(lifetime),
 		client.AllowWithoutKey(),
 	}
-	if proxy {
+	if !disableProxy {
 		opts = append(opts, client.WithPageantProxy())
 	}
 
@@ -92,7 +96,6 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set up tray app
-	beeep.AppName = "Serverless SSH CA Client"
 	app, err := tray.New(beeep.AppName, listenAddr, resources, lh, renewAt)
 	if err != nil {
 		return err
@@ -118,7 +121,7 @@ func Execute(ctx context.Context, args []string) error {
 	defer lockFile.Close()
 
 	// start pageant proxy if requested
-	if proxy {
+	if !disableProxy {
 		logger.Info("attempting to start pageant proxy process")
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
