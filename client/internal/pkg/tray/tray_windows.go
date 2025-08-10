@@ -25,6 +25,8 @@ const (
 	stateCertificateOK      appState = "CertificateOK"
 	stateCertificateMissing appState = "CertificateMissing"
 	stateCertificateExpired appState = "CertificateExpired"
+
+	defaultIcon = "ok"
 )
 
 type Application struct {
@@ -390,7 +392,14 @@ func (app *Application) generate() error {
 }
 
 func (app *Application) notify(title string, message string, icon string) {
-	if err := beeep.Notify(title, message, icon); err != nil {
+	// grab icon
+	b, ok := app.notificationIcons[icon]
+	if !ok {
+		b = app.notificationIcons[defaultIcon]
+	}
+
+	// set notification
+	if err := beeep.Notify(title, message, b); err != nil {
 		app.logger.Error("could not send notification", "error", err)
 	}
 }
