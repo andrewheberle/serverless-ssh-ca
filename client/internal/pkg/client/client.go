@@ -667,3 +667,13 @@ func (lh *LoginHandler) CerificateExpiry() time.Time {
 func (lh *LoginHandler) SetLogger(logger *slog.Logger) {
 	lh.logger = logger
 }
+
+// OIDCConfig shows the current underlying OIDC config
+func (lh *LoginHandler) OIDCConfig() config.ClientOIDCConfig {
+	return lh.config.Oidc()
+}
+
+// CertificateAuthorityURL shows the CA URL
+func (lh *LoginHandler) CertificateAuthorityURL() string {
+	return lh.config.CertificateAuthorityURL()
+}

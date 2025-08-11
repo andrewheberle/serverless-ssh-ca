@@ -66,6 +66,10 @@ func loadConfig(name string) SystemConfig {
 //
 // An error is returned if values are not set after merge
 func mergeConfig(a, b SystemConfig) (SystemConfig, error) {
+	if a.ClientID != "" {
+		b.ClientID = a.ClientID
+	}
+
 	if a.Issuer != "" {
 		b.Issuer = a.Issuer
 	}

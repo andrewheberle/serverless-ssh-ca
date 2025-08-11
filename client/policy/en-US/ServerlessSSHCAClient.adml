@@ -1,11 +1,15 @@
 <?xml version='1.0' encoding='utf-8'?>
 
 <policyDefinitionResources revision="1.0" schemaVersion="1.0">
-    <displayName>Serverless SSH CA Client</displayName>
-    <description>The client for Serverless SSH CA</description>
+    <displayName>
+    </displayName>
+    <description>
+    </description>
     <resources>
         <stringTable>
-            <string id="Category">Settings for the Serverless SSH CA Client</string>
+            <string id="Category">Serverless SSH CA Client</string>
+            <string id="Category_Explain">Settings for the Serverless SSH CA Client</string>
+            <string id="SupportedOn_All">All versions of the Serverless SSH CA Client</string>
             <string id="ClientID">Client ID</string>
             <string id="ClientID_Explain">OIDC Client ID</string>
             <string id="Issuer">Issuer</string>

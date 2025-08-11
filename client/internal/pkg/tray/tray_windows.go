@@ -108,8 +108,10 @@ func (app *Application) Run() {
 }
 
 func (app *Application) RunLogged(logger *slog.Logger) {
-	app.logger = logger
-	app.client.SetLogger(logger)
+	if logger != nil {
+		app.logger = logger
+		app.client.SetLogger(logger)
+	}
 	systray.Run(app.onReady, func() {})
 }
 
@@ -130,7 +132,13 @@ func (app *Application) onReady() {
 	app.setState()
 
 	// send some status
-	app.logger.Info("tray application started")
+	app.logger.Info("tray application started",
+		"client_id", app.client.OIDCConfig().ClientID,
+		"issuer", app.client.OIDCConfig().Issuer,
+		"redirect_url", app.client.OIDCConfig().RedirectURL,
+		"scopes", app.client.OIDCConfig().Scopes,
+		"ssh_ca_url", app.client.CertificateAuthorityURL(),
+	)
 
 	// handle clicks
 	go app.eventloop()
@@ -277,7 +285,7 @@ func (app *Application) eventloop() {
 
 		select {
 		case <-t.C:
-			// this is just to stop here
+			// this is a noop
 			continue
 		case <-app.mRenew.ClickedCh:
 			// start by disabling menu item so we aren't overlapping
@@ -286,10 +294,11 @@ func (app *Application) eventloop() {
 			// try refresh first
 			if err := app.refresh(); err != nil {
 				// then do interactive renewal
+				app.logger.Warn("could not perform a refresh, running renew", "error", err)
 				if err := app.renew(); err != nil {
-					app.logger.Error("could not request certificate", "error", err)
-					app.notify("Error", "The certificate request failed", "error")
-					continue
+					app.logger.Error("could not renew certificate", "error", err)
+					app.notify("Error", "The certificate renewal failed", "error")
+					break
 				}
 			}
 
@@ -303,7 +312,7 @@ func (app *Application) eventloop() {
 			if err := app.generate(); err != nil {
 				app.logger.Error("could not generate private key", "error", err)
 				app.notify("Error", "The generation of a private key failed", "error")
-				continue
+				break
 			}
 
 			app.notify("Key Generated", "A private key was sucessfully generated", "ok")
@@ -354,6 +363,8 @@ func (app *Application) refresh() error {
 		return ErrRenewRunning
 	}
 	defer app.mu.Unlock()
+
+	app.logger.Info("attempting a refresh")
 
 	if err := app.client.Refresh(); err != nil {
 		return err
