@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='utf-8'?>
+
+<policyDefinitionResources revision="1.0" schemaVersion="1.0">
+    <displayName>
+    </displayName>
+    <description>
+    </description>
+    <resources>
+        <stringTable>
+            <string id="Category">Serverless SSH CA Client</string>
+            <string id="Category_Explain">Settings for the Serverless SSH CA Client</string>
+            <string id="SupportedOn_All">All versions of the Serverless SSH CA Client</string>
+            <string id="ClientID">Client ID</string>
+            <string id="ClientID_Explain">OIDC Client ID</string>
+            <string id="Issuer">Issuer</string>
+            <string id="Issuer_Explain">OIDC Issuer</string>
+            <string id="Scopes">Scopes</string>
+            <string id="Scopes_Explain">List of OIDC scopes</string>
+            <string id="RedirectURL">Redirect URL</string>
+            <string id="RedirectURL_Explain">Redirect URL of client for OIDC authentication flow</string>
+            <string id="CertificateAuthorityURL">Certificate Authority URL</string>
+            <string id="CertificateAuthorityURL_Explain">The URL of the SSH Certificate Authority (CA)</string>
+        </stringTable>
+        <presentationTable>
+            <presentation id="ClientID">
+                <textBox refId="ClientID_Element">
+                    <label>Enter the OIDC Client ID:</label>
+                </textBox>
+            </presentation>
+            <presentation id="Issuer">
+                <textBox refId="Issuer_Element">
+                    <label>Enter the OIDC Issuer:</label>
+                </textBox>
+            </presentation>
+            <presentation id="Scopes">
+                <multiTextBox refId="Scopes_Element">Enter the list of OIDC scopes:</multiTextBox>
+            </presentation>
+            <presentation id="RedirectURL">
+                <textBox refId="RedirectURL_Element">
+                    <label>Enter the OIDC Redirect URL:</label>
+                </textBox>
+            </presentation>
+            <presentation id="CertificateAuthorityURL">
+                <textBox refId="CertificateAuthorityURL_Element">
+                    <label>Enter the Certificate Authority (CA) URL:</label>
+                </textBox>
+            </presentation>
+        </presentationTable>
+    </resources>
+</policyDefinitionResources>
