@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 
-<policyDefinitions revision="1.0" schemaVersion="1.0">
+<policyDefinitionResources revision="1.0" schemaVersion="1.0">
     <displayName>Serverless SSH CA Client</displayName>
     <description>The client for Serverless SSH CA</description>
     <resources>
@@ -29,9 +29,7 @@
                 </textBox>
             </presentation>
             <presentation id="Scopes">
-                <multiTextBox refId="Scopes_Element">
-                    <label>Enter the list of OIDC scopes:</label>
-                </multiTextBox>
+                <multiTextBox refId="Scopes_Element">Enter the list of OIDC scopes:</multiTextBox>
             </presentation>
             <presentation id="RedirectURL">
                 <textBox refId="RedirectURL_Element">
