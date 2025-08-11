@@ -86,7 +86,7 @@ func mergeConfig(a, b SystemConfig) (SystemConfig, error) {
 		b.CertificateAuthorityURL = a.CertificateAuthorityURL
 	}
 
-	if a.Issuer == "" || len(a.Scopes) == 0 || a.RedirectURL == "" || a.CertificateAuthorityURL == "" {
+	if a.ClientID == "" || a.Issuer == "" || len(a.Scopes) == 0 || a.RedirectURL == "" || a.CertificateAuthorityURL == "" {
 		return SystemConfig{}, ErrConfigIncomplete
 	}
 
