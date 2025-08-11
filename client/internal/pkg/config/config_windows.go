@@ -17,7 +17,9 @@ func loadPolicy() SystemConfig {
 	if err != nil {
 		return SystemConfig{}
 	}
-	defer k.Close()
+	defer func() {
+		_ = k.Close()
+	}()
 
 	var config SystemConfig
 	clientId, _, err := k.GetStringValue("ClientID")
