@@ -18,6 +18,7 @@ import (
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/tray"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/pflag"
+	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 //go:embed icons
@@ -34,6 +35,14 @@ func configDirs() (user, system string, err error) {
 	return filepath.Join(dir, appName), filepath.Join(os.Getenv("ProgramData"), appName), nil
 }
 
+func runInstall() error {
+	return eventlog.InstallAsEventCreate("Serverless SSH CA Client", eventlog.Error|eventlog.Warning|eventlog.Info)
+}
+
+func runUninstall() error {
+	return eventlog.Remove("Serverless SSH CA Client")
+}
+
 func Execute(ctx context.Context, args []string) error {
 	beeep.AppName = appName
 
@@ -45,16 +54,35 @@ func Execute(ctx context.Context, args []string) error {
 
 	var lifetime, renewAt time.Duration
 	var listenAddr, logDir, systemConfigFile, userConfigFile string
-	var disableProxy bool
+	var install, uninstall, disableProxy bool
 
-	pflag.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
-	pflag.DurationVar(&renewAt, "renew", time.Hour, "Renew once remaining time gets below this value")
-	pflag.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
-	pflag.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
-	pflag.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
-	pflag.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
-	pflag.BoolVar(&disableProxy, "disable-proxy", false, "Disable proxying of PuTTY Agent (pageant) requests")
-	pflag.Parse()
+	flags := pflag.NewFlagSet("tray", pflag.ExitOnError)
+
+	flags.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
+	flags.DurationVar(&renewAt, "renew", time.Hour, "Renew once remaining time gets below this value")
+	flags.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
+	flags.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
+	flags.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
+	flags.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
+	flags.BoolVar(&disableProxy, "disable-proxy", false, "Disable proxying of PuTTY Agent (pageant) requests")
+	flags.BoolVar(&install, "install", false, "Perform post-install steps")
+	flags.MarkHidden("install")
+	flags.BoolVar(&uninstall, "uninstall", false, "Perform pre-uninstall steps")
+	flags.MarkHidden("uninstall")
+	_ = flags.Parse(args)
+
+	// ensure install and uninstall are not called togther
+	if install && uninstall {
+		return fmt.Errorf("--install and --uninstall cannot be used together")
+	}
+
+	// handle install or uninstall
+	if install {
+		return runInstall()
+	}
+	if uninstall {
+		return runUninstall()
+	}
 
 	// check renewAt is not larger than lifetime
 	if renewAt > lifetime {
