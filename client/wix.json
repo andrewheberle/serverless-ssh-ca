@@ -22,7 +22,7 @@
         "description": "Serverless SSH CA Client",
         "target": "[INSTALLDIR]\\ssh-ca-client.exe",
         "wdir": "INSTALLDIR",
-        "arguments": "--proxy"
+        "arguments": ""
       }
     ]
   },
