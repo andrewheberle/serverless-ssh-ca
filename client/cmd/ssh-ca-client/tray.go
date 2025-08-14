@@ -4,5 +4,23 @@
 
 package main
 
-// This is only here to trigger the generation of the required syso file for
-// the Windows tray application during the build process
+import (
+	"fmt"
+	"os"
+
+	"golang.org/x/sys/windows/svc/eventlog"
+)
+
+func logFatal(format string, a ...any) {
+	logger, err := eventlog.Open("Serverless SSH CA Client")
+	if err != nil {
+		panic(err)
+	}
+	defer logger.Close()
+
+	if err := logger.Error(1000, fmt.Sprintf(format, a...)); err != nil {
+		panic(err)
+	}
+
+	os.Exit(1)
+}

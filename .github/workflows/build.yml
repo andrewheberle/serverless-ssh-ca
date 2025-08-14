@@ -35,7 +35,7 @@ jobs:
         with:
           name: dist-artifact
           path: client/dist/**/*.exe
-          retention-days: 2
+          retention-days: 1
   msi-build:
     name: Package as an MSI
     runs-on: windows-latest
@@ -57,7 +57,7 @@ jobs:
           name: dist-artifact
           path: client/dist
       - name: Add WiX Toolset to path
-        run: echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: Write-Output $env:WIX | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Install go-msi
         run: go install github.com/mh-cbon/go-msi@latest
       - name: Build MSI
@@ -65,3 +65,9 @@ jobs:
           cd client
           go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client.msi" --version "$(git describe --tags)"
           Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client.msi").Hash) ssh-ca-client.msi" | Out-File -FilePath ".\dist\ssh-ca-client.msi.sha256sum"
+      - name: Upload MSI as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-artifact
+          path: client/dist/**/*.msi
+          retention-days: 1
