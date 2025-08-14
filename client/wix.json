@@ -25,5 +25,15 @@
         "arguments": "--proxy"
       }
     ]
-  }
+  },
+  "hooks": [
+    {
+      "when": "install",
+      "command": "[INSTALLDIR]\\ssh-ca-client.exe --install"
+    },
+    {
+      "when": "uninstall",
+      "command": "[INSTALLDIR]\\ssh-ca-client.exe --uninstall"
+    }
+  ]
 }
