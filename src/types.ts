@@ -28,7 +28,8 @@ export type CertificateSignerResponse = {
 
 // this is the expected JWT payload for a certificate request
 export type CertificateRequestJWTPayload = {
-    email?: string
+    email: string
+    [key: string]: string | string[]
 } & JWTPayload
 
 export type SSHExtension = {

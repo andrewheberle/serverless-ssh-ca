@@ -17,11 +17,18 @@ export const withValidJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async 
         const { payload } = await verifyJWT(jwt)
 
         if (payload.email === undefined) {
-            console.error("JWT was verified but was missing email claim")
+            console.error("JWT was verified but was missing required email claim")
             throw new StatusError(400)
         }
 
         console.log(`Validated JWT for ${payload.email}`)
+
+        if (env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM !== undefined) {
+            if (payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM] !== undefined) {
+                const p = payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM]
+                request.principals = typeof p === "string" ? [p] : p
+            }
+        }
 
         // add info to request
         request.sub = payload.sub
