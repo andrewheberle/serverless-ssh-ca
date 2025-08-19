@@ -15,6 +15,9 @@
 			"JWT_ALGORITHMS": {
 				"description": "The supported JWT algorithms"
 			},
+			"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": {
+				"description": "The OIDC claim that contains additional SSH principals to add to the certificate. If ommitted only the default claims (via SSH_CERTIFICATE_PRINCIPALS and SSH_CERTIFICATE_INCLUDE_SELF) are added"
+			},
 			"SSH_CERTIFICATE_LIFETIME": {
 				"description": "The lifetime of the issued SSH certificates, although the client may request a shorter duration"
 			},

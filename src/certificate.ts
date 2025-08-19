@@ -75,6 +75,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
             })
         }
     } else {
+        // use defaults if not provided
         env.SSH_CERTIFICATE_EXTENSIONS.forEach((ext: string) => {
             extensions.push({
                 critical: false,
@@ -85,6 +86,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
 
     }
 
+    // add info to certificate
     if (certificate.signatures.openssh !== undefined) {
         certificate.signatures = {
             openssh: {

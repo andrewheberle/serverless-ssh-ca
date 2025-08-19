@@ -17,7 +17,7 @@ export const withValidJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async 
         const { payload } = await verifyJWT(jwt)
 
         if (payload.email === undefined) {
-            console.error("JWT was verified but was missing email claim")
+            console.error("JWT was verified but was missing required email claim")
             throw new StatusError(400)
         }
 

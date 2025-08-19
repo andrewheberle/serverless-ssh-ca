@@ -23,6 +23,7 @@
 		"JWT_JWKS_URL": "https://idp.example.com/.well-known/jwks.json",
 		"JWT_ISSUER": "https://idp.example.com",
 		"JWT_ALGORITHMS": ["RS256"],
+		"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": "groups",
 		"SSH_CERTIFICATE_LIFETIME": "24 hours",
 		"SSH_CERTIFICATE_PRINCIPALS": ["ssh-admin"],
 		"SSH_CERTIFICATE_INCLUDE_SELF": false,
