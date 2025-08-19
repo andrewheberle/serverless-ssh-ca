@@ -33,6 +33,10 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
 
                     // add to request making sure its as string[]
                     request.principals = typeof p === "string" ? [p] : p
+
+                    console.log(`Identity token included the following principals: ${request.principals.join(", ")}`)
+                } else {
+                    console.log("No additional principals included in identity token")
                 }
             }
         }
