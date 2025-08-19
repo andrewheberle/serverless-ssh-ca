@@ -25,6 +25,16 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
             if (identity.payload.sub === undefined && request.sub === undefined) {
                 console.warn("The sub claim was missing on tokens")
             }
+
+            // extract principals claim info from id token if set
+            if (env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM !== undefined) {
+                if (identity.payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM] !== undefined) {
+                    const p = identity.payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM]
+
+                    // add to request making sure its as string[]
+                    request.principals = typeof p === "string" ? [p] : p
+                }
+            }
         }
 
         // parse provided public key

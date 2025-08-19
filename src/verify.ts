@@ -23,13 +23,6 @@ export const withValidJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async 
 
         console.log(`Validated JWT for ${payload.email}`)
 
-        if (env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM !== undefined) {
-            if (payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM] !== undefined) {
-                const p = payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM]
-                request.principals = typeof p === "string" ? [p] : p
-            }
-        }
-
         // add info to request
         request.sub = payload.sub
         request.email = payload.email
