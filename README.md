@@ -105,6 +105,9 @@ npm install
     "JWT_ISSUER": "https://example.com/",
     // The supported JWT algorithms
     "JWT_ALGORITHMS": ["RS256"],
+    // An OIDC claim included in the users identity token that will be used to
+    // populate the list of principals on the issued certificate 
+    "JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": "groups",
     // The lifetime of the issued SSH certificates
     "SSH_CERTIFICATE_LIFETIME": "24 hours",
     // A list of additional principals to add to the certificate
