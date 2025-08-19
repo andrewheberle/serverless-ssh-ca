@@ -24,17 +24,6 @@ import (
 //go:embed icons
 var resources embed.FS
 
-const appName = "Serverless SSH CA Client"
-
-func configDirs() (user, system string, err error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", "", err
-	}
-
-	return filepath.Join(dir, appName), filepath.Join(os.Getenv("ProgramData"), appName), nil
-}
-
 func runInstall() error {
 	return eventlog.InstallAsEventCreate("Serverless SSH CA Client", eventlog.Error|eventlog.Warning|eventlog.Info)
 }

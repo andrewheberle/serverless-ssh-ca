@@ -23,21 +23,19 @@ var (
 	ErrNoPrivateKey = errors.New("no private key found, please run \"ssh-ca-client generate\"")
 )
 
-const ConfigDirName = ".serverless-ssh-ca"
-
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	if err := c.Command.Init(cd); err != nil {
 		return err
 	}
 
-	home, err := os.UserHomeDir()
+	user, system, err := configDirs()
 	if err != nil {
 		return err
 	}
 
 	cmd := cd.CobraCommand
-	cmd.PersistentFlags().StringVar(&c.systemConfigFile, "config", filepath.Join(home, ConfigDirName, "config.yml"), "Path to configuration file")
-	cmd.PersistentFlags().StringVar(&c.userConfigFile, "user", filepath.Join(home, ConfigDirName, "user.yml"), "Path to user configuration file")
+	cmd.PersistentFlags().StringVar(&c.systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
+	cmd.PersistentFlags().StringVar(&c.userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
 
 	return nil
 }
