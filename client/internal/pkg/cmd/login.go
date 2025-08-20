@@ -72,7 +72,7 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 
 func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	// try refresh first
-	if err := c.client.Refresh(); err == nil {
+	if err := c.client.Refresh(c.listenAddr); err == nil {
 		return nil
 	}
 
