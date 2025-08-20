@@ -34,7 +34,7 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
                     // add to request making sure its as string[]
                     request.principals = typeof p === "string" ? [p] : p
 
-                    // replace any  spaces with underscores
+                    // replace any spaces with underscores
                     request.principals.forEach((value, index, array) => {
                         array[index] = value.replaceAll(" ", "_")
                     })

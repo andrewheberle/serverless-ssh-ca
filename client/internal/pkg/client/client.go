@@ -181,6 +181,11 @@ func (lh *LoginHandler) Start(address string) error {
 	lh.srv.Addr = address
 	lh.started = true
 	go func() {
+		// make sure to set we are no longer running when this completes
+		defer func() {
+			lh.started = false
+		}()
+
 		// run in a goroutine so this returns immediately
 		lh.done <- lh.srv.ListenAndServe()
 	}()
@@ -208,7 +213,7 @@ func (lh *LoginHandler) Wait(ctx context.Context) error {
 	}
 }
 
-// Shutdown gracefullt shuts down the HTTP service
+// Shutdown gracefully shuts down the HTTP service
 func (lh *LoginHandler) Shutdown() error {
 	// shut down the service
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
@@ -463,7 +468,7 @@ func (lh *LoginHandler) addToAgent() error {
 }
 
 // Refresh attempts to refresh the authentication and identity token
-func (lh *LoginHandler) Refresh() error {
+func (lh *LoginHandler) Refresh(addr string) error {
 	// try refresh token
 	refresh, err := lh.config.GetRefreshToken()
 	if err != nil {
@@ -473,6 +478,21 @@ func (lh *LoginHandler) Refresh() error {
 	if refresh == "" {
 		return ErrNoRefreshToken
 	}
+
+	// start web server now
+	lh.logger.Info("starting web server", "address", addr)
+	if err := lh.Start(addr); err != nil {
+		return err
+	}
+
+	// make sure to shut down
+	defer func() {
+		if err := lh.Shutdown(); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				lh.logger.Warn("error shutting down web server after refresh", "error", err)
+			}
+		}
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -485,6 +505,8 @@ func (lh *LoginHandler) Refresh() error {
 	if err != nil {
 		return err
 	}
+
+	// shut down we se
 
 	return lh.doLogin(token)
 }
