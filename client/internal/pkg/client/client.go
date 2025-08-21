@@ -180,6 +180,7 @@ func (lh *LoginHandler) Start(address string) error {
 
 	lh.srv.Addr = address
 	lh.started = true
+	lh.done = make(chan error)
 	go func() {
 		// make sure to set we are no longer running when this completes
 		defer func() {
@@ -198,7 +199,9 @@ func (lh *LoginHandler) Start(address string) error {
 //
 // If the service has not been started this will return [ErrNotStarted]
 func (lh *LoginHandler) Wait(ctx context.Context) error {
-	lh.mu.RLock()
+	if !lh.mu.TryRLock() {
+		return ErrAlreadyStarted
+	}
 	defer lh.mu.RUnlock()
 
 	if !lh.started {
@@ -220,6 +223,7 @@ func (lh *LoginHandler) Shutdown() error {
 	defer cancel()
 
 	// shutdown and send result to channel
+	lh.logger.Info("shutting down web server")
 	err := lh.srv.Shutdown(ctx)
 	lh.done <- err
 	close(lh.done)
@@ -468,7 +472,7 @@ func (lh *LoginHandler) addToAgent() error {
 }
 
 // Refresh attempts to refresh the authentication and identity token
-func (lh *LoginHandler) Refresh(addr string) error {
+func (lh *LoginHandler) Refresh() error {
 	// try refresh token
 	refresh, err := lh.config.GetRefreshToken()
 	if err != nil {
@@ -479,23 +483,9 @@ func (lh *LoginHandler) Refresh(addr string) error {
 		return ErrNoRefreshToken
 	}
 
-	// start web server now
-	lh.logger.Info("starting web server", "address", addr)
-	if err := lh.Start(addr); err != nil {
-		return err
-	}
-
-	// make sure to shut down
-	defer func() {
-		if err := lh.Shutdown(); err != nil {
-			if !errors.Is(err, http.ErrServerClosed) {
-				lh.logger.Warn("error shutting down web server after refresh", "error", err)
-			}
-		}
-	}()
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
+
 	tokenSource := lh.oauth2Config.TokenSource(ctx, &oauth2.Token{
 		RefreshToken: refresh,
 	})
@@ -505,8 +495,6 @@ func (lh *LoginHandler) Refresh(addr string) error {
 	if err != nil {
 		return err
 	}
-
-	// shut down we se
 
 	return lh.doLogin(token)
 }

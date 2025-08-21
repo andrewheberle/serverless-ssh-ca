@@ -342,7 +342,7 @@ func (app *Application) refreshWithBackoff() error {
 	}
 
 	// we are ok to attempt a refresh
-	if err := app.client.Refresh(app.addr); err != nil {
+	if err := app.client.Refresh(); err != nil {
 		// increment our failure count and set a backoff of double our failure count
 		app.refreshFailure++
 		app.refreshBackOff = app.refreshFailure * 2
@@ -366,7 +366,7 @@ func (app *Application) refresh() error {
 
 	app.logger.Info("attempting a refresh")
 
-	if err := app.client.Refresh(app.addr); err != nil {
+	if err := app.client.Refresh(); err != nil {
 		return err
 	}
 
