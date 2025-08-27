@@ -21,17 +21,23 @@ redirect_url: http://localhost:3000/auth/callback
 ca_url: https://ca.example.com/
 ```
 
-The default location for this config file is `$HOME/.ssh-serverless-ca/config.yml`
-however this may also be provided using the `--config` command line flag.
+The default location for this config file is
+`%PROGRAMDATA%\Serverless SSH CA Client\config.yml` on Windows and
+`/etc/serverless-ssh-ca/config.yml` on other plaforms however this may also be
+overidden using the `--config` command line flag.
 
 If one of the requested scopes is `offline_access` and this is supported by the
 OIDC IdP then the client can use the provided refresh token for subsequent
 certificate renewals.
 
-The client saves persistent user data such as the user private key, refresh
-token (if provided) and certificate into a user specific configuration file,
-which by default is `$HOME/.ssh-serverless-ca/user.yaml` however this can be
-overidden using the `--user` command line flag.
+On Windows these system level options can be set using Group Policy via the
+ADMX/ADML files in the `policy` sub-directory.
+
+The client saves persistent user data such as the users private key, refresh
+token (if available) and certificate into a user specific configuration file,
+which by default is `%APPDATA%\Serverless SSH CA Client\config.yml` on Windows
+and `$HOME/.config/serverless-ssh-ca/user.yaml` however this can be overidden
+using the `--user` command line flag.
 
 This allows the use of a shared/system configuration file that defines the
 OIDC and SSH CA configuration with user specific data kept seperate.
@@ -84,16 +90,16 @@ At this time the GUI is only built and packaged for Windows.
 
 The GUI supports the following command line flags:
 
-| Flag              | Type            | Description                                       | Default                               | 
-|-------------------|-----------------|---------------------------------------------------|---------------------------------------|
-| `--life`          | `time.Duration` | Lifetime of SSH certificate                       | `24h`                                 |
-| `--renew`         | `time.Duration` | Renew once remaining time gets below this value   | `1h`                                  |
-| `--addr`          | `string`        | Listen address for OIDC auth flow                 | `localhost:3000`                      |
-| `--log`           | `string`        | Path to log file                                  | `$HOME/.ssh-serverless-ca/tray.log`   |
-| `--crash`         | `string`        | Path to log file for panics/crashes               | `$HOME/.ssh-serverless-ca/crash.log`  |
-| `--config`        | `string`        | Path to configuration file                        | `$HOME/.ssh-serverless-ca/config.yml` |
-| `--user`          | `string`        | Path to user configuration file                   | `$HOME/.ssh-serverless-ca/user.yml`   |
-| `--disable-proxy` | `bool`          | Disable proxying of PuTTY Agent (pageant) requests | `false`                               |
+| Flag              | Type            | Description                                        | Default                                            | 
+|-------------------|-----------------|----------------------------------------------------|----------------------------------------------------|
+| `--life`          | `time.Duration` | Lifetime of SSH certificate                        | `24h`                                              |
+| `--renew`         | `time.Duration` | Renew once remaining time gets below this value    | `1h`                                               |
+| `--addr`          | `string`        | Listen address for OIDC auth flow                  | `localhost:3000`                                   |
+| `--log`           | `string`        | Path to log file                                   | `%PROGRAMDATA%\Serverless SSH CA Client/tray.log`  |
+| `--crash`         | `string`        | Path to log file for panics/crashes                | `%PROGRAMDATA%\Serverless SSH CA Client/crash.log` |
+| `--config`        | `string`        | Path to configuration file                         | `%APPDATA%\Serverless SSH CA Client/config.yml`    |
+| `--user`          | `string`        | Path to user configuration file                    | `%PROGRAMDATA%\Serverless SSH CA Client/user.yml`  |
+| `--disable-proxy` | `bool`          | Disable proxying of PuTTY Agent (pageant) requests | `false`                                            |
 
 # Attributions
 
