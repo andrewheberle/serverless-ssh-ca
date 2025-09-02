@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/sessions v1.4.0
 	github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec
 	github.com/openpubkey/openpubkey v0.18.0
-	github.com/spf13/pflag v1.0.7
+	github.com/spf13/pflag v1.0.10
 	golang.org/x/crypto v0.41.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sys v0.35.0
