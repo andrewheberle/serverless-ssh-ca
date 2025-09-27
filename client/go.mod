@@ -16,7 +16,7 @@ require (
 	github.com/openpubkey/openpubkey v0.18.0
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/crypto v0.41.0
-	golang.org/x/oauth2 v0.30.0
+	golang.org/x/oauth2 v0.31.0
 	golang.org/x/sys v0.35.0
 	golang.zx2c4.com/wireguard/windows v0.5.3
 	sigs.k8s.io/yaml v1.6.0
