@@ -1,4 +1,4 @@
-package cmd
+package cli
 
 import (
 	"context"
@@ -15,6 +15,9 @@ type loginCommand struct {
 	lifetime   time.Duration
 	showTokens bool
 	listenAddr string
+
+	// handle host keys
+	host bool
 
 	client *client.LoginHandler
 

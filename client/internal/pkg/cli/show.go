@@ -1,4 +1,4 @@
-package cmd
+package cli
 
 import (
 	"context"
@@ -13,7 +13,7 @@ type showCommand struct {
 	private     bool
 	certificate bool
 
-	config *config.Config
+	config config.Config
 
 	*simplecommand.Command
 }
@@ -40,6 +40,7 @@ func (c *showCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return fmt.Errorf("problem accessing root command")
 	}
 	c.config = root.config
+
 	return nil
 }
 

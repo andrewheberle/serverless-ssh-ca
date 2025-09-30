@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	userconfig "github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config/user"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
 	"github.com/andrewheberle/sshagent"
@@ -47,7 +48,7 @@ type LoginHandler struct {
 	verifier         *oidc.IDTokenVerifier
 	oauth2Config     oauth2.Config
 	store            *sessions.CookieStore
-	config           *config.Config
+	config           config.Config
 	lifetime         time.Duration
 	redirectURL      *url.URL
 	done             chan error
@@ -76,7 +77,7 @@ var (
 // NewLoginHandler creates a new handler
 func NewLoginHandler(system, user string, opts ...LoginHandlerOption) (*LoginHandler, error) {
 	// load config
-	config, err := config.LoadConfig(system, user)
+	config, err := userconfig.LoadConfig(system, user)
 	if err != nil {
 		return nil, err
 	}

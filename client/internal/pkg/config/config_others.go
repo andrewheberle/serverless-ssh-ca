@@ -3,22 +3,17 @@
 package config
 
 import (
-	"fmt"
 	"os"
-
-	"sigs.k8s.io/yaml"
+	"path/filepath"
 )
 
-func loadSystemConfig(name string) (SystemConfig, error) {
-	y, err := os.ReadFile(name)
+const AppName = "serverless-ssh-ca"
+
+func ConfigDirs() (user, system string, err error) {
+	dir, err := os.UserConfigDir()
 	if err != nil {
-		return SystemConfig{}, err
+		return "", "", err
 	}
 
-	var config SystemConfig
-	if err := yaml.Unmarshal(y, &config); err != nil {
-		return SystemConfig{}, fmt.Errorf("problem parsing system config: %w", err)
-	}
-
-	return config, nil
+	return filepath.Join(dir, AppName), filepath.Join("/etc", AppName), nil
 }

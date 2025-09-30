@@ -1,4 +1,4 @@
-package cmd
+package cli
 
 import (
 	"context"
@@ -14,7 +14,10 @@ import (
 type generateCommand struct {
 	force bool
 
-	config *config.Config
+	// handle host keys
+	host bool
+
+	config config.Config
 
 	*simplecommand.Command
 }
@@ -40,6 +43,7 @@ func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return fmt.Errorf("problem accessing root command")
 	}
 	c.config = root.config
+
 	return nil
 }
 
