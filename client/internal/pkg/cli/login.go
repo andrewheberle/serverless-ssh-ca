@@ -47,9 +47,15 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return err
 	}
 
+	// get root command flags
 	root, ok := this.Root.Command.(*rootCommand)
 	if !ok {
 		return fmt.Errorf("problem accessing root command")
+	}
+
+	// handle host key config
+	if c.host {
+		return ErrNotImplemented
 	}
 
 	// set options

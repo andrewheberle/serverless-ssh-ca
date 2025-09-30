@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config/user"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
 )
@@ -16,13 +15,12 @@ type rootCommand struct {
 	systemConfigFile string
 	userConfigFile   string
 
-	config config.Config
-
 	*simplecommand.Command
 }
 
 var (
-	ErrNoPrivateKey = errors.New("no private key found, please run \"ssh-ca-client generate\"")
+	ErrNoPrivateKey   = errors.New("no private key found, please run \"ssh-ca-client generate\"")
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
@@ -51,13 +49,6 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if err := os.MkdirAll(filepath.Dir(c.userConfigFile), 0755); err != nil {
 		return err
 	}
-
-	// load config
-	config, err := user.LoadConfig(c.systemConfigFile, c.userConfigFile)
-	if err != nil {
-		return err
-	}
-	c.config = config
 
 	return nil
 }

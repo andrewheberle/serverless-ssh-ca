@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config/user"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
@@ -38,11 +39,23 @@ func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return err
 	}
 
+	// get root command flags
 	root, ok := this.Root.Command.(*rootCommand)
 	if !ok {
 		return fmt.Errorf("problem accessing root command")
 	}
-	c.config = root.config
+
+	// handle host key config
+	if c.host {
+		return ErrNotImplemented
+	}
+
+	// load config
+	config, err := user.LoadConfig(root.systemConfigFile, root.userConfigFile)
+	if err != nil {
+		return err
+	}
+	c.config = config
 
 	return nil
 }
