@@ -59,7 +59,22 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set up host subcommand structure
-	hostCmd := simplecommand.New("host", "Handle host keys")
+	hostCmd := &hostCommand{
+		Command: simplecommand.New("host", "Handle host keys"),
+	}
+	hostCmd.SubCommands = []simplecobra.Commander{
+		&generateCommand{
+			Command: simplecommand.New("generate", "Generate a SSH host keys"),
+			host:    true,
+		},
+		&loginCommand{
+			Command: simplecommand.New(
+				"login",
+				"Login via OIDC and request a host certificate",
+				simplecommand.Long("This command will allow the initial interactive request for a host certificate and also for non-interactive renewals"),
+			),
+		},
+	}
 
 	rootCmd.SubCommands = []simplecobra.Commander{
 		&generateCommand{

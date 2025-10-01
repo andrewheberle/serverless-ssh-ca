@@ -15,6 +15,6 @@ var (
 	ErrNotSupported = errors.New("not currently supported on your OS")
 )
 
-func New(title, addr string, fs embed.FS, client *client.LoginHandler) (*Application, error) {
+func New(title, addr string, fs embed.FS, client client.LoginHandler) (*Application, error) {
 	return nil, ErrNotSupported
 }

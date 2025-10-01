@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/allan-simon/go-singleinstance"
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
+	client "github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client/user"
+	userconfig "github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config/user"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/tray"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/pflag"
@@ -107,7 +108,7 @@ func Execute(ctx context.Context, args []string) error {
 	debug.SetCrashOutput(crash, debug.CrashOptions{})
 
 	// set options
-	opts := []client.LoginHandlerOption{
+	opts := []client.UserLoginHandlerOption{
 		client.WithLifetime(lifetime),
 		client.AllowWithoutKey(),
 	}
@@ -115,8 +116,14 @@ func Execute(ctx context.Context, args []string) error {
 		opts = append(opts, client.WithPageantProxy())
 	}
 
+	// load config
+	config, err := userconfig.LoadConfig(systemConfigFile, userConfigFile)
+	if err != nil {
+		return err
+	}
+
 	// set up login client
-	lh, err := client.NewLoginHandler(systemConfigFile, userConfigFile, opts...)
+	lh, err := client.NewLoginHandler(config, opts...)
 	if err != nil {
 		return err
 	}

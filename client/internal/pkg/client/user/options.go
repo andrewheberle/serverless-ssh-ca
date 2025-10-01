@@ -1,4 +1,4 @@
-package client
+package user
 
 import (
 	"log/slog"
@@ -6,20 +6,20 @@ import (
 	"time"
 )
 
-// Options for [*LoginHandler]
-type LoginHandlerOption func(*LoginHandler)
+// Options for [*UserLoginHandler]
+type UserLoginHandlerOption func(*UserLoginHandler)
 
 // WithLifetime sets a different lifetime than [DefaultLifetime]
-func WithLifetime(lifetime time.Duration) LoginHandlerOption {
-	return func(lh *LoginHandler) {
+func WithLifetime(lifetime time.Duration) UserLoginHandlerOption {
+	return func(lh *UserLoginHandler) {
 		lh.lifetime = lifetime
 	}
 }
 
 // SkipAgent sets the login process to skip adding the key and certificate
 // to the users local SSH agent
-func SkipAgent() LoginHandlerOption {
-	return func(lh *LoginHandler) {
+func SkipAgent() UserLoginHandlerOption {
+	return func(lh *UserLoginHandler) {
 		lh.skipAgent = true
 	}
 }
@@ -27,37 +27,37 @@ func SkipAgent() LoginHandlerOption {
 // ShowTokens will display/log the tokens returned from the OIDC login/refresh
 // process. This is designed as a debugging tool rather than something that is
 // enabled by default
-func ShowTokens() LoginHandlerOption {
-	return func(lh *LoginHandler) {
+func ShowTokens() UserLoginHandlerOption {
+	return func(lh *UserLoginHandler) {
 		lh.showTokens = true
 	}
 }
 
 // WithServer allows using a custom [*http.Server] instead of the default
-func WithServer(srv *http.Server) LoginHandlerOption {
-	return func(lh *LoginHandler) {
+func WithServer(srv *http.Server) UserLoginHandlerOption {
+	return func(lh *UserLoginHandler) {
 		lh.srv = srv
 	}
 }
 
 // By default [NewLoginHandler] will return a [ErrNoPrivateKey] error if no
 // private private key exists, however passing the AllowWithoutKey
-// [LoginHandlerOption] to [NewLoginHandler] will skip this check
-func AllowWithoutKey() LoginHandlerOption {
-	return func(lh *LoginHandler) {
+// [UserLoginHandlerOption] to [NewUserLoginHandler] will skip this check
+func AllowWithoutKey() UserLoginHandlerOption {
+	return func(lh *UserLoginHandler) {
 		lh.allowWithoutKey = true
 	}
 }
 
 // WithLogger allows providing a custom [*slog.Logger] for the service
-func WithLogger(logger *slog.Logger) LoginHandlerOption {
-	return func(lh *LoginHandler) {
+func WithLogger(logger *slog.Logger) UserLoginHandlerOption {
+	return func(lh *UserLoginHandler) {
 		lh.logger = logger
 	}
 }
 
-func WithPageantProxy() LoginHandlerOption {
-	return func(lh *LoginHandler) {
+func WithPageantProxy() UserLoginHandlerOption {
+	return func(lh *UserLoginHandler) {
 		lh.pageantProxy = true
 	}
 }

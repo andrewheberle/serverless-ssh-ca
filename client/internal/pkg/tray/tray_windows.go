@@ -30,7 +30,7 @@ const (
 )
 
 type Application struct {
-	client  *client.LoginHandler
+	client  client.LoginHandler
 	done    chan bool
 	title   string
 	addr    string
@@ -57,7 +57,7 @@ var (
 	ErrRenewRunning = errors.New("a renew was already in progress")
 )
 
-func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt time.Duration) (*Application, error) {
+func New(title, addr string, fs embed.FS, client client.LoginHandler, renewAt time.Duration) (*Application, error) {
 	app := &Application{
 		addr:              addr,
 		client:            client,

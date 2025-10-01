@@ -6,7 +6,8 @@ import (
 	"os"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config/user"
+	hostconfig "github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config/host"
+	userconfig "github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config/user"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
@@ -29,7 +30,7 @@ func (c *generateCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.Flags().BoolVar(&c.force, "force", false, "Force replacing and existing key")
+	cmd.Flags().BoolVar(&c.force, "force", false, "Force replacing any existing key(s)")
 
 	return nil
 }
@@ -45,17 +46,22 @@ func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return fmt.Errorf("problem accessing root command")
 	}
 
-	// handle host key config
-	if c.host {
-		return ErrNotImplemented
-	}
-
 	// load config
-	config, err := user.LoadConfig(root.systemConfigFile, root.userConfigFile)
-	if err != nil {
-		return err
+	if c.host {
+		config, err := hostconfig.LoadConfig(root.systemConfigFile)
+		if err != nil {
+			return err
+		}
+
+		c.config = config
+	} else {
+		config, err := userconfig.LoadConfig(root.systemConfigFile, root.userConfigFile)
+		if err != nil {
+			return err
+		}
+
+		c.config = config
 	}
-	c.config = config
 
 	return nil
 }
