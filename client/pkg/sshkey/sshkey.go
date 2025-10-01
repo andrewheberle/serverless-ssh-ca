@@ -21,30 +21,20 @@ var (
 	ErrUnsupportedKey = errors.New("unsupported key type")
 )
 
+const (
+	DsaKey     = "dsa"
+	RsaKey     = "rsa"
+	EcdsaKey   = "ecdsa"
+	Ed25519Key = "ed25519"
+)
+
 // GenerateKey will generate an OpenSSH ECDSA private key using
 // the P-256 elliptic curve.
 //
 // The resulting key is returned as a byte slice in OpenSSH PEM
 // format.
 func GenerateKey(comment string) ([]byte, error) {
-	// generate ECDSA key
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	// encode to openssh format
-	privKey, err := ssh.MarshalPrivateKey(key, comment)
-	if err != nil {
-		return nil, err
-	}
-
-	pemBytes := pem.EncodeToMemory(privKey)
-	if pemBytes == nil {
-		return nil, fmt.Errorf("could not encode key")
-	}
-
-	return pemBytes, nil
+	return Generate(comment, EcdsaKey)
 }
 
 // ParseKey will parse the provided byte slice (in OpenSSH ECDSA Private Key format)
@@ -55,7 +45,7 @@ func GenerateKey(comment string) ([]byte, error) {
 //
 // Only ECDSA format private keys are supported by this function.
 func ParseKey(pemBytes []byte) (*ecdsa.PrivateKey, error) {
-	privateKey, err := ssh.ParseRawPrivateKey(pemBytes)
+	privateKey, err := Parse(pemBytes)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse private key file: %w", err)
 	}
@@ -76,7 +66,7 @@ func ParseKey(pemBytes []byte) (*ecdsa.PrivateKey, error) {
 func Generate(comment, keytype string) ([]byte, error) {
 	var key crypto.PrivateKey
 	switch keytype {
-	case "rsa":
+	case RsaKey:
 		var err error
 
 		// generate RSA key
@@ -84,7 +74,7 @@ func Generate(comment, keytype string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-	case "dsa":
+	case DsaKey:
 		var k *dsa.PrivateKey
 
 		// generate DSA key
@@ -93,7 +83,7 @@ func Generate(comment, keytype string) ([]byte, error) {
 		}
 
 		key = k
-	case "ecdsa":
+	case EcdsaKey:
 		var err error
 
 		// generate ECDSA key
@@ -101,7 +91,7 @@ func Generate(comment, keytype string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-	case "ed25519":
+	case Ed25519Key:
 		var err error
 
 		// generate ed25519 key
