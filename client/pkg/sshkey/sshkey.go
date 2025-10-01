@@ -4,7 +4,6 @@ package sshkey
 
 import (
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -22,7 +21,6 @@ var (
 )
 
 const (
-	DsaKey     = "dsa"
 	RsaKey     = "rsa"
 	EcdsaKey   = "ecdsa"
 	Ed25519Key = "ed25519"
@@ -59,7 +57,7 @@ func ParseKey(pemBytes []byte) (*ecdsa.PrivateKey, error) {
 }
 
 // Generate will generate an OpenSSH private key using
-// the specified format ("rsa", "dsa", "ecdsa" or "ed25519").
+// the specified format ("rsa", "ecdsa" or "ed25519").
 //
 // The resulting key is returned as a byte slice in OpenSSH PEM
 // format.
@@ -74,15 +72,6 @@ func Generate(comment, keytype string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-	case DsaKey:
-		var k *dsa.PrivateKey
-
-		// generate DSA key
-		if err := dsa.GenerateKey(k, rand.Reader); err != nil {
-			return nil, err
-		}
-
-		key = k
 	case EcdsaKey:
 		var err error
 
@@ -129,7 +118,7 @@ func Parse(pemBytes []byte) (any, error) {
 	}
 
 	switch key := privateKey.(type) {
-	case *rsa.PrivateKey, *dsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey:
+	case *rsa.PrivateKey, *ecdsa.PrivateKey, ed25519.PrivateKey:
 		return key, nil
 	}
 
@@ -138,12 +127,6 @@ func Parse(pemBytes []byte) (any, error) {
 
 func IsRSA(key any) bool {
 	_, ok := key.(*rsa.PrivateKey)
-
-	return ok
-}
-
-func IsDSA(key any) bool {
-	_, ok := key.(*dsa.PrivateKey)
 
 	return ok
 }
