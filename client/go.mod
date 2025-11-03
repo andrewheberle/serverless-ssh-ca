@@ -7,7 +7,7 @@ require (
 	github.com/andrewheberle/simplecommand v0.4.0
 	github.com/andrewheberle/sshagent v1.0.0
 	github.com/bep/simplecobra v0.6.1
-	github.com/coreos/go-oidc/v3 v3.15.0
+	github.com/coreos/go-oidc/v3 v3.16.0
 	github.com/gen2brain/beeep v0.11.1
 	github.com/getlantern/systray v1.2.2
 	github.com/gorilla/securecookie v1.1.2
@@ -34,7 +34,7 @@ require (
 	github.com/getlantern/hex v0.0.0-20190417191902-c6586a6fe0b7 // indirect
 	github.com/getlantern/hidden v0.0.0-20190325191715-f02dbb02be55 // indirect
 	github.com/getlantern/ops v0.0.0-20190325191751-d70cb0d6f85f // indirect
-	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
