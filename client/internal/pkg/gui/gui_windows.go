@@ -136,7 +136,7 @@ func Execute(ctx context.Context, args []string) error {
 		return err
 	}
 	defer func() {
-		log.Close()
+		_ = log.Close()
 	}()
 
 	logger := slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{}))
