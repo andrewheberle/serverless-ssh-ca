@@ -22,7 +22,7 @@ builds:
     goos:
       - linux
       - windows
-    main: ./cmd/ssh-ca-client
+    main: ./cmd/ssh-ca-client-cli
   - id: gui
     binary: ssh-ca-client
     env:
@@ -34,12 +34,10 @@ builds:
     hooks:
       pre:
         - go install github.com/tc-hib/go-winres@v0.3.3
-        - go generate ./cmd/ssh-ca-client/tray.go
+        - go generate ./cmd/ssh-ca-client
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui
-    tags:
-      - tray
 
 archives:
   - allow_different_binary_count: true
