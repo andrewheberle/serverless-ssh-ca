@@ -33,13 +33,22 @@
 			"permit-port-forwarding",
 			"permit-pty",
 			"permit-user-rc",
-		]
+		],
+		"HOST_CERT_VALIDITY": "90 days",
+		"ALLOWED_HOST_ENROLL_GROUP": "ssh-host-admin",
+		"OIDC_CLIENT_ID": "client-id"
 	},
 	"secrets_store_secrets": [
 		{
 			"binding": "PRIVATE_KEY",
 			"store_id": "demo",
 			"secret_name": "ssh-ca-private-key"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "DEVICE_CODES",
+			"id": "demo"
 		}
 	]
 }

@@ -1,10 +1,11 @@
-import { IRequest, IttyRouter, StatusError, text } from "itty-router";
-import { CFArgs } from "../router";
-import { parsePrivateKey } from "sshpk";
-import { withValidJWT } from "../verify";
-import { CertificateSignerResponse } from "../types";
-import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate";
-import { withPayload } from "../payload";
+import { IRequest, IttyRouter, StatusError, text } from "itty-router"
+import { CFArgs } from "../router"
+import { parsePrivateKey } from "sshpk"
+import { withValidJWT } from "../verify"
+import { CertificateSignerResponse } from "../types"
+import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate"
+import { withPayload } from "../payload"
+import { router as hostRouter } from "./v1/host"
 
 export const router = IttyRouter<IRequest, CFArgs>({ base: '/api/v1' })
 
@@ -45,3 +46,4 @@ router
             throw new StatusError(503)
         }
     })
+    .all("/host/*", hostRouter.fetch)

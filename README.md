@@ -121,7 +121,15 @@ npm install
         "permit-port-forwarding",
         "permit-pty",
         "permit-user-rc",
-    ]
+    ],
+    // The following configuration is used to support the OIDC
+    // device code flow for issuing host certificates.
+    // In this mode the CA acts as an IdP for the CA client but
+    // as a SP to the upstream IdP used for SSO.
+    // this is currently experimental
+    "HOST_CERT_VALIDITY": "90 days",
+    "ALLOWED_HOST_ENROLL_GROUP": "ssh-host-admin",
+    "OIDC_CLIENT_ID": "client-id"
 },
 ```
 

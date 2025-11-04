@@ -19,7 +19,7 @@
 				"description": "The OIDC claim that contains additional SSH principals to add to the certificate. If ommitted only the default claims (via SSH_CERTIFICATE_PRINCIPALS and SSH_CERTIFICATE_INCLUDE_SELF) are added"
 			},
 			"SSH_CERTIFICATE_LIFETIME": {
-				"description": "The lifetime of the issued SSH certificates, although the client may request a shorter duration"
+				"description": "The lifetime of the issued User SSH certificates, although the client may request a shorter duration"
 			},
 			"SSH_CERTIFICATE_PRINCIPALS": {
 				"description": "A list of additional principals to add to the SSH certificate"
@@ -32,6 +32,15 @@
 			},
 			"PRIVATE_KEY": {
 				"description": "The ECDSA private key to use in OpenSSH format"
+			},
+			"HOST_CERT_VALIDITY": {
+				"description": "The lifetime of the issued Host SSH certificates, although the client may request a shorter duration"
+			},
+			"ALLOWED_HOST_ENROLL_GROUP": {
+				"description": "An accepted group claim to allow Host SSH certificate enrollment"
+			},
+			"OIDC_CLIENT_ID": {
+				"description": "The OIDC Client ID to authenticate the enrollment of Host SSH certificates"
 			}
 		}
 	},
