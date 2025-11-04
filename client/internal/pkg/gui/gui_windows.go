@@ -64,9 +64,9 @@ func Execute(ctx context.Context, args []string) error {
 	flags.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
 	flags.BoolVar(&disableProxy, "disable-proxy", false, "Disable proxying of PuTTY Agent (pageant) requests")
 	flags.BoolVar(&install, "install", false, "Perform post-install steps")
-	flags.MarkHidden("install")
+	_ = flags.MarkHidden("install")
 	flags.BoolVar(&uninstall, "uninstall", false, "Perform pre-uninstall steps")
-	flags.MarkHidden("uninstall")
+	_ = flags.MarkHidden("uninstall")
 	_ = flags.Parse(args)
 
 	// ensure install and uninstall are not called togther
@@ -103,8 +103,10 @@ func Execute(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer crash.Close()
-	debug.SetCrashOutput(crash, debug.CrashOptions{})
+	defer func() {
+		_ = crash.Close()
+	}()
+	_ = debug.SetCrashOutput(crash, debug.CrashOptions{})
 
 	// set options
 	opts := []client.LoginHandlerOption{
@@ -133,7 +135,9 @@ func Execute(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer log.Close()
+	defer func() {
+		log.Close()
+	}()
 
 	logger := slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{}))
 	slog.Info("logging to log file", "file", logFile)
@@ -144,7 +148,9 @@ func Execute(ctx context.Context, args []string) error {
 		logger.Error("could not take lock", "error", err)
 		return err
 	}
-	defer lockFile.Close()
+	defer func() {
+		_ = lockFile.Close()
+	}()
 
 	// start pageant proxy if requested
 	if !disableProxy {

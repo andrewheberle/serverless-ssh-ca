@@ -16,7 +16,9 @@ func logFatal(format string, a ...any) {
 	if err != nil {
 		panic(err)
 	}
-	defer logger.Close()
+	defer func() {
+		_ = logger.Close()
+	}()
 
 	if err := logger.Error(1000, fmt.Sprintf(format, a...)); err != nil {
 		panic(err)
