@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/windows/registry"
 	"sigs.k8s.io/yaml"
@@ -11,6 +12,17 @@ import (
 var (
 	ErrConfigIncomplete = errors.New("config was incomplete")
 )
+
+const AppName = "Serverless SSH CA Client"
+
+func ConfigDirs() (user, system string, err error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", "", err
+	}
+
+	return filepath.Join(dir, AppName), filepath.Join(os.Getenv("ProgramData"), AppName), nil
+}
 
 func loadPolicy() SystemConfig {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, "Software\\Policies\\Serverless SSH CA Client", registry.QUERY_VALUE)

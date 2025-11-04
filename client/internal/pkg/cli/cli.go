@@ -1,6 +1,7 @@
-package cmd
+package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 		return err
 	}
 
-	user, system, err := configDirs()
+	user, system, err := config.ConfigDirs()
 	if err != nil {
 		return err
 	}
@@ -60,4 +61,35 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	return nil
 }
 
-// Execute function is in cli.go or tray.go depending on build tags
+func Execute(ctx context.Context, args []string) error {
+	rootCmd := &rootCommand{
+		Command: simplecommand.New("ssh-ca-client-cli", "A CLI based client for a serverless SSH CA"),
+	}
+	rootCmd.SubCommands = []simplecobra.Commander{
+		&generateCommand{
+			Command: simplecommand.New("generate", "Generate a SSH private key"),
+		},
+		&loginCommand{
+			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
+		},
+		&showCommand{
+			Command: simplecommand.New("show", "Show existing private/public key"),
+		},
+		&versionCommand{
+			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client"),
+		},
+	}
+
+	// Set up simplecobra
+	x, err := simplecobra.New(rootCmd)
+	if err != nil {
+		return err
+	}
+
+	// run command with the provided args
+	if _, err := x.Execute(ctx, args); err != nil {
+		return err
+	}
+
+	return nil
+}
