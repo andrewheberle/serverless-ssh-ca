@@ -1,10 +1,10 @@
-import { RequestHandler, StatusError } from "itty-router";
-import { CFArgs } from "./router";
-import { AuthenticatedRequest, CertificateSignerPayload } from "./types";
-import { parseKey } from "sshpk";
-import { seconds } from "itty-time";
-import { verifyJWT } from "./verify";
-import { JWSInvalid, JWTInvalid } from "jose/errors";
+import { RequestHandler, StatusError } from "itty-router"
+import { CFArgs } from "./router"
+import { AuthenticatedRequest, CertificateSignerPayload } from "./types"
+import { parseKey } from "sshpk"
+import { seconds } from "itty-time"
+import { verifyJWT } from "./verify"
+import { JWSInvalid, JWTInvalid } from "jose/errors"
 
 export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext) => {
     try {
@@ -65,7 +65,8 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
             throw err
         }
 
+        // unhandled error, so just log and throw it again
         console.log(err)
-        throw new StatusError(503)
+        throw err
     }
 }

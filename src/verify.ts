@@ -35,8 +35,9 @@ export const withValidJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async 
             throw err
         }
 
+        // unhandled error, so just log and throw it again
         console.log(err)
-        throw new StatusError(503)
+        throw err
     }
 }
 

@@ -1,10 +1,10 @@
-import { IRequest, IttyRouter, StatusError, text } from "itty-router";
-import { CFArgs } from "../router";
-import { parsePrivateKey } from "sshpk";
-import { withValidJWT } from "../verify";
-import { CertificateSignerResponse } from "../types";
-import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate";
-import { withPayload } from "../payload";
+import { IRequest, IttyRouter, StatusError, text } from "itty-router"
+import { CFArgs } from "../router"
+import { parsePrivateKey } from "sshpk"
+import { withValidJWT } from "../verify"
+import { CertificateSignerResponse } from "../types"
+import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate"
+import { withPayload } from "../payload"
 
 export const router = IttyRouter<IRequest, CFArgs>({ base: '/api/v1' })
 
@@ -17,8 +17,9 @@ router
 
             return text(`${pub.toString("ssh")}\n`)
         } catch (err) {
+            // unhandled error, so just log and throw it again
             console.log(err)
-            throw new StatusError(503)
+            throw err
         }
     })
     .post("/certificate", withValidJWT, withPayload, async (request, env, ctx) => {
@@ -41,7 +42,8 @@ router
                 throw new StatusError(400)
             }
 
+            // unhandled error, so just log and throw it again
             console.log(err)
-            throw new StatusError(503)
+            throw err
         }
     })
