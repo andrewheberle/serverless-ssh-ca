@@ -37,3 +37,8 @@ export type SSHExtension = {
     name: string;
     data: Buffer<ArrayBuffer>
 }
+
+// log levels
+export const LogLevelInfo = "info"
+export const LogLevelWarning = "warning"
+export const LogLevelError = "error"
