@@ -1,8 +1,8 @@
-import { IRequest, IttyRouter, StatusError, text } from "itty-router"
+import { error, IRequest, IttyRouter, text } from "itty-router"
 import { CFArgs } from "../router"
 import { parsePrivateKey } from "sshpk"
 import { withValidJWT } from "../verify"
-import { CertificateSignerResponse, LogLevelError, LogLevelInfo } from "../types"
+import { CertificateSignerResponse, LogLevel } from "../types"
 import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate"
 import { withPayload } from "../payload"
 
@@ -18,12 +18,12 @@ router
             return text(`${pub.toString("ssh")}\n`)
         } catch (err) {
             // unhandled error, so just log and throw it again
-            console.log({ level: LogLevelError, error: err })
+            console.log({ level: LogLevel.Error, message: "unhandled error", error: err })
             throw err
         }
     })
     .post("/certificate", withValidJWT, withPayload, async (request, env, ctx) => {
-        console.log({ level: LogLevelInfo, message: "handling request", for: request.email })
+        console.log({ level: LogLevel.Info, message: "handling request", for: request.email })
         try {
             const opts: CreateCertificateOptions = {
                 lifetime: request.lifetime,
@@ -38,12 +38,12 @@ router
             return response
         } catch (err) {
             if (err instanceof CertificateExtraExtensionsError) {
-                console.log({ level: LogLevelError, message: "the request included additional certificate extensions", error: err })
-                throw new StatusError(400)
+                console.log({ level: LogLevel.Error, message: "the request included additional certificate extensions", error: err })
+                error(400)
             }
 
             // unhandled error, so just log and throw it again
-            console.log({ level: LogLevelError, error: err })
+            console.log({ level: LogLevel.Error, message: "unhandled error", error: err })
             throw err
         }
     })

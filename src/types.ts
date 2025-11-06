@@ -39,6 +39,8 @@ export type SSHExtension = {
 }
 
 // log levels
-export const LogLevelInfo = "info"
-export const LogLevelWarning = "warning"
-export const LogLevelError = "error"
+export enum LogLevel {
+    Info = "info",
+    Warning = "warning",
+    Error = "error"
+}
