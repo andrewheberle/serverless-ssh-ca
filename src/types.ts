@@ -37,3 +37,10 @@ export type SSHExtension = {
     name: string;
     data: Buffer<ArrayBuffer>
 }
+
+// log levels
+export enum LogLevel {
+    Info = "info",
+    Warning = "warning",
+    Error = "error"
+}

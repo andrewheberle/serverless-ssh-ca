@@ -1,6 +1,5 @@
-import { IttyRouter, IRequest, error, IRequestStrict } from "itty-router"
+import { IttyRouter, IRequest, error } from "itty-router"
 import { router as apiv1 } from "./api/v1"
-
 
 export type CFArgs = [Env, ExecutionContext]
 

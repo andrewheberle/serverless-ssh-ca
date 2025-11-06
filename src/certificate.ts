@@ -1,5 +1,5 @@
 import { seconds } from "itty-time"
-import { Certificate, createCertificate, identityForUser, identityFromDN, Key, parseKey, parsePrivateKey } from "sshpk"
+import { Certificate, createCertificate, identityForUser, identityFromDN, Key, parsePrivateKey } from "sshpk"
 import { SSHExtension } from "./types"
 import { env } from "cloudflare:workers"
 
