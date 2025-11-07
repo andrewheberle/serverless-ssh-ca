@@ -42,7 +42,7 @@
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
-		"@andrewheberle/ts-slog": "^1.0.0",
+		"@andrewheberle/ts-slog": "^1.1.0",
 		"@types/sshpk": "^1.17.4",
 		"itty-router": "^5.0.20",
 		"itty-time": "^2.0.2",
