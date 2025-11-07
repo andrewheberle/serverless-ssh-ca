@@ -5,6 +5,7 @@ import { withValidJWT } from "../verify"
 import { CertificateSignerResponse } from "../types"
 import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate"
 import { withPayload } from "../payload"
+import { router as hostRouter } from "./v1/host"
 import { Logger } from "@andrewheberle/ts-slog"
 
 const logger = new Logger()
@@ -50,3 +51,4 @@ router
             throw err
         }
     })
+    .all("/host/*", hostRouter.fetch)
