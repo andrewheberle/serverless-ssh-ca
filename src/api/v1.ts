@@ -1,4 +1,4 @@
-import { IRequest, IttyRouter, StatusError, text } from "itty-router"
+import { error, IRequest, IttyRouter, text } from "itty-router"
 import { CFArgs } from "../router"
 import { parsePrivateKey } from "sshpk"
 import { withValidJWT } from "../verify"
@@ -6,6 +6,9 @@ import { CertificateSignerResponse } from "../types"
 import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate"
 import { withPayload } from "../payload"
 import { router as hostRouter } from "./v1/host"
+import { Logger } from "@andrewheberle/ts-slog"
+
+const logger = new Logger()
 
 export const router = IttyRouter<IRequest, CFArgs>({ base: '/api/v1' })
 
@@ -18,12 +21,13 @@ router
 
             return text(`${pub.toString("ssh")}\n`)
         } catch (err) {
-            console.log(err)
-            throw new StatusError(503)
+            // unhandled error, so just log and throw it again
+            logger.error("unhandled error", "error", err)
+            throw err
         }
     })
     .post("/certificate", withValidJWT, withPayload, async (request, env, ctx) => {
-        console.log(`Handling request for ${request.email}`)
+        logger.info("handling request", "for", request.email)
         try {
             const opts: CreateCertificateOptions = {
                 lifetime: request.lifetime,
@@ -38,12 +42,13 @@ router
             return response
         } catch (err) {
             if (err instanceof CertificateExtraExtensionsError) {
-                console.warn(err)
-                throw new StatusError(400)
+                logger.error("the request included additional certificate extensions", "error", err)
+                error(400)
             }
 
-            console.log(err)
-            throw new StatusError(503)
+            // unhandled error, so just log and throw it again
+            logger.error("unhandled error", "error", err)
+            throw err
         }
     })
     .all("/host/*", hostRouter.fetch)
