@@ -5,6 +5,18 @@ Certificate Authority in this repository.
 
 ## Installing
 
+There are two versions of the client, one CLI based that runs on Windows and
+on Linux (however minimal testing is done on this OS) and a Windows only GUI
+version.
+
+### CLI
+
+```sh
+go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client-cli@latest
+```
+
+### GUI
+
 ```sh
 go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client@latest
 ```
@@ -36,8 +48,8 @@ ADMX/ADML files in the `policy` sub-directory.
 The client saves persistent user data such as the users private key, refresh
 token (if available) and certificate into a user specific configuration file,
 which by default is `%APPDATA%\Serverless SSH CA Client\config.yml` on Windows
-and `$HOME/.config/serverless-ssh-ca/user.yaml` however this can be overidden
-using the `--user` command line flag.
+and `$HOME/.config/serverless-ssh-ca/user.yaml` on other platforms however this
+can be overidden using the `--user` command line flag.
 
 This allows the use of a shared/system configuration file that defines the
 OIDC and SSH CA configuration with user specific data kept seperate.
@@ -80,11 +92,6 @@ attempt a renewal of the authentication token so the process can avoid an
 interactive authentication flow.
 
 ## As a GUI
-
-If the client is built with the `tray` build tag and `-ldflags -H=windowsgui`
-it can be run as a GUI application that sits in the system tray (this is quite
-Windows-centric at this time) and allows generation of a private key and
-request/renewal of certificates.
 
 At this time the GUI is only built and packaged for Windows.
 
