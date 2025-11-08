@@ -24,7 +24,7 @@ jobs:
           go-version-file: client/go.mod
           go-version: ${{ matrix.go }}
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           working-directory: client
           version: v2.1
