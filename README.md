@@ -51,7 +51,7 @@ sequenceDiagram
     activate Client
     Client-->>User: Auth flow completed
     deactivate Client
-    Client->>CA: POST /api/v1/certificate
+    Client->>CA: POST /api/v2/certificate
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -71,7 +71,7 @@ sequenceDiagram
     IdP-->>Client: Token returned
     deactivate IdP
     activate Client
-    Client->>CA: POST /api/v1/certificate
+    Client->>CA: POST /api/v2/certificate
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -121,7 +121,9 @@ npm install
         "permit-port-forwarding",
         "permit-pty",
         "permit-user-rc",
-    ]
+    ],
+    // The maximum time skew allowed for certificate requests
+    "CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
 },
 ```
 
