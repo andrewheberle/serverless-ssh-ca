@@ -621,8 +621,6 @@ func (lh *LoginHandler) generateNonce() (string, error) {
 		return "", err
 	}
 
-	lh.logger.Info("generated nonce signature", "format", signature.Format, "blob", signature.Blob, "length", len(signature.Blob))
-
 	// return encoded data
 	return fmt.Sprintf("%s.%s", dataToSign, base64.StdEncoding.EncodeToString(signature.Blob)), nil
 }
