@@ -24,7 +24,7 @@ The flow to obtain a certificate using the CLI version is as follows:
    `http://localhost:3000/auth/callback`)
 5. The client uses the JWT from the IdP as `Authorization: Bearer <TOKEN>`
    in a `POST` request containing the users SSH public key to the CA's
-   `/api/v1/certificate` endpoint
+   `/api/v2/certificate` endpoint
 6. The CA verifies the incoming JWT and assuming it is valid and verified, will 
    respond with a signed certificate based on the provided public key
 7. The client saves the certificate and adds the SSH private key and
