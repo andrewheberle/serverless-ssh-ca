@@ -57,6 +57,11 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
 
         // set optional extensions list
         request.extensions = payload.extensions
+
+        // add nonce to request if present to support v2 api requirement
+        if (payload.nonce !== undefined) {
+            request.nonce = payload.nonce
+        }
     } catch (err) {
         if (err instanceof JWSInvalid) {
             logger.error("the identity token was invalid", "error", err)
