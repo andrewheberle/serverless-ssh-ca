@@ -33,6 +33,10 @@
 			"PRIVATE_KEY": {
 				"description": "The ECDSA private key to use in OpenSSH format"
 			}
+			,
+			"CERTIFICATE_REQUEST_TIME_SKEW_MAX": {
+				"description": "The maximum time offset/skew allowed for certificate requests from a client"
+			}
 		}
 	},
 	"scripts": {
