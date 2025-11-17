@@ -140,7 +140,7 @@ func Execute(ctx context.Context, args []string) error {
 	}()
 
 	logger := slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{}))
-	slog.Info("logging to log file", "file", logFile)
+	logger.Info("logging to log file", "file", logFile)
 
 	// make sure we are only running once
 	lockFile, err := singleinstance.CreateLockFile(filepath.Join(user, "tray.lock"))

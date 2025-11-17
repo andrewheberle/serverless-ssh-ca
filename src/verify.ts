@@ -6,7 +6,7 @@ import { AuthenticatedRequest, CertificateRequestJWTPayload } from "./types"
 import { env } from "cloudflare:workers"
 import { Logger } from "@andrewheberle/ts-slog"
 import { ms } from "itty-time"
-import { parseFingerprint } from "sshpk"
+import { parseFingerprint, parseSignature } from "sshpk"
 
 const logger = new Logger()
 
@@ -87,15 +87,19 @@ export const withValidNonce: RequestHandler<AuthenticatedRequest, CFArgs> = asyn
             return error(400)
         }
 
-        // verify signature in nonce
+        // parse signature
+        const signature = parseSignature(signatureBase64, "ecdsa", "ssh") 
+
+        // create verifier from public key
         const dataToVerify = `${timestamp}.${fingerprintHex}`
-        const signature = Buffer.from(signatureBase64, "base64")
         const verifier = request.public_key.createVerify("sha256")
         verifier.update(dataToVerify)
+
+        // check if signature is valid
         const valid = verifier.verify(signature)
         
         if (!valid) {
-            logger.error("nonce signature validation failed")
+            logger.error("nonce signature validation failed", "nonce", request.nonce)
             return error(400)
         }
     } catch (err) {
