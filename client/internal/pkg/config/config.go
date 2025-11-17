@@ -155,17 +155,8 @@ func (c *Config) CertificateAuthorityURL() string {
 }
 
 func (c *Config) HasPrivateKey() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	// get key
-	pemBytes, err := c.getPrivateKeyBytes()
-	if err != nil {
-		return false
-	}
-
-	// parse key
-	if _, err := ssh.ParsePrivateKey(pemBytes); err != nil {
+	// parse key via Signer
+	if _, err := c.Signer(); err != nil {
 		return false
 	}
 
@@ -297,4 +288,19 @@ func (c *Config) SetRefreshToken(token string) error {
 	}
 
 	return nil
+}
+
+// Signer returns a ssh.Signer
+func (c *Config) Signer() (ssh.Signer, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// get key
+	pemBytes, err := c.getPrivateKeyBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	// parse key and return signer
+	return ssh.ParsePrivateKey(pemBytes)
 }

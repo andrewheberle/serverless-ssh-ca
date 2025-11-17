@@ -6,7 +6,7 @@ import { AuthenticatedRequest, CertificateRequestJWTPayload } from "./types"
 import { env } from "cloudflare:workers"
 import { Logger } from "@andrewheberle/ts-slog"
 import { ms } from "itty-time"
-import { parseFingerprint } from "sshpk"
+import { parseFingerprint, parseSignature } from "sshpk"
 
 const logger = new Logger()
 
@@ -55,14 +55,14 @@ export const verifyJWT = async function (jwt: string) {
 export const withValidNonce: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext) => {
     try {
         if (request.nonce === undefined) {
-            logger.error("request did not contain a nonce")
+            logger.error("request did not contain a nonce", "for", request.email)
             return error(400)
         }
 
         // split and verify parts
         const parts = request.nonce.split(".")
         if (parts.length !== 3) {
-            logger.error("invalid nonce format", "length", parts.length)
+            logger.error("invalid nonce format", "length", parts.length, "for", request.email)
             return error(400)
         }
         const [ timestampStr, fingerprintHex, signatureBase64 ] = parts
@@ -70,37 +70,43 @@ export const withValidNonce: RequestHandler<AuthenticatedRequest, CFArgs> = asyn
         // verify timestamp
         const timestamp: number = parseInt(timestampStr, 10)
         if (isNaN(timestamp)) {
-            logger.error("timestamp was not a number", "timestamp", timestamp)
+            logger.error("timestamp was not a number", "timestamp", timestamp, "for", request.email)
             return error(400)
         }
         const now = Date.now()
         const age = now - timestamp
         if (age > ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
-            logger.error("nonce timestamp too old", "timestamp", timestamp, "age", age)
+            logger.error("nonce timestamp too old", "timestamp", timestamp, "age", age, "for", request.email)
             return error(400)
         }
 
         // verify fingerprint matches public key
         const fingerprint = parseFingerprint(fingerprintHex)
         if (!fingerprint.matches(request.public_key)) {
-            logger.error("nonce fingerprint did not match public key")
+            logger.error("nonce fingerprint did not match public key", "for", request.email)
             return error(400)
         }
 
-        // verify signature in nonce
+        // parse signature
+        const signature = parseSignature(signatureBase64, "ecdsa", "ssh") 
+
+        // create verifier from public key
         const dataToVerify = `${timestamp}.${fingerprintHex}`
-        const signature = Buffer.from(signatureBase64, "base64")
         const verifier = request.public_key.createVerify("sha256")
         verifier.update(dataToVerify)
+
+        // check if signature is valid
         const valid = verifier.verify(signature)
         
         if (!valid) {
-            logger.error("nonce signature validation failed")
+            logger.error("nonce signature validation failed", "for", request.email)
             return error(400)
         }
+
+        logger.info("verified nonce in request", "for", request.email)
     } catch (err) {
         // unhandled error, so log and throw it again and handle downstream
-        logger.error("unhandled error", "error", err)
+        logger.error("unhandled error", "error", err, "for", request.email)
         throw err
     }
 }

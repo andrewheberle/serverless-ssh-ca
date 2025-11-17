@@ -25,6 +25,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/ndbeals/winssh-pageant/pageant"
 	"github.com/openpubkey/openpubkey/util"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/oauth2"
 )
@@ -33,6 +34,7 @@ type CertificateSignerPayload struct {
 	Lifetime  time.Duration `json:"lifetime"`
 	PublicKey []byte        `json:"public_key"`
 	Identity  string        `json:"identity,omitempty"`
+	Nonce     string        `json:"nonce"`
 }
 
 type CertificateSignerResponse struct {
@@ -552,6 +554,12 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		return nil, err
 	}
 
+	// generate nonce
+	nonce, err := lh.generateNonce()
+	if err != nil {
+		return nil, err
+	}
+
 	// encode json
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
@@ -559,12 +567,13 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		PublicKey: publicKey,
 		Lifetime:  time.Duration(lh.lifetime.Seconds()),
 		Identity:  id,
+		Nonce:     nonce,
 	}); err != nil {
 		return nil, err
 	}
 
 	// build url
-	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL(), "/api/v1/certificate")
+	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL(), "/api/v2/certificate")
 	if err != nil {
 		return nil, err
 	}
@@ -592,6 +601,28 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	}
 
 	return &csr, nil
+}
+
+func (lh *LoginHandler) generateNonce() (string, error) {
+	// get signer
+	signer, err := lh.config.Signer()
+	if err != nil {
+		return "", err
+	}
+
+	// generate data to sign
+	timestamp := time.Now().UnixMilli()
+	fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
+	dataToSign := fmt.Sprintf("%d.%s", timestamp, fingerprint)
+
+	// sign data
+	signature, err := signer.Sign(rand.Reader, []byte(dataToSign))
+	if err != nil {
+		return "", err
+	}
+
+	// return encoded data
+	return fmt.Sprintf("%s.%s", dataToSign, base64.StdEncoding.EncodeToString(signature.Blob)), nil
 }
 
 // ExecuteLogin performs [*LoginHandler.Start()], attempts to open the users
