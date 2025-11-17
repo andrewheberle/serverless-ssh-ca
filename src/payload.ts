@@ -9,7 +9,7 @@ import { Logger } from "@andrewheberle/ts-slog"
 
 const logger = new Logger()
 
-export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext) => {
+export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext): Promise<Response | null> => {
     try {
         const payload = await request.json<CertificateSignerPayload>()
 
@@ -52,16 +52,12 @@ export const withPayload: RequestHandler<AuthenticatedRequest, CFArgs> = async (
         // parse provided public key
         request.public_key = parseKey(atob(payload.public_key))
 
-        // lifetime defaults to env.SSH_CERTIFICATE_LIFETIME if not set
-        request.lifetime = payload.lifetime !== undefined ? payload.lifetime : seconds(env.SSH_CERTIFICATE_LIFETIME)
-
-        // set optional extensions list
-        request.extensions = payload.extensions
-
         // add nonce to request if present to support v2 api requirement
         if (payload.nonce !== undefined) {
             request.nonce = payload.nonce
         }
+
+        return null
     } catch (err) {
         if (err instanceof JWSInvalid) {
             logger.error("the identity token was invalid", "error", err)

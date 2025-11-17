@@ -10,7 +10,7 @@ import { parseFingerprint, parseSignature } from "sshpk"
 
 const logger = new Logger()
 
-export const withValidJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext) => {
+export const withValidJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext): Promise<Response | null> => {
     try {
         // extract jwt from Authorization header
         const jwt = request.headers.get("Authorization")?.replace("Bearer ", "")
@@ -32,6 +32,8 @@ export const withValidJWT: RequestHandler<AuthenticatedRequest, CFArgs> = async 
         // add info to request
         request.sub = payload.sub
         request.email = payload.email
+
+        return null
     } catch (err) {
         if (err instanceof JWSInvalid) {
             logger.error("the JWS was invalid", "error", err)
@@ -52,7 +54,7 @@ export const verifyJWT = async function (jwt: string) {
     return await jwtVerify<CertificateRequestJWTPayload>(jwt, JWKS, { issuer: env.JWT_ISSUER, algorithms: env.JWT_ALGORITHMS })
 }
 
-export const withValidNonce: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext) => {
+export const withValidNonce: RequestHandler<AuthenticatedRequest, CFArgs> = async (request: AuthenticatedRequest, env: Env, ctx: ExecutionContext): Promise<Response | null> => {
     try {
         if (request.nonce === undefined) {
             logger.error("request did not contain a nonce", "for", request.email)
@@ -104,6 +106,8 @@ export const withValidNonce: RequestHandler<AuthenticatedRequest, CFArgs> = asyn
         }
 
         logger.info("verified nonce in request", "for", request.email)
+
+        return null
     } catch (err) {
         // unhandled error, so log and throw it again and handle downstream
         logger.error("unhandled error", "error", err, "for", request.email)

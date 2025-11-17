@@ -1,14 +1,19 @@
-import { IttyRouter, IRequest, error } from "itty-router"
-import { router as apiv1 } from "./api/v1"
-import { router as apiv2 } from "./api/v2"
-import { router as currentApi } from "./api/current"
+import { IttyRouter, error } from "itty-router"
+import { CaPublicKeyEndpoint, CertificateRequestEndpoint as CertificateRequestV1Endpoint} from "./api/v1"
+import { CertificateRequestEndpoint } from "./api/v2"
+import { fromIttyRouter } from "chanfana"
+import { AuthenticatedRequest } from "./types"
+import { withValidJWT, withValidNonce } from "./verify"
+import { withPayload } from "./payload"
 
 export type CFArgs = [Env, ExecutionContext]
 
-export const router = IttyRouter<IRequest, CFArgs>()
+const router = IttyRouter<AuthenticatedRequest, CFArgs>()
 
-router
-    .all("/api/v1/*", apiv1.fetch)
-    .all("/api/v2/*", apiv2.fetch)
-    .all("/api/*", currentApi.fetch)
-    .all("*", () => error(404))
+export const openapi = fromIttyRouter(router)
+
+openapi.get("/api/v1/ca", CaPublicKeyEndpoint)
+openapi.post("/api/v1/certificate", withValidJWT, withPayload, CertificateRequestV1Endpoint)
+openapi.post("/api/v2/certificate", withValidJWT, withPayload, withValidNonce, CertificateRequestEndpoint)
+
+router.all("*", () => error(404))
