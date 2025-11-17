@@ -12,6 +12,7 @@ export type AuthenticatedRequest = {
     principals?: string[]
     extensions?: typeof env.SSH_CERTIFICATE_EXTENSIONS
 	lifetime: number
+    nonce?: string
 } & IRequestStrict
 
 // this is the JSON payload of a certificate request
@@ -20,6 +21,7 @@ export type CertificateSignerPayload = {
     identity?: string
     extensions?: typeof env.SSH_CERTIFICATE_EXTENSIONS
 	lifetime?: number
+    nonce?: string
 }
 
 export type CertificateSignerResponse = {
