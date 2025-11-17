@@ -75,7 +75,7 @@ export const withValidNonce: RequestHandler<AuthenticatedRequest, CFArgs> = asyn
         }
         const now = Date.now()
         const age = now - timestamp
-        if (age > ms("5 minutes")) {
+        if (age > ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
             logger.error("nonce timestamp too old", "timestamp", timestamp, "age", age)
             return error(400)
         }

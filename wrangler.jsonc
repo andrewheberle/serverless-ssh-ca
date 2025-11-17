@@ -33,7 +33,8 @@
 			"permit-port-forwarding",
 			"permit-pty",
 			"permit-user-rc",
-		]
+		],
+		"CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
 	},
 	"secrets_store_secrets": [
 		{
