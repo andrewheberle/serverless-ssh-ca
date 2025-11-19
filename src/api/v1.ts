@@ -62,6 +62,7 @@ const HeaderSchema = z.object({
 
 class CertificateRequestEndpoint extends OpenAPIRoute {
     schema = {
+        operationId: "post_CertificateRequestEndpointv1",
         deprecated: true,
         security: [
             {
