@@ -1,3 +1,3 @@
-import { openapi } from "./router"
+import { app } from "./router"
 
-export default openapi satisfies ExportedHandler<Env>
+export default app satisfies ExportedHandler<Env>
