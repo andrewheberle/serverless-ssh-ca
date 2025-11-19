@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -62,6 +64,7 @@ type LoginHandler struct {
 
 const (
 	DefaultLifetime = time.Hour * 24
+	UserAgent       = "Serverless-SSH-CA-Client"
 )
 
 var (
@@ -73,6 +76,8 @@ var (
 
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
+
+	userAgentFull = getUserAgent(UserAgent)
 )
 
 // NewLoginHandler creates a new handler
@@ -544,6 +549,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		Transport: &customTransport{
 			Headers: map[string]string{
 				"Authorization": "Bearer " + access,
+				"User-Agent":    userAgentFull,
 			},
 		},
 	}
@@ -717,4 +723,16 @@ func (lh *LoginHandler) OIDCConfig() config.ClientOIDCConfig {
 // CertificateAuthorityURL shows the CA URL
 func (lh *LoginHandler) CertificateAuthorityURL() string {
 	return lh.config.CertificateAuthorityURL()
+}
+
+func getUserAgent(name string) string {
+	version := "Unknown"
+
+	// get version if available
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		version = info.Main.Version
+	}
+
+	return fmt.Sprintf("%s/%s (%s-%s)", name, version, runtime.GOOS, runtime.GOARCH)
 }
