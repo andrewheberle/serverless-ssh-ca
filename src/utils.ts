@@ -36,21 +36,11 @@ export class NonceParseError extends Error {
     }
 }
 
-export class NonceVerifyError extends Error {
-    constructor(message: string) {
-        super(message)
-        this.name = "NonceVerifyError"
-
-        // This is necessary for proper stack trace in TypeScript
-        Object.setPrototypeOf(this, NonceVerifyError.prototype)
-    }
-}
-
 class Nonce {
-    timestamp: number
-    fingerprint: Fingerprint
-    signature: Signature
-    private dataToVerify: string
+    readonly timestamp: number
+    readonly fingerprint: Fingerprint
+    readonly signature: Signature
+    private readonly dataToVerify: string
 
     constructor(nonce: string) {
         const parts = nonce.split(".")
@@ -105,10 +95,6 @@ class Nonce {
      * @returns true or false if verification succeeds
      */
     verify(key: Key) {
-        if (!this.fingerprint.matches(key)) {
-            throw new NonceVerifyError("nonce fingerprint did not match public_key fingerprint")
-        }
-
         // create verifier from public key
         const verifier = key.createVerify("sha256")
         verifier.update(this.dataToVerify)
