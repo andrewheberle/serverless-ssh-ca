@@ -26,52 +26,107 @@ type ParsedNonce = {
     dataToVerify: string
 }
 
-export const transformNonce = (val: string, ctx: z.RefinementCtx): ParsedNonce | never => {
-    const parts = val.split(".")
-    if (parts.length !== 3) {
-        return fatalIssue(ctx, "invalid nonce format")
+export class NonceParseError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = "NonceParseError"
+
+        // This is necessary for proper stack trace in TypeScript
+        Object.setPrototypeOf(this, NonceParseError.prototype)
+    }
+}
+
+export class NonceVerifyError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = "NonceVerifyError"
+
+        // This is necessary for proper stack trace in TypeScript
+        Object.setPrototypeOf(this, NonceVerifyError.prototype)
+    }
+}
+
+class Nonce {
+    timestamp: number
+    fingerprint: Fingerprint
+    signature: Signature
+    private dataToVerify: string
+
+    constructor(nonce: string) {
+        const parts = nonce.split(".")
+        if (parts.length !== 3) {
+            throw new NonceParseError("invalid nonce format")
+        }
+
+        const [timestampStr, fingerprintHex, signatureBase64] = parts
+
+        // verify timestamp
+        const timestamp: number = parseInt(timestampStr, 10)
+        if (isNaN(timestamp)) {
+            throw new NonceParseError("timestamp was not a number")
+        }
+
+        const now = Date.now()
+        const age = now - timestamp
+        if (age > ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
+            throw new NonceParseError("nonce timestamp too old")
+        }
+
+        // verify fingerprint matches public key
+        try {
+            const fingerprint = parseFingerprint(fingerprintHex)
+            if (fingerprint === undefined) {
+                throw new NonceParseError("nonce fingerprint did not parse")
+            }
+
+            // parse signature
+            const signature = parseSignature(signatureBase64, "ecdsa", "ssh")
+
+            // set our values
+            this.timestamp = timestamp
+            this.fingerprint = fingerprint
+            this.signature = signature
+            this.dataToVerify = `${timestamp}.${fingerprintHex}`
+        } catch (err) {
+            switch (true) {
+                case (err instanceof FingerprintFormatError):
+                    throw new NonceParseError("nonce fingerprint was an invalid format")
+                case (err instanceof SignatureParseError):
+                    throw new NonceParseError("nonce signature could not be parsed")
+                default:
+                    throw err
+            }
+        }
     }
 
-    const [timestampStr, fingerprintHex, signatureBase64] = parts
+    /**
+     * 
+     * @param key public key to use to verify fingerprint and signature against
+     * @returns true or false if verification succeeds
+     */
+    verify(key: Key) {
+        if (!this.fingerprint.matches(key)) {
+            throw new NonceVerifyError("nonce fingerprint did not match public_key fingerprint")
+        }
 
-    // verify timestamp
-    const timestamp: number = parseInt(timestampStr, 10)
-    if (isNaN(timestamp)) {
-        return fatalIssue(ctx, "timestamp was not a number")
+        // create verifier from public key
+        const verifier = key.createVerify("sha256")
+        verifier.update(this.dataToVerify)
+
+        return verifier.verify(this.signature)
     }
+}
 
-    const now = Date.now()
-    const age = now - timestamp
-    if (age > ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
-        return fatalIssue(ctx, "nonce timestamp too old")
-    }
 
-    // verify fingerprint matches public key
+export const transformNonce = (val: string, ctx: z.RefinementCtx): Nonce | never => {
     try {
-        const fingerprint = parseFingerprint(fingerprintHex)
-        if (fingerprint === undefined) {
-            return fatalIssue(ctx, "nonce fingerprint did not parse")
-        }
-
-        // parse signature
-        const signature = parseSignature(signatureBase64, "ecdsa", "ssh")
-
-        // return for later
-        return {
-            timestamp: timestamp,
-            fingerprint: fingerprint,
-            signature: signature,
-            dataToVerify: `${timestamp}.${fingerprintHex}`
-        }
+        return new Nonce(val)
     } catch (err) {
-        switch (true) {
-            case (err instanceof FingerprintFormatError):
-                return fatalIssue(ctx, "nonce fingerprint was an invalid format")
-            case (err instanceof SignatureParseError):
-                return fatalIssue(ctx, "nonce signature could not be parsed")
-            default:
-                return fatalIssue(ctx, "nonce fingerprint unhandled error")
+        if (err instanceof NonceParseError) {
+            return fatalIssue(ctx, err.message)
         }
+
+        return fatalIssue(ctx, "nonce transform unhandled error")
     }
 }
 
@@ -203,7 +258,7 @@ export const parseIdentity = async (jwt: string | undefined): Promise<ParsedIden
 }
 
 type ParsedCertificateRequest = {
-    nonce: ParsedNonce
+    nonce: Nonce
     public_key: Key
     lifetime: number
     identity: string
@@ -211,18 +266,18 @@ type ParsedCertificateRequest = {
 }
 
 export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.RefinementCtx) => {
-    if (!val.nonce.fingerprint.matches(val.public_key)) {
-        return fatalIssue(ctx, "nonce fingerprint did not match public_key fingerprint")
+    try {
+        // verify nonce signature
+        if (!val.nonce.verify(val.public_key)) {
+            return fatalIssue(ctx, "nonce signature validation failed")
+        }
+
+        return z.NEVER
+    } catch (err) {
+        if (err instanceof NonceVerifyError) {
+            return fatalIssue(ctx, err.message)
+        }
+
+        return fatalIssue(ctx, "nonce verification unhandled error")
     }
-
-    // create verifier from public key
-    const dataToVerify = `${val.nonce.timestamp}.${val.nonce.fingerprint.toString("hex")}`
-    const verifier = val.public_key.createVerify("sha256")
-    verifier.update(dataToVerify)
-
-    if (!verifier.verify(val.nonce.dataToVerify)) {
-        return fatalIssue(ctx, "nonce signature validation failed")
-    }
-
-    return z.NEVER
 }
