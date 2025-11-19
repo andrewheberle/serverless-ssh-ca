@@ -1,40 +1,148 @@
 import { Logger } from "@andrewheberle/ts-slog"
-import { error, IRequest, IttyRouter, RequestHandler } from "itty-router"
-import { CFArgs } from "../router"
-import { withValidJWT, withValidNonce } from "../verify"
-import { withPayload } from "../payload"
-import { CertificateExtraExtensionsError, CreateCertificateOptions, createSignedCertificate } from "../certificate"
+import { contentJson, fromHono, InputValidationException, OpenAPIRoute } from "chanfana"
+import { Hono } from "hono"
+import { HTTPException } from "hono/http-exception"
+import z, { ZodError } from "zod"
+import { AppContext } from "../router"
+import { env } from "cloudflare:workers"
+import { seconds } from "itty-time"
 import { CertificateSignerResponse } from "../types"
+import { CreateCertificateOptions, createSignedCertificate } from "../certificate"
+import { fatalIssue, parseIdentity, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
 
 const logger = new Logger()
 
-export const router = IttyRouter<IRequest, CFArgs>({ base: "/api/v2" })
+export const api = fromHono(new Hono())
 
-export const handleUserCertificateRoute: RequestHandler<IRequest, CFArgs> = async (request, env, ctx) => {
-    logger.info("handling request", "for", request.email)
-    try {
-        const opts: CreateCertificateOptions = {
-            lifetime: request.lifetime,
-            principals: request.principals,
-            extensions: request.extensions
-        }
-        const certificate = await createSignedCertificate(request.email, request.public_key, opts)
-        const response: CertificateSignerResponse = {
-            certificate: btoa(certificate.toString("openssh"))
-        }
+const HeaderSchema = z.object({
+    "Authorization": z.string()
+        .startsWith("Bearer ")
+        .transform(transformAuthorizationHeader)
+        .describe("Access Token JWT from OIDC IdP")
+})
 
-        return response
-    } catch (err) {
-        if (err instanceof CertificateExtraExtensionsError) {
-            logger.error("the request included additional certificate extensions", "error", err)
-            return error(400)
-        }
+class CertificateRequestEndpoint extends OpenAPIRoute {
+    schema = {
+        security: [
+            {
+                oidcAuth: []
+            }
+        ],
+        request: {
+            headers: HeaderSchema,
+            body: contentJson(
+                z.object({
+                    public_key: z.string()
+                        .transform(transformPublicKey)
+                        .describe("SSH public key to sign"),
+                    nonce: z.string()
+                        .transform(transformNonce)
+                        .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}"),
+                    identity: z.string()
+                        .describe("Identity Token JWT from OIDC IdP"),
+                    extensions: z.array(z.string())
+                        .default(env.SSH_CERTIFICATE_EXTENSIONS)
+                        .describe("Extensions to include in issued SSH certificate in seconds"),
+                    lifetime: z.number()
+                        .min(seconds("5 minutes"))
+                        .max(seconds(env.SSH_CERTIFICATE_LIFETIME))
+                        .default(seconds(env.SSH_CERTIFICATE_LIFETIME))
+                        .describe("Lifetime of issued SSH certificate"),
+                })
+                    .superRefine((val, ctx) => {
+                        if (!val.nonce.fingerprint.matches(val.public_key)) {
+                            return fatalIssue(ctx, "nonce fingerprint did not match public_key fingerprint")
+                        }
 
-        // unhandled error, so just log and throw it again
-        logger.error("unhandled error", "error", err)
-        throw err
+                        // create verifier from public key
+                        const dataToVerify = `${val.nonce.timestamp}.${val.nonce.fingerprint.toString("hex")}`
+                        const verifier = val.public_key.createVerify("sha256")
+                        verifier.update(dataToVerify)
+
+                        if (!verifier.verify(val.nonce.signature)) {
+                            return fatalIssue(ctx, "nonce signature validation failed")
+                        }
+
+                        return z.NEVER
+                    })
+            )
+        },
+        responses: {
+            "200": {
+                description: "SSH User Certificate issued successfully",
+                ...contentJson(z.object({
+                    certificate: z.string(),
+                }))
+            },
+            "401": {
+                description: "Access to the endpoint is Unauthorized",
+                ...contentJson(z.object({
+                    status: z.literal(401),
+                    error: z.literal("Unauthorized")
+                }))
+            },
+            "403": {
+                description: "Access to the endpoint is Forbidden",
+                ...contentJson(z.object({
+                    status: z.literal(403),
+                    error: z.literal("Forbidden")
+                }))
+            },
+            ...InputValidationException.schema(),
+            "422": {
+                description: "The request to could not be processed",
+                ...contentJson(z.object({
+                    status: z.literal(422),
+                    error: z.literal("Unprocessable Entity")
+                }))
+            },
+            "500": {
+                description: "There was an internal error",
+                ...contentJson(z.object({
+                    status: z.literal(500),
+                    error: z.literal("Internal Server Error")
+                }))
+            }
+        }
+    }
+
+    async handle(c: AppContext) {
+        logger.info("starting...")
+        try {
+            const data = await this.getValidatedData<typeof this.schema>()
+
+            logger.info("handling request", "for", data.headers.Authorization.email)
+
+            const identity = await parseIdentity(data.body.identity)
+            if (identity.sub !== data.headers["Authorization"].sub) {
+                throw new HTTPException(403, { message: "possible token substitution as subjects for authentication and identity tokens did not match" })
+            }
+
+            const opts: CreateCertificateOptions = {
+                lifetime: data.body.lifetime,
+                principals: identity.principals,
+                extensions: data.body.extensions as typeof env.SSH_CERTIFICATE_EXTENSIONS
+            }
+
+            const certificate = await createSignedCertificate(data.headers.Authorization.email, data.body.public_key, opts)
+            const response: CertificateSignerResponse = {
+                certificate: btoa(certificate.toString("openssh"))
+            }
+
+            return c.json(response)
+        } catch (err) {
+            switch (true) {
+                case (err instanceof DOMException):
+                    if (err.name === "InvalidCharacterError") {
+                        throw new HTTPException(422, { message: "the content was not valid base64 encoded data", cause: err })
+                    }
+            }
+
+            // otherwise just re-throw error
+            logger.error("some error", "error", err)
+            throw err
+        }
     }
 }
 
-router
-    .post("/certificate", withValidJWT, withPayload, withValidNonce, handleUserCertificateRoute)
+api.post("/certificate", CertificateRequestEndpoint)

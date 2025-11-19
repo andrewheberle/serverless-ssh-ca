@@ -32,8 +32,7 @@
 			},
 			"PRIVATE_KEY": {
 				"description": "The ECDSA private key to use in OpenSSH format"
-			}
-			,
+			},
 			"CERTIFICATE_REQUEST_TIME_SKEW_MAX": {
 				"description": "The maximum time offset/skew allowed for certificate requests from a client"
 			}
@@ -48,11 +47,13 @@
 	"devDependencies": {
 		"@andrewheberle/ts-slog": "^1.1.0",
 		"@types/sshpk": "^1.17.4",
-		"itty-router": "^5.0.20",
+		"chanfana": "^2.8.3",
+		"hono": "^4.10.6",
 		"itty-time": "^2.0.2",
 		"jose": "^6.0.12",
 		"sshpk": "^1.18.0",
 		"typescript": "^5.5.2",
-		"wrangler": "^4.26.0"
+		"wrangler": "^4.26.0",
+		"zod": "^3.25.76"
 	}
 }
