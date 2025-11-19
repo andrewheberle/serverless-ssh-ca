@@ -20,7 +20,6 @@ go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client-c
 ```sh
 go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client@latest
 ```
-
 ## Configuration
 
 The client requires the IdP and CA details set as follows:
@@ -53,6 +52,16 @@ can be overidden using the `--user` command line flag.
 
 This allows the use of a shared/system configuration file that defines the
 OIDC and SSH CA configuration with user specific data kept seperate.
+
+## Requirements
+
+Regardless of the version being run there must be a running `ssh-agent` to handle
+private keys, certificates and authentication to your SSH client of choice.
+
+On Windows this requires the `OpenSSH Agent` service to be set to `Manual` start
+and `ssh-agent.exe` must be started on login for your user.
+
+On Linux `ssh-agent` should be started as part of your normal process.
 
 ## Running via the CLI
 
