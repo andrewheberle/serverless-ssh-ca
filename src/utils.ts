@@ -23,6 +23,7 @@ type ParsedNonce = {
     timestamp: number
     fingerprint: Fingerprint
     signature: Signature
+    dataToVerify: string
 }
 
 export const transformNonce = (val: string, ctx: z.RefinementCtx): ParsedNonce | never => {
@@ -60,6 +61,7 @@ export const transformNonce = (val: string, ctx: z.RefinementCtx): ParsedNonce |
             timestamp: timestamp,
             fingerprint: fingerprint,
             signature: signature,
+            dataToVerify: `${timestamp}.${fingerprintHex}`
         }
     } catch (err) {
         switch (true) {
@@ -198,4 +200,29 @@ export const parseIdentity = async (jwt: string | undefined): Promise<ParsedIden
         sub: payload.sub,
         principals: principals,
     }
+}
+
+type ParsedCertificateRequest = {
+    nonce: ParsedNonce
+    public_key: Key
+    lifetime: number
+    identity: string
+    extensions: string[]
+}
+
+export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.RefinementCtx) => {
+    if (!val.nonce.fingerprint.matches(val.public_key)) {
+        return fatalIssue(ctx, "nonce fingerprint did not match public_key fingerprint")
+    }
+
+    // create verifier from public key
+    const dataToVerify = `${val.nonce.timestamp}.${val.nonce.fingerprint.toString("hex")}`
+    const verifier = val.public_key.createVerify("sha256")
+    verifier.update(dataToVerify)
+
+    if (!verifier.verify(val.nonce.dataToVerify)) {
+        return fatalIssue(ctx, "nonce signature validation failed")
+    }
+
+    return z.NEVER
 }

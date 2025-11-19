@@ -2,13 +2,13 @@ import { Logger } from "@andrewheberle/ts-slog"
 import { contentJson, fromHono, InputValidationException, OpenAPIRoute } from "chanfana"
 import { Hono } from "hono"
 import { HTTPException } from "hono/http-exception"
-import z, { ZodError } from "zod"
+import z from "zod"
 import { AppContext } from "../router"
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 import { CertificateSignerResponse } from "../types"
 import { CreateCertificateOptions, createSignedCertificate } from "../certificate"
-import { fatalIssue, parseIdentity, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
+import { parseIdentity, refineCertificateRequest, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
 
 const logger = new Logger()
 
@@ -49,22 +49,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
                         .default(seconds(env.SSH_CERTIFICATE_LIFETIME))
                         .describe("Lifetime of issued SSH certificate"),
                 })
-                    .superRefine((val, ctx) => {
-                        if (!val.nonce.fingerprint.matches(val.public_key)) {
-                            return fatalIssue(ctx, "nonce fingerprint did not match public_key fingerprint")
-                        }
-
-                        // create verifier from public key
-                        const dataToVerify = `${val.nonce.timestamp}.${val.nonce.fingerprint.toString("hex")}`
-                        const verifier = val.public_key.createVerify("sha256")
-                        verifier.update(dataToVerify)
-
-                        if (!verifier.verify(val.nonce.signature)) {
-                            return fatalIssue(ctx, "nonce signature validation failed")
-                        }
-
-                        return z.NEVER
-                    })
+                    .superRefine(refineCertificateRequest)
             )
         },
         responses: {
@@ -107,11 +92,10 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
     }
 
     async handle(c: AppContext) {
-        logger.info("starting...")
         try {
             const data = await this.getValidatedData<typeof this.schema>()
 
-            logger.info("handling request", "for", data.headers.Authorization.email)
+            logger.info("handling renewal request", "for", data.headers.Authorization.email)
 
             const identity = await parseIdentity(data.body.identity)
             if (identity.sub !== data.headers["Authorization"].sub) {
@@ -139,7 +123,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             }
 
             // otherwise just re-throw error
-            logger.error("some error", "error", err)
+            logger.error("unhandled error", "error", err)
             throw err
         }
     }
