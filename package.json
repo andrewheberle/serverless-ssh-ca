@@ -42,18 +42,22 @@
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"test": "wrangler deploy --dry-run && npx vitest run --config tests/vitest.config.mts"
 	},
-	"devDependencies": {
+	"dependencies": {
 		"@andrewheberle/ts-slog": "^1.1.0",
-		"@types/sshpk": "^1.17.4",
 		"chanfana": "^2.8.3",
 		"hono": "^4.10.6",
 		"itty-time": "^2.0.2",
 		"jose": "^6.0.12",
 		"sshpk": "^1.18.0",
-		"typescript": "^5.5.2",
-		"wrangler": "^4.26.0",
 		"zod": "^3.25.76"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.10.8",
+		"@types/sshpk": "^1.17.4",
+		"typescript": "^5.5.2",
+		"wrangler": "^4.26.0"
 	}
 }
