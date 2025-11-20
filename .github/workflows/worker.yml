@@ -1,12 +1,13 @@
 name: Worker CI
 
+permissions:
+  contents: read
+
 on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v5
         with:
