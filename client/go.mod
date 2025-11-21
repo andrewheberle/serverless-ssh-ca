@@ -7,7 +7,7 @@ require (
 	github.com/andrewheberle/simplecommand v0.4.0
 	github.com/andrewheberle/sshagent v1.0.0
 	github.com/bep/simplecobra v0.6.1
-	github.com/coreos/go-oidc/v3 v3.16.0
+	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/gen2brain/beeep v0.11.1
 	github.com/getlantern/systray v1.2.2
 	github.com/gorilla/securecookie v1.1.2
