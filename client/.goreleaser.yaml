@@ -34,7 +34,7 @@ builds:
     hooks:
       pre:
         - go install github.com/tc-hib/go-winres@v0.3.3
-        - go generate ./cmd/ssh-ca-client/...
+        - go generate ./cmd/ssh-ca-client/main_windows.go
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui
