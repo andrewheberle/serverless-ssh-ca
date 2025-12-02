@@ -33,10 +33,10 @@ import (
 )
 
 type CertificateSignerPayload struct {
-	Lifetime  time.Duration `json:"lifetime"`
-	PublicKey []byte        `json:"public_key"`
-	Identity  string        `json:"identity,omitempty"`
-	Nonce     string        `json:"nonce"`
+	Lifetime  int    `json:"lifetime"`
+	PublicKey []byte `json:"public_key"`
+	Identity  string `json:"identity,omitempty"`
+	Nonce     string `json:"nonce"`
 }
 
 type CertificateSignerResponse struct {
@@ -569,12 +569,13 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	// encode json
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
-	if err := enc.Encode(CertificateSignerPayload{
+	payload := CertificateSignerPayload{
 		PublicKey: publicKey,
-		Lifetime:  time.Duration(lh.lifetime.Seconds()),
+		Lifetime:  int(lh.lifetime.Seconds()),
 		Identity:  id,
 		Nonce:     nonce,
-	}); err != nil {
+	}
+	if err := enc.Encode(payload); err != nil {
 		return nil, err
 	}
 
@@ -586,6 +587,12 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 
 	// do POST
 	lh.logger.Info("sending request to CA", "url", caCertUrl)
+	lh.logger.Debug("certificate request",
+		"public_key", payload.PublicKey,
+		"lifetime", payload.Lifetime,
+		"identity", payload.Identity,
+		"nonce", payload.Nonce,
+	)
 	res, err := client.Post(caCertUrl, "application/json", buf)
 	if err != nil {
 		return nil, err
