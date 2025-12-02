@@ -122,6 +122,7 @@ const identityPrincipals = (payload: CertificateRequestJWTPayload): string[] => 
 
     const p = payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM]
     if (p === undefined) {
+        logger.warn("principals claim was missing despite being set in CA config", "claim", env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         return []
     }
 
