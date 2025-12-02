@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
@@ -15,6 +17,7 @@ type loginCommand struct {
 	lifetime   time.Duration
 	showTokens bool
 	listenAddr string
+	debug      bool
 
 	client *client.LoginHandler
 
@@ -35,6 +38,7 @@ func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.Flags().BoolVar(&c.showTokens, "show-tokens", false, "Display OIDC tokens after login process")
 	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
+	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 
 	return nil
 }
@@ -58,6 +62,16 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	}
 	if c.skipAgent {
 		opts = append(opts, client.SkipAgent())
+	}
+
+	logLevel := new(slog.LevelVar)
+	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	logger := slog.New(h)
+
+	opts = append(opts, client.WithLogger(logger))
+
+	if c.debug {
+		logLevel.Set(slog.LevelDebug)
 	}
 
 	// set up login client
