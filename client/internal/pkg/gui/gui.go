@@ -13,6 +13,7 @@ import (
 
 	"github.com/allan-simon/go-singleinstance"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/tray"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/pflag"
@@ -21,22 +22,11 @@ import (
 //go:embed icons
 var resources embed.FS
 
-const appName = "Serverless SSH CA Client"
-
-func configDirs() (user, system string, err error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", "", err
-	}
-
-	return filepath.Join(dir, appName), filepath.Join(os.Getenv("ProgramData"), appName), nil
-}
-
 func Execute(ctx context.Context, args []string) error {
-	beeep.AppName = appName
+	beeep.AppName = config.FriendlyAppName
 
 	// find config dirs
-	user, system, err := configDirs()
+	user, system, err := config.ConfigDirs()
 	if err != nil {
 		return err
 	}
@@ -53,7 +43,7 @@ func Execute(ctx context.Context, args []string) error {
 	flags.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
 	flags.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
 	flags.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
-	flags.BoolVar(&disableProxy, "disable-proxy", false, "Disable proxying of PuTTY Agent (pageant) requests")
+	flags.BoolVar(&disableProxy, "disable-proxy", pageantProxyDefault, "Disable proxying of PuTTY Agent (pageant) requests")
 	flags.BoolVar(&install, "install", false, "Perform post-install steps")
 	_ = flags.MarkHidden("install")
 	flags.BoolVar(&uninstall, "uninstall", false, "Perform pre-uninstall steps")

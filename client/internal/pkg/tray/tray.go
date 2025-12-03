@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"fyne.io/systray"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/gen2brain/beeep"
-	"github.com/getlantern/systray"
 )
 
 type appState string
@@ -71,12 +71,7 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 	}
 
 	// load tray icons
-	tIcons := map[string]string{
-		"ok":      "icons/ok.ico",
-		"error":   "icons/error.ico",
-		"warning": "icons/warning.ico",
-	}
-	for name, file := range tIcons {
+	for name, file := range trayIcons() {
 		icon, err := fs.ReadFile(file)
 		if err != nil {
 			return nil, err

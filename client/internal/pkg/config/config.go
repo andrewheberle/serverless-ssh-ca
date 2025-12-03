@@ -12,6 +12,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const FriendlyAppName = "Serverless SSH CA Client"
+
 type Config struct {
 	mu               sync.RWMutex
 	systemConfigName string
