@@ -16,7 +16,6 @@ import (
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/tray"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/pflag"
-	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 //go:embed icons
@@ -31,14 +30,6 @@ func configDirs() (user, system string, err error) {
 	}
 
 	return filepath.Join(dir, appName), filepath.Join(os.Getenv("ProgramData"), appName), nil
-}
-
-func runInstall() error {
-	return eventlog.InstallAsEventCreate("Serverless SSH CA Client", eventlog.Error|eventlog.Warning|eventlog.Info)
-}
-
-func runUninstall() error {
-	return eventlog.Remove("Serverless SSH CA Client")
 }
 
 func Execute(ctx context.Context, args []string) error {

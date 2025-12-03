@@ -23,7 +23,7 @@ builds:
       - linux
       - windows
     main: ./cmd/ssh-ca-client-cli
-  - id: gui
+  - id: windowsgui
     binary: ssh-ca-client
     env:
       - CGO_ENABLED=0
@@ -38,6 +38,13 @@ builds:
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui
+  - id: linuxgui
+    binary: ssh-ca-client
+    goarch:
+      - amd64
+    goos:
+      - linux
+    main: ./cmd/ssh-ca-client
 
 archives:
   - allow_different_binary_count: true
