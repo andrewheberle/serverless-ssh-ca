@@ -24,7 +24,7 @@ jobs:
           go-version-file: client/go.mod
           cache: false
       - name: Install dependencies
-        run: apt-get install -qqy libayatana-indicator3-dev libgtk-3-dev
+        run: sudo apt-get install -qqy libayatana-indicator3-dev libgtk-3-dev
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
