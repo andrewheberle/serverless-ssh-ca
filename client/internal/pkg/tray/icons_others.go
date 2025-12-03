@@ -2,7 +2,7 @@
 
 package tray
 
-func trayIcons() map[string]string {
+func trayIconFiles() map[string]string {
 	return map[string]string{
 		"ok":      "icons/ok.png",
 		"error":   "icons/error.png",

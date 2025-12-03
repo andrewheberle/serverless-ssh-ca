@@ -41,7 +41,7 @@ builds:
   - id: linuxgui
     binary: ssh-ca-client
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
     goarch:
       - amd64
     goos:

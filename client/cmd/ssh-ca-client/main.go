@@ -1,10 +1,9 @@
-//go:build !windows
+//go:generate go-winres make --product-version=git-tag --file-version=git-tag
 
 package main
 
 import (
 	"context"
-	"log/slog"
 	"os"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/gui"
@@ -12,7 +11,6 @@ import (
 
 func main() {
 	if err := gui.Execute(context.Background(), os.Args[1:]); err != nil {
-		slog.Error("error during execution", "error", err)
-		os.Exit(1)
+		logFatal("Error during execution: %s\n", err)
 	}
 }

@@ -71,7 +71,7 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 	}
 
 	// load tray icons
-	for name, file := range trayIcons() {
+	for name, file := range trayIconFiles() {
 		icon, err := fs.ReadFile(file)
 		if err != nil {
 			return nil, err
