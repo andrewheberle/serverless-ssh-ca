@@ -73,6 +73,9 @@ var (
 	ErrAlreadyStarted         = errors.New("server has already started")
 	ErrNotStarted             = errors.New("server has not been started")
 	ErrPageantProxyNotEnabled = errors.New("pageant proxy not enabled")
+	ErrConnectingToAgent      = errors.New("could not connect to agent")
+	ErrAddingToAgent          = errors.New("could not add to agent")
+	ErrCertificateNotValid    = errors.New("certificate validity not ok")
 
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
@@ -438,14 +441,14 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 		return nil
 	}
 
-	if err := lh.addToAgent(); err != nil {
+	if err := lh.AddToAgent(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (lh *LoginHandler) addToAgent() error {
+func (lh *LoginHandler) AddToAgent() error {
 	keyBytes, err := lh.config.GetPrivateKeyBytes()
 	if err != nil {
 		return err
@@ -466,16 +469,27 @@ func (lh *LoginHandler) addToAgent() error {
 		return err
 	}
 
-	agentClient, err := sshagent.NewAgent()
-	if err != nil {
-		return fmt.Errorf("could not connect to agent: %w", err)
+	// check validity
+	now := time.Now().Unix()
+	if now > int64(cert.ValidBefore) || now < int64(cert.ValidAfter) {
+		lh.logger.Error("certificate was not valid", "validbefore", cert.ValidBefore, "validafter", cert.ValidAfter, "now", now)
+		return ErrCertificateNotValid
 	}
 
-	return agentClient.Add(agent.AddedKey{
+	agentClient, err := sshagent.NewAgent()
+	if err != nil {
+		return ErrConnectingToAgent
+	}
+
+	if err := agentClient.Add(agent.AddedKey{
 		PrivateKey:  key,
 		Certificate: cert,
 		Comment:     cert.KeyId,
-	})
+	}); err != nil {
+		return ErrAddingToAgent
+	}
+
+	return nil
 }
 
 // Refresh attempts to refresh the authentication and identity token

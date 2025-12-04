@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -88,6 +89,12 @@ func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args
 	// try refresh first
 	if err := c.client.Refresh(); err == nil {
 		return nil
+	} else {
+		slog.Warn("error during refresh", "error", err)
+		if errors.Is(err, client.ErrAddingToAgent) || errors.Is(err, client.ErrConnectingToAgent) {
+			slog.Info("skipping interactive login flow as error was related to SSH agent")
+		}
+
 	}
 
 	// otherwise do interactive login

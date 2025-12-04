@@ -33,7 +33,7 @@ func Execute(ctx context.Context, args []string) error {
 
 	var lifetime, renewAt time.Duration
 	var listenAddr, logDir, systemConfigFile, userConfigFile string
-	var install, uninstall, disableProxy bool
+	var install, uninstall, disableProxy, addOnStart bool
 
 	flags := pflag.NewFlagSet("tray", pflag.ExitOnError)
 
@@ -44,6 +44,7 @@ func Execute(ctx context.Context, args []string) error {
 	flags.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
 	flags.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
 	flags.BoolVar(&disableProxy, "disable-proxy", pageantProxyDefault, "Disable proxying of PuTTY Agent (pageant) requests")
+	flags.BoolVar(&addOnStart, "add-on-start", true, "Add current key and certificate (if valid) to SSH agent on start")
 	flags.BoolVar(&install, "install", false, "Perform post-install steps")
 	_ = flags.MarkHidden("install")
 	flags.BoolVar(&uninstall, "uninstall", false, "Perform pre-uninstall steps")
@@ -147,6 +148,14 @@ func Execute(ctx context.Context, args []string) error {
 				}
 			}
 		}()
+	}
+
+	// try to add to agent on start
+	if addOnStart {
+		logger.Info("attempting to add current certificate to ssh agent")
+		if err := lh.AddToAgent(); err != nil {
+			logger.Warn("could not add current certificate to ssh agent", "error", err)
+		}
 	}
 
 	app.RunLogged(logger)

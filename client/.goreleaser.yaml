@@ -38,7 +38,7 @@ builds:
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui
-  - id: linuxgui
+  - id: gui
     binary: ssh-ca-client
     env:
       - CGO_ENABLED=1
