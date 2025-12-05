@@ -38,7 +38,7 @@ type ParsedAuthorizationHeader = {
 
 export const transformAuthorizationHeader = async (val: string, ctx: z.RefinementCtx): Promise<ParsedAuthorizationHeader | never> => {
     // skip this when running locally
-    if (env.IS_PRODUCTION === "false") {
+    if (env.IS_PRODUCTION as string === "false") {
         return {
             email: "text@example.com",
             sub: "test",
@@ -170,7 +170,7 @@ type ParsedCertificateRequest = {
     extensions: string[]
 }
 
-export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.RefinementCtx) => {
+export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.RefinementCtx): never => {
     try {
         // check nonce fingerprint matches public key
         if (!val.nonce.fingerprint.matches(val.public_key)) {
@@ -187,3 +187,8 @@ export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.R
         return fatalIssue(ctx, "nonce verification unhandled error")
     }
 }
+
+export const split = (v: string): string[] => {
+    return v.split(",")
+}
+

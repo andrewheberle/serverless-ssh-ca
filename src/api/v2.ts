@@ -8,7 +8,7 @@ import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 import { CertificateSignerResponse } from "../types"
 import { CreateCertificateOptions, createSignedCertificate } from "../certificate"
-import { parseIdentity, refineCertificateRequest, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
+import { parseIdentity, refineCertificateRequest, split, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
 
 const logger = new Logger()
 
@@ -41,7 +41,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
                     identity: z.string()
                         .describe("Identity Token JWT from OIDC IdP"),
                     extensions: z.array(z.string())
-                        .default(env.SSH_CERTIFICATE_EXTENSIONS)
+                        .default(split(env.SSH_CERTIFICATE_EXTENSIONS))
                         .describe("Extensions to include in issued SSH certificate in seconds"),
                     lifetime: z.number()
                         .min(seconds("5 minutes"))
@@ -105,7 +105,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             const opts: CreateCertificateOptions = {
                 lifetime: data.body.lifetime,
                 principals: identity.principals,
-                extensions: data.body.extensions as typeof env.SSH_CERTIFICATE_EXTENSIONS
+                extensions: data.body.extensions,
             }
 
             const certificate = await createSignedCertificate(data.headers.Authorization.email, data.body.public_key, opts)

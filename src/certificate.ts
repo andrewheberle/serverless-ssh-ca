@@ -2,17 +2,18 @@ import { seconds } from "itty-time"
 import { Certificate, createCertificate, identityForUser, identityFromDN, Key, parsePrivateKey } from "sshpk"
 import { SSHExtension } from "./types"
 import { env } from "cloudflare:workers"
+import { split } from "./utils"
 
 export type CreateCertificateOptions = {
     lifetime?: number
     principals?: string[]
-    extensions?: typeof env.SSH_CERTIFICATE_EXTENSIONS
+    extensions?: string[]
 }
 
 const DefaultCreateCertificateOptions: CreateCertificateOptions = {
     lifetime: seconds(env.SSH_CERTIFICATE_LIFETIME),
     principals: [],
-    extensions: env.SSH_CERTIFICATE_EXTENSIONS
+    extensions: split(env.SSH_CERTIFICATE_EXTENSIONS)
 }
 
 export class CertificateExtraExtensionsError extends Error {
@@ -27,7 +28,7 @@ export class CertificateExtraExtensionsError extends Error {
 
 export async function createSignedCertificate(email: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
     // add identities
-    const identity = env.SSH_CERTIFICATE_INCLUDE_SELF
+    const identity = env.SSH_CERTIFICATE_INCLUDE_SELF as string === "true"
         ? [identityForUser(email.split("@")[0])]
         : []
     if (options.principals !== undefined) {
@@ -35,7 +36,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
             identity.push(identityForUser(p))
         }
     }
-    for (const p of env.SSH_CERTIFICATE_PRINCIPALS) {
+    for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
         identity.push(identityForUser(p))
     }
 
@@ -63,7 +64,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
     if (options.extensions !== undefined) {
         // if extensions are provided in request, ensure they do not include extra extensions beyond the defaults
         for (const ext of options.extensions) {
-            if (!env.SSH_CERTIFICATE_EXTENSIONS.includes(ext)) {
+            if (!split(env.SSH_CERTIFICATE_EXTENSIONS).includes(ext)) {
                 throw new CertificateExtraExtensionsError(`${ext} is not allowed`)
             }
 
@@ -76,7 +77,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
         }
     } else {
         // use defaults if not provided
-        env.SSH_CERTIFICATE_EXTENSIONS.forEach((ext: string) => {
+        split(env.SSH_CERTIFICATE_EXTENSIONS).forEach((ext: string) => {
             extensions.push({
                 critical: false,
                 name: ext,
