@@ -13,46 +13,27 @@ import (
 
 	"github.com/allan-simon/go-singleinstance"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/tray"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/pflag"
-	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 //go:embed icons
 var resources embed.FS
 
-const appName = "Serverless SSH CA Client"
-
-func configDirs() (user, system string, err error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", "", err
-	}
-
-	return filepath.Join(dir, appName), filepath.Join(os.Getenv("ProgramData"), appName), nil
-}
-
-func runInstall() error {
-	return eventlog.InstallAsEventCreate("Serverless SSH CA Client", eventlog.Error|eventlog.Warning|eventlog.Info)
-}
-
-func runUninstall() error {
-	return eventlog.Remove("Serverless SSH CA Client")
-}
-
 func Execute(ctx context.Context, args []string) error {
-	beeep.AppName = appName
+	beeep.AppName = config.FriendlyAppName
 
 	// find config dirs
-	user, system, err := configDirs()
+	user, system, err := config.ConfigDirs()
 	if err != nil {
 		return err
 	}
 
 	var lifetime, renewAt time.Duration
 	var listenAddr, logDir, systemConfigFile, userConfigFile string
-	var install, uninstall, disableProxy bool
+	var install, uninstall, disableProxy, addOnStart bool
 
 	flags := pflag.NewFlagSet("tray", pflag.ExitOnError)
 
@@ -62,7 +43,8 @@ func Execute(ctx context.Context, args []string) error {
 	flags.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
 	flags.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
 	flags.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
-	flags.BoolVar(&disableProxy, "disable-proxy", false, "Disable proxying of PuTTY Agent (pageant) requests")
+	flags.BoolVar(&disableProxy, "disable-proxy", pageantProxyDefault, "Disable proxying of PuTTY Agent (pageant) requests")
+	flags.BoolVar(&addOnStart, "add-on-start", true, "Add current key and certificate (if valid) to SSH agent on start")
 	flags.BoolVar(&install, "install", false, "Perform post-install steps")
 	_ = flags.MarkHidden("install")
 	flags.BoolVar(&uninstall, "uninstall", false, "Perform pre-uninstall steps")
@@ -166,6 +148,14 @@ func Execute(ctx context.Context, args []string) error {
 				}
 			}
 		}()
+	}
+
+	// try to add to agent on start
+	if addOnStart {
+		logger.Info("attempting to add current certificate to ssh agent")
+		if err := lh.AddToAgent(); err != nil {
+			logger.Warn("could not add current certificate to ssh agent", "error", err)
+		}
 	}
 
 	app.RunLogged(logger)

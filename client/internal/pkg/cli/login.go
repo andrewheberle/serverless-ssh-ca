@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -17,9 +18,13 @@ type loginCommand struct {
 	lifetime   time.Duration
 	showTokens bool
 	listenAddr string
+	add        bool
 	debug      bool
+	force      bool
 
 	client *client.LoginHandler
+
+	logger *slog.Logger
 
 	*simplecommand.Command
 }
@@ -38,7 +43,9 @@ func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.Flags().BoolVar(&c.showTokens, "show-tokens", false, "Display OIDC tokens after login process")
 	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
+	cmd.Flags().BoolVar(&c.add, "add", false, "Add existing certificate to SSH agent")
 	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
+	cmd.Flags().BoolVar(&c.force, "force", false, "Force renewal even if current certificate has more than 50% validity left")
 
 	return nil
 }
@@ -66,9 +73,9 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 
 	logLevel := new(slog.LevelVar)
 	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
-	logger := slog.New(h)
+	c.logger = slog.New(h)
 
-	opts = append(opts, client.WithLogger(logger))
+	opts = append(opts, client.WithLogger(c.logger))
 
 	if c.debug {
 		logLevel.Set(slog.LevelDebug)
@@ -85,9 +92,33 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 }
 
 func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
+	// just add if requested
+	if c.add {
+		c.logger.Info("attempting to add current certificate to ssh-agent")
+		return c.client.AddToAgent()
+	}
+
+	// check life is not more than 50% done
+	if time.Now().Add(c.lifetime / 2).Before(c.client.CerificateExpiry()) {
+		if !c.force {
+			c.logger.Info("skipping renewal as current certificate has more than 50% of its lifetime left")
+
+			return nil
+
+		} else {
+			c.logger.Info("renewal forced despite current certificate having more than 50% of its lifetime lef")
+		}
+	}
+
 	// try refresh first
 	if err := c.client.Refresh(); err == nil {
 		return nil
+	} else {
+		c.logger.Warn("error during refresh", "error", err)
+		if errors.Is(err, client.ErrAddingToAgent) || errors.Is(err, client.ErrConnectingToAgent) {
+			c.logger.Info("skipping interactive login flow as error was related to SSH agent")
+		}
+
 	}
 
 	// otherwise do interactive login

@@ -1,3 +1,5 @@
+//go:build windows || linux
+
 package tray
 
 import (
@@ -10,9 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"fyne.io/systray"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/gen2brain/beeep"
-	"github.com/getlantern/systray"
 )
 
 type appState string
@@ -27,6 +29,10 @@ const (
 	stateCertificateExpired appState = "CertificateExpired"
 
 	defaultIcon = "ok"
+
+	okIcon      = "ok"
+	warningIcon = "warning"
+	errorIcon   = "error"
 )
 
 type Application struct {
@@ -71,12 +77,7 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 	}
 
 	// load tray icons
-	tIcons := map[string]string{
-		"ok":      "icons/ok.ico",
-		"error":   "icons/error.ico",
-		"warning": "icons/warning.ico",
-	}
-	for name, file := range tIcons {
+	for name, file := range trayIconFiles() {
 		icon, err := fs.ReadFile(file)
 		if err != nil {
 			return nil, err
@@ -87,9 +88,9 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 
 	// load notification icons
 	nIcons := map[string]string{
-		"ok":      "icons/ok.png",
-		"error":   "icons/error.png",
-		"warning": "icons/warning.png",
+		okIcon:      "icons/ok.png",
+		errorIcon:   "icons/error.png",
+		warningIcon: "icons/warning.png",
 	}
 	for name, file := range nIcons {
 		icon, err := fs.ReadFile(file)
@@ -225,12 +226,17 @@ func (app *Application) setState() {
 			if err := app.refreshWithBackoff(); err == nil {
 				app.logger.Info("refresh of certificate succeeded")
 				// send notification
-				app.notify("Cerificate Refreshed", "The current certificate was successfully refreshed", "ok")
+				app.notify("Cerificate Refreshed", "The current certificate was successfully refreshed", okIcon)
 				// re-run to handle change
 				app.setState()
 				// finish now
 				break
 			} else {
+				// return if renewal is in progress
+				if errors.Is(err, ErrRenewRunning) {
+					break
+				}
+
 				if errors.Is(err, ErrRenewSkipped) {
 					app.logger.Error("expired certificate was not renewed due to recent failures", "failures", app.refreshFailure, "backoff", app.refreshBackOff)
 				} else {
@@ -240,7 +246,7 @@ func (app *Application) setState() {
 
 			app.state = stateCertificateExpired
 			// send notification
-			app.notify("Cerificate Expired", "The current certificate has expired and must be manually renewed", "warning")
+			app.notify("Cerificate Expired", "The current certificate has expired and must be manually renewed", warningIcon)
 			// re-run to handle change
 			app.setState()
 			// finish now
@@ -255,12 +261,17 @@ func (app *Application) setState() {
 			if err := app.refreshWithBackoff(); err == nil {
 				app.logger.Info("refresh of certificate succeeded")
 				// send notification
-				app.notify("Cerificate Refreshed", "The current certificate was successfully refreshed", "ok")
+				app.notify("Cerificate Refreshed", "The current certificate was successfully refreshed", okIcon)
 				// re-run to handle change
 				app.setState()
 				// finish now
 				break
 			} else {
+				// return if renewal is in progress
+				if errors.Is(err, ErrRenewRunning) {
+					break
+				}
+
 				// just log error
 				if errors.Is(err, ErrRenewSkipped) {
 					app.logger.Error("certificate near expiry was not renewed due to recent failures", "failures", app.refreshFailure, "backoff", app.refreshBackOff)
@@ -274,7 +285,7 @@ func (app *Application) setState() {
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle(fmt.Sprintf("%s left", timeLeft(app.client.CerificateExpiry())))
 		setTooltip("Current certificate valid")
-		systray.SetIcon(app.trayIcons["ok"])
+		systray.SetIcon(app.trayIcons[okIcon])
 	}
 }
 
@@ -293,16 +304,21 @@ func (app *Application) eventloop() {
 
 			// try refresh first
 			if err := app.refresh(); err != nil {
+				// skip interactive flow if error was related to ssh agent
+				if errors.Is(err, client.ErrAddingToAgent) || errors.Is(err, client.ErrConnectingToAgent) {
+					app.logger.Warn("certificate refreshed but could not add to agent", "error", err)
+					app.notify("Warning", "Certificate renewed byt could not add to SSH Agent", warningIcon)
+				}
 				// then do interactive renewal
 				app.logger.Warn("could not perform a refresh, running renew", "error", err)
 				if err := app.renew(); err != nil {
 					app.logger.Error("could not renew certificate", "error", err)
-					app.notify("Error", "The certificate renewal failed", "error")
+					app.notify("Error", "The certificate renewal failed", errorIcon)
 					break
 				}
 			}
 
-			app.notify("Certificate Issued", "A new certificate was issued and added to the local ssh-agent", "ok")
+			app.notify("Certificate Issued", "A new certificate was issued and added to the local ssh-agent", okIcon)
 			app.state = stateCertificateOK
 		case <-app.mGenerate.ClickedCh:
 			// start by disabling menu item so we aren't overlapping
@@ -311,11 +327,11 @@ func (app *Application) eventloop() {
 			// do key generation
 			if err := app.generate(); err != nil {
 				app.logger.Error("could not generate private key", "error", err)
-				app.notify("Error", "The generation of a private key failed", "error")
+				app.notify("Error", "The generation of a private key failed", errorIcon)
 				break
 			}
 
-			app.notify("Key Generated", "A private key was sucessfully generated", "ok")
+			app.notify("Key Generated", "A private key was sucessfully generated", okIcon)
 			app.state = stateKeyOK
 		case <-app.mQuit.ClickedCh:
 			app.logger.Info("application shutting down")

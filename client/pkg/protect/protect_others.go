@@ -1,14 +1,13 @@
-//go:build aix || darwin || dragonfly || freebsd || (js && wasm) || linux || nacl || netbsd || openbsd || solaris
+//go:build !windows && !linux
 
 package protect
 
-import "log/slog"
-
+// Decrypt returns the data as-is on this platform
 func Decrypt(data []byte, name string) ([]byte, error) {
 	return data, nil
 }
 
+// Encrypt returns the data as-is on this platform
 func Encrypt(data []byte, name string) ([]byte, error) {
-	slog.Warn("this sensitive data has been saved unencrypted on this platform")
 	return data, nil
 }

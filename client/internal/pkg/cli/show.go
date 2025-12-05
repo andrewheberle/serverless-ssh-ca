@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/simplecommand"
@@ -12,6 +13,7 @@ import (
 type showCommand struct {
 	private     bool
 	certificate bool
+	status      bool
 
 	config *config.Config
 
@@ -26,6 +28,9 @@ func (c *showCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.private, "private", false, "Display private key")
 	cmd.Flags().BoolVar(&c.certificate, "certificate", false, "Display certificate if one exists")
+	cmd.Flags().BoolVar(&c.status, "status", false, "Display status only")
+	cmd.MarkFlagsMutuallyExclusive("status", "private")
+	cmd.MarkFlagsMutuallyExclusive("status", "certificate")
 
 	return nil
 }
@@ -44,6 +49,38 @@ func (c *showCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 }
 
 func (c *showCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
+	if c.status {
+		if !c.config.HasPrivateKey() {
+			fmt.Printf("Private Key:        missing\n")
+			fmt.Printf("Certificate:        N/A\n")
+			fmt.Printf("Certificate Status: N/A\n")
+			fmt.Printf("Certificate Expiry: N/A\n")
+
+			return nil
+		}
+
+		if !c.config.HasCertificate() {
+			fmt.Printf("Private Key:        exists\n")
+			fmt.Printf("Certificate:        missing\n")
+			fmt.Printf("Certificate Status: N/A\n")
+			fmt.Printf("Certificate Expiry: N/A\n")
+
+			return nil
+		}
+
+		status := "valid"
+		if !c.config.CertificateValid() {
+			status = "expired"
+		}
+		expiry := c.config.CerificateExpiry()
+		fmt.Printf("Private Key:        exists\n")
+		fmt.Printf("Certificate:        exists\n")
+		fmt.Printf("Certificate Status: %s\n", status)
+		fmt.Printf("Certificate Expiry: %v (%s)\n", expiry, time.Until(expiry))
+
+		return nil
+	}
+
 	if !c.config.HasPrivateKey() {
 		return ErrNoPrivateKey
 	}

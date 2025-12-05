@@ -6,7 +6,7 @@
   "files": {
     "guid": "66807fd7-177d-4462-822a-24211b9fb0f1",
     "items": [
-      "dist\\gui_windows_amd64_v1\\ssh-ca-client.exe",
+      "dist\\windowsgui_windows_amd64_v1\\ssh-ca-client.exe",
       "dist\\cli_windows_amd64_v1\\ssh-ca-client-cli.exe"
     ]
   },

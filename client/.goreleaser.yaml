@@ -23,7 +23,7 @@ builds:
       - linux
       - windows
     main: ./cmd/ssh-ca-client-cli
-  - id: gui
+  - id: windowsgui
     binary: ssh-ca-client
     env:
       - CGO_ENABLED=0
@@ -34,10 +34,17 @@ builds:
     hooks:
       pre:
         - go install github.com/tc-hib/go-winres@v0.3.3
-        - go generate ./cmd/ssh-ca-client/main_windows.go
+        - go generate ./cmd/ssh-ca-client/generate_windows.go
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui
+  - id: gui
+    binary: ssh-ca-client
+    goarch:
+      - amd64
+    goos:
+      - linux
+    main: ./cmd/ssh-ca-client
 
 archives:
   - allow_different_binary_count: true
