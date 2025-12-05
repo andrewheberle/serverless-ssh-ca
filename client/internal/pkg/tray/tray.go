@@ -14,7 +14,6 @@ import (
 
 	"fyne.io/systray"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
-	"github.com/gen2brain/beeep"
 )
 
 type appState string
@@ -27,8 +26,6 @@ const (
 	stateCertificateOK      appState = "CertificateOK"
 	stateCertificateMissing appState = "CertificateMissing"
 	stateCertificateExpired appState = "CertificateExpired"
-
-	defaultIcon = "ok"
 
 	okIcon      = "ok"
 	warningIcon = "warning"
@@ -416,19 +413,6 @@ func (app *Application) renew() error {
 
 func (app *Application) generate() error {
 	return app.client.GenerateKey()
-}
-
-func (app *Application) notify(title string, message string, icon string) {
-	// grab icon
-	b, ok := app.notificationIcons[icon]
-	if !ok {
-		b = app.notificationIcons[defaultIcon]
-	}
-
-	// set notification
-	if err := beeep.Notify(title, message, b); err != nil {
-		app.logger.Error("could not send notification", "error", err)
-	}
 }
 
 func timeLeft(t time.Time) string {
