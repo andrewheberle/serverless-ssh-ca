@@ -7,7 +7,7 @@ import z from "zod"
 import { HTTPException } from "hono/http-exception"
 import { CreateCertificateOptions, createSignedCertificate } from "../certificate"
 import { CertificateSignerResponse } from "../types"
-import { parseIdentity, transformAuthorizationHeader, transformPublicKey } from "../utils"
+import { parseIdentity, split, transformAuthorizationHeader, transformPublicKey } from "../utils"
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 
@@ -80,7 +80,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
                         .optional()
                         .describe("Identity Token JWT from OIDC IdP"),
                     extensions: z.array(z.string())
-                        .default(env.SSH_CERTIFICATE_EXTENSIONS)
+                        .default(split(env.SSH_CERTIFICATE_EXTENSIONS))
                         .describe("Extensions to include in issued SSH certificate in seconds"),
                     lifetime: z.number()
                         .min(seconds("5 minutes"))
@@ -144,7 +144,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             const opts: CreateCertificateOptions = {
                 lifetime: data.body.lifetime,
                 principals: identity.principals,
-                extensions: data.body.extensions as typeof env.SSH_CERTIFICATE_EXTENSIONS
+                extensions: data.body.extensions,
             }
 
             const certificate = await createSignedCertificate(data.headers.Authorization.email, data.body.public_key, opts)

@@ -13,28 +13,28 @@
 				"description": "The issuer of the JWT access and identity tokens provided by the client"
 			},
 			"JWT_ALGORITHMS": {
-				"description": "The supported JWT algorithms"
+				"description": "The supported JWT algorithms as a comma seperated list"
 			},
 			"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": {
 				"description": "The OIDC claim that contains additional SSH principals to add to the certificate. If ommitted only the default claims (via SSH_CERTIFICATE_PRINCIPALS and SSH_CERTIFICATE_INCLUDE_SELF) are added"
 			},
 			"SSH_CERTIFICATE_LIFETIME": {
-				"description": "The lifetime of the issued SSH certificates, although the client may request a shorter duration"
+				"description": "The lifetime of the issued SSH certificates in human readable form (ie \"24 hours\"), although the client may request a shorter duration"
 			},
 			"SSH_CERTIFICATE_PRINCIPALS": {
-				"description": "A list of additional principals to add to the SSH certificate"
+				"description": "A comma seperated list of additional principals to add to the SSH certificate"
 			},
 			"SSH_CERTIFICATE_INCLUDE_SELF": {
 				"description": "Whether to add the users own name as a valid principal (based on the part before the @ symbol in the JWT email claim)"
 			},
 			"SSH_CERTIFICATE_EXTENSIONS": {
-				"description": "The list of SSH extensions to add to the certificate, although the client may request a smaller list"
+				"description": "A comma serverless list of SSH extensions to add to the certificate, although the client may request a smaller list"
 			},
 			"PRIVATE_KEY": {
 				"description": "The ECDSA private key to use in OpenSSH format"
 			},
 			"CERTIFICATE_REQUEST_TIME_SKEW_MAX": {
-				"description": "The maximum time offset/skew allowed for certificate requests from a client"
+				"description": "The maximum time offset/skew allowed for certificate requests from a client in human readable form (ie \"5 minutes\")"
 			}
 		}
 	},

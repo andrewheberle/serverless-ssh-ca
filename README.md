@@ -103,25 +103,19 @@ npm install
     "JWT_JWKS_URL": "https://example.com/.well-known/jwks.json",
     // The issuer of the JWT access token
     "JWT_ISSUER": "https://example.com/",
-    // The supported JWT algorithms
-    "JWT_ALGORITHMS": ["RS256"],
+    // The supported JWT algorithms as a comma seperated list
+    "JWT_ALGORITHMS": "RS256",
     // An OIDC claim included in the users identity token that will be used to
     // populate the list of principals on the issued certificate 
     "JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": "groups",
     // The lifetime of the issued SSH certificates
     "SSH_CERTIFICATE_LIFETIME": "24 hours",
-    // A list of additional principals to add to the certificate
-    "SSH_CERTIFICATE_PRINCIPALS": ["ssh-admin"],
+    // A comma seperated list of additional principals to add to the certificate
+    "SSH_CERTIFICATE_PRINCIPALS": "ssh-admin",
     // Whether to add the users own name as a valid principal
-    "SSH_CERTIFICATE_INCLUDE_USER": false,
-    // The list of SSH extensions to add to the certificate
-    "SSH_CERTIFICATE_EXTENSIONS": [
-        "permit-X11-forwarding",
-        "permit-agent-forwarding",
-        "permit-port-forwarding",
-        "permit-pty",
-        "permit-user-rc",
-    ],
+    "SSH_CERTIFICATE_INCLUDE_USER": "false",
+    // The list of SSH extensions to add to the certificate as a comma seperated list
+    "SSH_CERTIFICATE_EXTENSIONS": "permit-X11-forwarding,permit-agent-forwarding,permit-port-forwarding,permit-pty,permit-user-rc",
     // The maximum time skew allowed for certificate requests
     "CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
 },

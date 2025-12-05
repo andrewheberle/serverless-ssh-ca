@@ -5,7 +5,7 @@ import { JWTPayload } from "jose"
 export type CertificateSignerPayload = {
     public_key: string
     identity: string
-    extensions?: typeof env.SSH_CERTIFICATE_EXTENSIONS
+    extensions?: string[]
 	lifetime?: number
     nonce?: string
 }
