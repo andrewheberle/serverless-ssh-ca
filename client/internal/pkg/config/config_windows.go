@@ -15,6 +15,11 @@ var (
 
 const AppName = "Serverless SSH CA Client"
 
+const (
+	keySecretName   = "key"
+	tokenSecretName = "token"
+)
+
 func ConfigDirs() (user, system string, err error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {

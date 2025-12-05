@@ -28,7 +28,6 @@ import (
 	"github.com/ndbeals/winssh-pageant/pageant"
 	"github.com/openpubkey/openpubkey/util"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/oauth2"
 )
 
@@ -469,10 +468,10 @@ func (lh *LoginHandler) AddToAgent() error {
 		return err
 	}
 
-	// check validity
+	// check validity (with 5-seconds grace time on ValidAfter as certificate could be issued with +1 seconds from now ValidAfter)
 	now := time.Now().Unix()
-	if now > int64(cert.ValidBefore) || now < int64(cert.ValidAfter) {
-		lh.logger.Error("certificate was not valid", "validbefore", cert.ValidBefore, "validafter", cert.ValidAfter, "now", now)
+	if now > int64(cert.ValidBefore) || now < int64(cert.ValidAfter-5) {
+		lh.logger.Error("certificate was not valid so not adding to agent", "validbefore", cert.ValidBefore, "validafter", cert.ValidAfter, "now", now)
 		return ErrCertificateNotValid
 	}
 
@@ -481,11 +480,7 @@ func (lh *LoginHandler) AddToAgent() error {
 		return ErrConnectingToAgent
 	}
 
-	if err := agentClient.Add(agent.AddedKey{
-		PrivateKey:  key,
-		Certificate: cert,
-		Comment:     cert.KeyId,
-	}); err != nil {
+	if err := agentClient.Add(addedKey(key, cert)); err != nil {
 		return ErrAddingToAgent
 	}
 
@@ -693,41 +688,15 @@ func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
 }
 
 func (lh *LoginHandler) HasCertificate() bool {
-	_, err := lh.config.GetCertificateBytes()
-	return err == nil
+	return lh.config.HasCertificate()
 }
 
 func (lh *LoginHandler) CertificateValid() bool {
-	//
-	// get cert bytes, error means invalid
-	certBytes, err := lh.config.GetCertificateBytes()
-	if err != nil {
-		return false
-	}
-
-	// parse the cert, errors mean invalid
-	cert, err := sshcert.ParseCert(certBytes)
-	if err != nil {
-		return false
-	}
-
-	// make sure not expired
-	return time.Now().Unix() < int64(cert.ValidBefore)
+	return lh.config.CertificateValid()
 }
 
 func (lh *LoginHandler) CerificateExpiry() time.Time {
-	certBytes, err := lh.config.GetCertificateBytes()
-	if err != nil {
-		return time.Time{}
-	}
-
-	// parse the cert, errors mean invalid
-	cert, err := sshcert.ParseCert(certBytes)
-	if err != nil {
-		return time.Time{}
-	}
-
-	return time.Unix(int64(cert.ValidBefore), 0)
+	return lh.config.CerificateExpiry()
 }
 
 // SetLogger sets the [*slog.Logger] used after the [*LoginHandler] has been

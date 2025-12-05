@@ -15,6 +15,7 @@ require (
 	github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec
 	github.com/openpubkey/openpubkey v0.18.0
 	github.com/spf13/pflag v1.0.10
+	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.45.0
 	golang.org/x/oauth2 v0.33.0
 	golang.org/x/sys v0.38.0
@@ -23,9 +24,11 @@ require (
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/andrewheberle/simpleviper v1.2.0 // indirect
+	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/esiqveland/notify v0.13.3 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect

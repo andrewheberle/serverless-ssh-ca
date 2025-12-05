@@ -12,6 +12,11 @@ import (
 
 const AppName = "serverless-ssh-ca"
 
+const (
+	keySecretName   = AppName
+	tokenSecretName = AppName
+)
+
 func ConfigDirs() (user, system string, err error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {

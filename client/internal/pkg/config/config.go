@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/protect"
+	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/yaml"
 )
@@ -21,6 +23,7 @@ type Config struct {
 	userConfigName   string
 	user             UserConfig
 }
+
 type ClientOIDCConfig struct {
 	Issuer      string   `json:"issuer"`
 	ClientID    string   `json:"client_id"`
@@ -174,7 +177,7 @@ func (c *Config) GetPrivateKeyBytes() ([]byte, error) {
 
 func (c *Config) getPrivateKeyBytes() ([]byte, error) {
 	// unprotect key
-	pemBytes, err := protect.Decrypt(c.user.PrivateKey, "key")
+	pemBytes, err := protect.Decrypt(c.user.PrivateKey, keySecretName)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +189,7 @@ func (c *Config) SetPrivateKeyBytes(pemBytes []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	protected, err := protect.Encrypt(pemBytes, "key")
+	protected, err := protect.Encrypt(pemBytes, keySecretName)
 	if err != nil {
 		return err
 	}
@@ -242,7 +245,32 @@ func (c *Config) GetCertificateBytes() ([]byte, error) {
 	return c.user.Certificate, nil
 }
 
+func (c *Config) HasCertificate() bool {
+	_, err := c.GetCertificateBytes()
+	return err == nil
+}
+
+func (c *Config) CertificateValid() bool {
+	return c.CerificateExpiry().After(time.Now())
+}
+
+func (c *Config) CerificateExpiry() time.Time {
+	certBytes, err := c.GetCertificateBytes()
+	if err != nil {
+		return time.Time{}
+	}
+
+	// parse the cert, errors mean invalid
+	cert, err := sshcert.ParseCert(certBytes)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return time.Unix(int64(cert.ValidBefore), 0)
+}
+
 func (c *Config) SetCertificateBytes(pemBytes []byte) error {
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -265,7 +293,7 @@ func (c *Config) GetRefreshToken() (string, error) {
 	}
 
 	// unprotect token
-	token, err := protect.Decrypt(c.user.RefreshToken, "token")
+	token, err := protect.Decrypt(c.user.RefreshToken, tokenSecretName)
 	if err != nil {
 		return "", err
 	}
@@ -277,7 +305,7 @@ func (c *Config) SetRefreshToken(token string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	protected, err := protect.Encrypt([]byte(token), "token")
+	protected, err := protect.Encrypt([]byte(token), tokenSecretName)
 	if err != nil {
 		return err
 	}
