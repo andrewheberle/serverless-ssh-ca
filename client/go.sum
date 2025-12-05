@@ -64,8 +64,6 @@ github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec h1:0YaDA5Ij
 github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec/go.mod h1:iF1dK7zZE509/dx3jD5QbYNln0DbhEujPG6zIsulNEQ=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 h1:zYyBkD/k9seD2A7fsi6Oo2LfFZAehjjQMERAvZLEDnQ=
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646/go.mod h1:jpp1/29i3P1S/RLdc7JQKbRpFeM1dOBd8T9ki5s+AY8=
-github.com/openpubkey/openpubkey v0.18.0 h1:V5GcpWiVaTfXU1ojrWszzVJZNfyjTDySCATe6VFYnFw=
-github.com/openpubkey/openpubkey v0.18.0/go.mod h1:fPLc+vfRombqs+UolQq/ldmItX/5kB0JHyf548PjYe4=
 github.com/openpubkey/openpubkey v0.20.0 h1:FGJOvKbtpD1R6zT+BzIktu73LW4PLbnFRITSw+aqAJI=
 github.com/openpubkey/openpubkey v0.20.0/go.mod h1:9XUrPDKPfk/asdCHFiEG3hGy6Yk/xl9GMCmGnjkUQwU=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
