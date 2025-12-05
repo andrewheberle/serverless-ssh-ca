@@ -36,12 +36,14 @@ func Encrypt(data []byte, name string) ([]byte, error) {
 }
 
 func getOrCreateKey(name string) ([]byte, error) {
+	// get user details
 	u, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("error looking up user %w", err)
 	}
 
-	secret, err := keyring.Get(name, u.Name)
+	// attempt to get secret from keyring
+	secret, err := keyring.Get(name, u.Username)
 	if errors.Is(err, keyring.ErrNotFound) {
 		// not found so generate and save
 		key := make([]byte, 32)
@@ -52,7 +54,8 @@ func getOrCreateKey(name string) ([]byte, error) {
 		// encode key to base64 string
 		secret = base64.StdEncoding.EncodeToString(key)
 
-		if err := keyring.Set(name, u.Name, secret); err != nil {
+		// set secret in keyring
+		if err := keyring.Set(name, u.Username, secret); err != nil {
 			return nil, fmt.Errorf("error saving base64 key to keyring: %w", err)
 		}
 
