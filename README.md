@@ -232,6 +232,9 @@ only decryptable by the same user that originally encrypted it.
 Although access to the config file by another user is possible, the values
 cannot be read (assuming DPAPI is secure).
 
+On Linux a random key is generated and saved in the users `login` keyring
+which is then used to encrypt this sensitive material using AES-GCM encryption.
+
 On other platforms, this is not the case and this data is simply stored as 
 BASE64 encoded strings, so security is less than ideal and filesystem
 permissions must be used to prevent unauthorised access.
