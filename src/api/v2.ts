@@ -7,8 +7,9 @@ import { AppContext } from "../router"
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 import { CertificateSignerResponse } from "../types"
-import { CreateCertificateOptions, createSignedCertificate } from "../certificate"
-import { parseIdentity, refineCertificateRequest, split, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
+import { CreateCertificateOptions, createSignedCertificate, createSignedHostCertificate } from "../certificate"
+import { parseIdentity, refineCertificateRequest, refineHostCertificateRequest, split, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
+import { CaPublicKeyEndpoint } from "./v1"
 
 const logger = new Logger()
 
@@ -20,6 +21,9 @@ const HeaderSchema = z.object({
         .transform(transformAuthorizationHeader)
         .describe("Access Token JWT from OIDC IdP")
 })
+
+// use /ca endpoint as-is from v1
+api.get("/ca", CaPublicKeyEndpoint)
 
 class CertificateRequestEndpoint extends OpenAPIRoute {
     schema = {
@@ -128,5 +132,109 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
         }
     }
 }
-
 api.post("/certificate", CertificateRequestEndpoint)
+
+class HostCertificateRequestEndpoint extends OpenAPIRoute {
+    schema = {
+        security: [
+            {
+                oidcAuth: []
+            }
+        ],
+        request: {
+            headers: HeaderSchema,
+            body: contentJson(
+                z.object({
+                    public_key: z.string()
+                        .transform(transformPublicKey)
+                        .describe("SSH public key to sign"),
+                    nonce: z.string()
+                        .transform(transformNonce)
+                        .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}"),
+                    principals: z.array(z.string())
+                        .describe("List of principals to include on the issued certificate"),
+                    lifetime: z.number()
+                        .min(seconds("24 hours"))
+                        .max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+                        .default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+                        .describe("Lifetime of issued Host SSH certificate"),
+                })
+                    .superRefine(refineHostCertificateRequest)
+            )
+        },
+        responses: {
+            "200": {
+                description: "SSH Host Certificate issued successfully",
+                ...contentJson(z.object({
+                    certificate: z.string(),
+                }))
+            },
+            "401": {
+                description: "Access to the endpoint is Unauthorized",
+                ...contentJson(z.object({
+                    status: z.literal(401),
+                    error: z.literal("Unauthorized")
+                }))
+            },
+            "403": {
+                description: "Access to the endpoint is Forbidden",
+                ...contentJson(z.object({
+                    status: z.literal(403),
+                    error: z.literal("Forbidden")
+                }))
+            },
+            ...InputValidationException.schema(),
+            "422": {
+                description: "The request to could not be processed",
+                ...contentJson(z.object({
+                    status: z.literal(422),
+                    error: z.literal("Unprocessable Entity")
+                }))
+            },
+            "500": {
+                description: "There was an internal error",
+                ...contentJson(z.object({
+                    status: z.literal(500),
+                    error: z.literal("Internal Server Error")
+                }))
+            }
+        }
+    }
+
+    async handle(c: AppContext) {
+        try {
+            const data = await this.getValidatedData<typeof this.schema>()
+
+            logger.info("handling host certificate request", "for", data.headers.Authorization.email)
+
+            // check user can issue host certificates
+            if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email)) {
+                throw new HTTPException(403, { message: "user not allowed to issue host certificates" })
+            }
+
+            const opts: CreateCertificateOptions = {
+                lifetime: data.body.lifetime,
+                principals: data.body.principals,
+            }
+
+            const certificate = await createSignedHostCertificate(data.headers.Authorization.email, data.body.public_key, opts)
+            const response: CertificateSignerResponse = {
+                certificate: btoa(certificate.toString("openssh"))
+            }
+
+            return c.json(response)
+        } catch (err) {
+            switch (true) {
+                case (err instanceof DOMException):
+                    if (err.name === "InvalidCharacterError") {
+                        throw new HTTPException(422, { message: "the content was not valid base64 encoded data", cause: err })
+                    }
+            }
+
+            // otherwise just re-throw error
+            logger.error("unhandled error", "error", err)
+            throw err
+        }
+    }
+}
+api.post("/host/request", HostCertificateRequestEndpoint)

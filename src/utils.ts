@@ -188,6 +188,31 @@ export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.R
     }
 }
 
+type ParsedHostCertificateRequest = {
+    nonce: Nonce
+    public_key: Key
+    lifetime: number
+    principals: string[]
+}
+
+export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): never => {
+    try {
+        // check nonce fingerprint matches public key
+        if (!val.nonce.fingerprint.matches(val.public_key)) {
+            return fatalIssue(ctx, "nonce fingerprint did not match public_key")
+        }
+
+        // verify nonce signature
+        if (!val.nonce.verify(val.public_key)) {
+            return fatalIssue(ctx, "nonce signature validation failed")
+        }
+
+        return z.NEVER
+    } catch (err) {
+        return fatalIssue(ctx, "nonce verification unhandled error")
+    }
+}
+
 export const split = (v: string): string[] => {
     return v.split(",")
 }

@@ -1,5 +1,5 @@
 import { seconds } from "itty-time"
-import { Certificate, createCertificate, identityForUser, identityFromDN, Key, parsePrivateKey } from "sshpk"
+import { Certificate, createCertificate, Identity, identityForHost, identityForUser, identityFromDN, Key, parsePrivateKey } from "sshpk"
 import { SSHExtension } from "./types"
 import { env } from "cloudflare:workers"
 import { split } from "./utils"
@@ -101,6 +101,48 @@ export async function createSignedCertificate(email: string, public_key: Key, op
 
     // re-sign after changes
     certificate.signWith(key)
+
+    return certificate
+}
+
+export type CreateHostCertificateOptions = {
+    lifetime?: number
+    principals?: string[]
+    extensions?: string[]
+}
+
+const DefaultCreateCHostertificateOptions: CreateHostCertificateOptions = {
+    lifetime: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME),
+    principals: [],
+}
+
+export async function createSignedHostCertificate(email: string, public_key: Key, options: CreateHostCertificateOptions = DefaultCreateCHostertificateOptions): Promise<Certificate> {
+    // generate list of identities for host key
+    const identity: Identity[] = []
+    if (options.principals !== undefined) {
+        for (const p of options.principals) {
+            identity.push(identityForHost(p))
+        }
+    }
+
+    // grab private key from secret store
+    const key = parsePrivateKey(await env.PRIVATE_KEY.get())
+
+    // lifetime is the smaller of what was provided in the options or the default
+    const lifetime = options.lifetime !== undefined
+        ? Math.min(options.lifetime, seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+        : seconds(env.SSH_HOST_CERTIFICATE_LIFETIME)
+
+    // generate value for serial of certificate
+    const unixTimestamp = Math.floor(Date.now() / 1000)
+    const serial = Buffer.alloc(8)
+    serial.writeBigUInt64BE(BigInt(unixTimestamp))
+
+    // set issuer of certificate based on ISSUER_DN
+    const issuer = identityFromDN(env.ISSUER_DN)
+
+    // create certificate
+    const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
 
     return certificate
 }
