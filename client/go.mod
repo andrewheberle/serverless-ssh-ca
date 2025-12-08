@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	fyne.io/systray v1.11.0
 	github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37
-	github.com/andrewheberle/simplecommand v0.4.0
+	github.com/andrewheberle/simplecommand v0.5.0
 	github.com/andrewheberle/sshagent v1.0.0
 	github.com/bep/simplecobra v0.6.1
 	github.com/coreos/go-oidc/v3 v3.17.0

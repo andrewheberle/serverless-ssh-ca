@@ -10,6 +10,8 @@ github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37 h1:2
 github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37/go.mod h1:6AXRstqK+32jeFmw89QGL2748+dj34Av4xc/I9oo9BY=
 github.com/andrewheberle/simplecommand v0.4.0 h1:ToylFIEiGHaqi5eWSjdeyfTmZjWuulCkWE2Aw9r+mrE=
 github.com/andrewheberle/simplecommand v0.4.0/go.mod h1:W3znl7Vxt8Bm0miazPPvZeQzO6XoHgi5ICTUpAvObB4=
+github.com/andrewheberle/simplecommand v0.5.0 h1:xFHc96leV1SdochxzDwz8puAEsk6dfm/XFWMdmKGky0=
+github.com/andrewheberle/simplecommand v0.5.0/go.mod h1:CjhYjrAAQaelwcX0/c3ecK2Um6PpWMAOfX5xr7ke0Uk=
 github.com/andrewheberle/simpleviper v1.2.0 h1:pg+4BF5MmxQ8r7I3UmWz6w56z0akYyQ1ChMjudvrZWc=
 github.com/andrewheberle/simpleviper v1.2.0/go.mod h1:h27fll0wuI9Q3m5YfqFBnSy3oqCreQLBBnw0Yro+IGE=
 github.com/andrewheberle/sshagent v1.0.0 h1:fqyiiEJGHc2nxDAhtQnYYeh+nxlKGLjSphAVU/YDH7Y=
