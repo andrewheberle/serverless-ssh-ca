@@ -22,15 +22,24 @@ jobs:
           go-version-file: client/go.mod
           cache: false
 
-      - name: Install dependencies
+      - name: Install Go dependencies
         run: |
           cd client
           go mod download
 
-      - name: Run tests
+      - name: Run Go tests with coverage
         run: |
           cd client
           go test -coverprofile=../coverage.txt ./...
+      
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        
+      - name: Install NPM dependencies
+        run: npm install
+
+      - name: Run Typescript tests with coverage
+        run: npm run coverage
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
