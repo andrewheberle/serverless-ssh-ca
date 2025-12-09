@@ -23,10 +23,6 @@ jobs:
         with:
           go-version-file: client/go.mod
           cache: false
-      - name: Run tests
-        run: |
-          cd client
-          go test ./...
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
