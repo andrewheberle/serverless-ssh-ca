@@ -173,7 +173,7 @@ type ParsedCertificateRequest = {
 export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.RefinementCtx): never => {
     try {
         // check nonce fingerprint matches public key
-        if (!val.nonce.fingerprint.matches(val.public_key)) {
+        if (!val.nonce.matches(val.public_key)) {
             return fatalIssue(ctx, "nonce fingerprint did not match public_key")
         }
 
@@ -198,7 +198,7 @@ type ParsedHostCertificateRequest = {
 export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): never => {
     try {
         // check nonce fingerprint matches public key
-        if (!val.nonce.fingerprint.matches(val.public_key)) {
+        if (!val.nonce.matches(val.public_key)) {
             return fatalIssue(ctx, "nonce fingerprint did not match public_key")
         }
 

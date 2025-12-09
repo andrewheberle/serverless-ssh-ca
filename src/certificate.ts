@@ -116,7 +116,7 @@ const DefaultCreateCHostertificateOptions: CreateHostCertificateOptions = {
     principals: [],
 }
 
-export async function createSignedHostCertificate(email: string, public_key: Key, options: CreateHostCertificateOptions = DefaultCreateCHostertificateOptions): Promise<Certificate> {
+export async function createSignedHostCertificate(public_key: Key, options: CreateHostCertificateOptions = DefaultCreateCHostertificateOptions): Promise<Certificate> {
     // generate list of identities for host key
     const identity: Identity[] = []
     if (options.principals !== undefined) {
