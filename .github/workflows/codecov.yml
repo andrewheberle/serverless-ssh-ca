@@ -20,14 +20,14 @@ jobs:
         uses: actions/setup-go@v5
 
       - name: Install dependencies
-        run:
-          - cd client
-          - go mod download
+        run: |
+          cd client
+          go mod download
 
       - name: Run tests
-        run:
-          - cd client
-          - go test -coverprofile=../coverage.txt
+        run: |
+          cd client
+          go test -coverprofile=../coverage.txt
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
