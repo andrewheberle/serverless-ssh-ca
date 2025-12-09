@@ -16,7 +16,7 @@ import (
 // Decrypt will decrypt provided data using the secret reference in "name"
 // using the Secret Service API via D-Bus
 func Decrypt(data []byte, name string) ([]byte, error) {
-	key, err := getOrCreateKey(name)
+	key, err := getOrCreateKey(name, false)
 	if err != nil {
 		return nil, fmt.Errorf("could not decrypt data: %w", err)
 	}
@@ -27,7 +27,7 @@ func Decrypt(data []byte, name string) ([]byte, error) {
 // Encrypt will encrypt provided data using the secret reference in "name"
 // using the Secret Service API via D-Bus
 func Encrypt(data []byte, name string) ([]byte, error) {
-	key, err := getOrCreateKey(name)
+	key, err := getOrCreateKey(name, true)
 	if err != nil {
 		return nil, fmt.Errorf("could not decrypt data: %w", err)
 	}
@@ -47,7 +47,7 @@ func (p *DefaultProtector) Encrypt(data []byte, name string) ([]byte, error) {
 	return Encrypt(data, name)
 }
 
-func getOrCreateKey(name string) ([]byte, error) {
+func getOrCreateKey(name string, create bool) ([]byte, error) {
 	// get user details
 	u, err := user.Current()
 	if err != nil {
@@ -56,23 +56,14 @@ func getOrCreateKey(name string) ([]byte, error) {
 
 	// attempt to get secret from keyring
 	secret, err := keyring.Get(name, u.Username)
-	if errors.Is(err, keyring.ErrNotFound) {
-		// not found so generate and save
-		key := make([]byte, 32)
-		if _, err := rand.Read(key); err != nil {
-			return nil, fmt.Errorf("error generating key: %w", err)
-		}
-
-		// encode key to base64 string
-		secret = base64.StdEncoding.EncodeToString(key)
-
-		// set secret in keyring
-		if err := keyring.Set(name, u.Username, secret); err != nil {
-			return nil, fmt.Errorf("error saving base64 key to keyring: %w", err)
-		}
-
+	// not found is not fatal if create is set
+	if errors.Is(err, keyring.ErrNotFound) && create {
 		// return generated key once saved
-		return key, nil
+		return createKey(name, u.Username)
+	}
+	// otherwise error
+	if err != nil {
+		return nil, err
 	}
 
 	// decode returned base64 secret
@@ -81,6 +72,25 @@ func getOrCreateKey(name string) ([]byte, error) {
 		return nil, fmt.Errorf("error decoding base64 key: %w", err)
 	}
 
+	return key, nil
+}
+
+func createKey(name, user string) ([]byte, error) {
+	// generate key
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("error generating key: %w", err)
+	}
+
+	// encode key to base64 string
+	secret := base64.StdEncoding.EncodeToString(key)
+
+	// set secret in keyring
+	if err := keyring.Set(name, user, secret); err != nil {
+		return nil, fmt.Errorf("error saving base64 key to keyring: %w", err)
+	}
+
+	// return generated key once saved
 	return key, nil
 }
 
