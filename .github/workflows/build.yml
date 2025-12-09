@@ -51,6 +51,10 @@ jobs:
         with:
           go-version-file: client/go.mod
           cache: false
+      - name: Run tests
+        run: |
+          cd client
+          go test -coverprofile=../coverage.txt ./...
       - name: Download artifacts
         uses: actions/download-artifact@v6
         with:
