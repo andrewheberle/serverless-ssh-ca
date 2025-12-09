@@ -22,11 +22,6 @@ jobs:
         with:
           go-version-file: client/go.mod
           cache: false
-          
-      - name: Run tests
-        run: |
-          cd client
-          go test ./...
 
       - name: Install dependencies
         run: |
@@ -36,7 +31,7 @@ jobs:
       - name: Run tests
         run: |
           cd client
-          go test -coverprofile=../coverage.txt
+          go test -coverprofile=../coverage.txt ./...
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
