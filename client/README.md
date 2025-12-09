@@ -1,5 +1,7 @@
 # ssh-ca-client
 
+[![codecov](https://codecov.io/gh/andrewheberle/serverless-ssh-ca/graph/badge.svg?token=AZLFIBTTFK)](https://codecov.io/gh/andrewheberle/serverless-ssh-ca)
+
 This provides the client-side service to interact with the Serverless
 Certificate Authority in this repository.
 
