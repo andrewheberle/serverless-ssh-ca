@@ -74,7 +74,7 @@ func loadConfig(name string) SystemConfig {
 	}
 
 	var config SystemConfig
-	if err := yaml.Unmarshal(y, &config); err != nil {
+	if err := yaml.UnmarshalStrict(y, &config); err != nil {
 		return SystemConfig{}
 	}
 

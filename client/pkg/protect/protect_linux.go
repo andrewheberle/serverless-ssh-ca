@@ -35,6 +35,18 @@ func Encrypt(data []byte, name string) ([]byte, error) {
 	return encrypt(key, data)
 }
 
+// Decrypt will decrypt provided data using the secret reference in "name"
+// using the Secret Service API via D-Bus
+func (p *DefaultProtector) Decrypt(data []byte, name string) ([]byte, error) {
+	return Decrypt(data, name)
+}
+
+// Encrypt will encrypt provided data using the secret reference in "name"
+// using the Secret Service API via D-Bus
+func (p *DefaultProtector) Encrypt(data []byte, name string) ([]byte, error) {
+	return Encrypt(data, name)
+}
+
 func getOrCreateKey(name string) ([]byte, error) {
 	// get user details
 	u, err := user.Current()

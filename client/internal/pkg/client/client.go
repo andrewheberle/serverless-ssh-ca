@@ -68,7 +68,6 @@ const (
 
 var (
 	ErrNoPrivateKey           = config.ErrNoPrivateKey
-	ErrNoRefreshToken         = errors.New("no refresh token found")
 	ErrAlreadyStarted         = errors.New("server has already started")
 	ErrNotStarted             = errors.New("server has not been started")
 	ErrPageantProxyNotEnabled = errors.New("pageant proxy not enabled")
@@ -452,6 +451,7 @@ func (lh *LoginHandler) AddToAgent() error {
 	if err != nil {
 		return err
 	}
+	defer clearBytes(keyBytes)
 
 	key, err := sshkey.ParseKey(keyBytes)
 	if err != nil {
@@ -493,10 +493,6 @@ func (lh *LoginHandler) Refresh() error {
 	refresh, err := lh.config.GetRefreshToken()
 	if err != nil {
 		return err
-	}
-
-	if refresh == "" {
-		return ErrNoRefreshToken
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -725,4 +721,10 @@ func getUserAgent(name string) string {
 	}
 
 	return fmt.Sprintf("%s/%s (%s-%s)", name, version, runtime.GOOS, runtime.GOARCH)
+}
+
+func clearBytes(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
 }

@@ -33,7 +33,7 @@ func loadSystemConfig(name string) (SystemConfig, error) {
 	}
 
 	var config SystemConfig
-	if err := yaml.Unmarshal(y, &config); err != nil {
+	if err := yaml.UnmarshalStrict(y, &config); err != nil {
 		return SystemConfig{}, fmt.Errorf("problem parsing system config: %w", err)
 	}
 
