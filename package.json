@@ -43,7 +43,8 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"cf-typegen": "wrangler types",
-		"test": "wrangler deploy --dry-run && npx vitest run --config tests/vitest.config.mts"
+		"coverage": "vitest run --coverage --config tests/vitest.config.mts",
+		"test": "wrangler deploy --dry-run && vitest run --config tests/vitest.config.mts"
 	},
 	"dependencies": {
 		"@andrewheberle/ts-slog": "^1.1.0",
@@ -57,7 +58,9 @@
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.10.8",
 		"@types/sshpk": "^1.17.4",
+		"@vitest/coverage-istanbul": "^3.2.4",
 		"typescript": "^5.5.2",
+		"vitest": "3.2.4",
 		"wrangler": "^4.26.0"
 	}
 }
