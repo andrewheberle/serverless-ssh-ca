@@ -13,7 +13,7 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec
-	github.com/openpubkey/openpubkey v0.20.0
+	github.com/openpubkey/openpubkey v0.21.0
 	github.com/spf13/pflag v1.0.10
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.45.0
