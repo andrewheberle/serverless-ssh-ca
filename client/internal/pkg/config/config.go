@@ -229,15 +229,8 @@ func (c *Config) getPublicKeyBytes() ([]byte, error) {
 		return nil, ErrNoPrivateKey
 	}
 
-	// get key
-	pemBytes, err := c.getPrivateKeyBytes()
-	if err != nil {
-		return nil, err
-	}
-	defer clearBytes(pemBytes)
-
-	// parse key
-	key, err := ssh.ParsePrivateKey(pemBytes)
+	// get and parse key
+	key, err := c.signer()
 	if err != nil {
 		return nil, err
 	}
@@ -338,12 +331,18 @@ func (c *Config) Signer() (ssh.Signer, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	return c.signer()
+}
+
+func (c *Config) signer() (ssh.Signer, error) {
 	// get key
 	pemBytes, err := c.getPrivateKeyBytes()
 	if err != nil {
 		return nil, err
 	}
 	defer clearBytes(pemBytes)
+
+	fmt.Printf("Key Bytes (from signer()): %v\n", pemBytes)
 
 	// parse key and return signer
 	return ssh.ParsePrivateKey(pemBytes)

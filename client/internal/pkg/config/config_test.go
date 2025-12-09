@@ -2,22 +2,24 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/protect"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
+	"golang.org/x/crypto/ssh"
 )
 
 type mockProtector struct {
 }
 
 func (p *mockProtector) Encrypt(data []byte, name string) ([]byte, error) {
-	return data, nil
+	return bytes.Clone(data), nil
 }
 
 func (p *mockProtector) Decrypt(data []byte, name string) ([]byte, error) {
-	return data, nil
+	return bytes.Clone(data), nil
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -253,6 +255,62 @@ func TestConfig_HasPrivateKey(t *testing.T) {
 			got := tt.config.HasPrivateKey()
 			if got != tt.want {
 				t.Errorf("HasPrivateKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_getPublicKeyBytes(t *testing.T) {
+	// generate test key
+	pemBytes, err := sshkey.GenerateKey("testkey")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Key PEM Bytes: %v\n", pemBytes)
+
+	// parse into a private key
+	key, err := ssh.ParsePrivateKey(pemBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	// convert to public key
+	publicBytes := ssh.MarshalAuthorizedKey(key.PublicKey())
+
+	tests := []struct {
+		name    string
+		config  *Config
+		want    []byte
+		wantErr bool
+	}{
+		{"no key", &Config{}, nil, true},
+		{"invalid key", &Config{
+			user: UserConfig{
+				PrivateKey: []byte("somedatathatisntavalidprivatekey"),
+			},
+			protector: &mockProtector{},
+		}, nil, true},
+		{"valid key", &Config{
+			user: UserConfig{
+				PrivateKey: pemBytes,
+			},
+			protector: &mockProtector{},
+		}, publicBytes, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.config.getPublicKeyBytes()
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("getPublicKeyBytes() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("getPublicKeyBytes() succeeded unexpectedly")
+			}
+			if !bytes.Equal(got, tt.want) {
+				t.Errorf("getPublicKeyBytes() = %v, want %v", got, tt.want)
 			}
 		})
 	}
