@@ -22,6 +22,7 @@ type Config struct {
 	system           SystemConfig
 	userConfigName   string
 	user             UserConfig
+	protector        protect.Protector
 }
 
 type ClientOIDCConfig struct {
@@ -66,6 +67,7 @@ func LoadConfig(system, user string) (*Config, error) {
 		system:           s,
 		userConfigName:   user,
 		user:             u,
+		protector:        protect.NewDefaultProtector(),
 	}, nil
 }
 
@@ -82,7 +84,7 @@ func loadUserConfig(name string) (UserConfig, error) {
 	}
 
 	var config UserConfig
-	if err := yaml.Unmarshal(y, &config); err != nil {
+	if err := yaml.UnmarshalStrict(y, &config); err != nil {
 		return UserConfig{}, fmt.Errorf("problem parsing user config: %w", err)
 	}
 
@@ -168,6 +170,9 @@ func (c *Config) HasPrivateKey() bool {
 	return true
 }
 
+// GetPrivateKeyBytes returns a []byte slice that contains the users
+// unencrypted SSH private key. It is up to the caller to ensure this is
+// handled securely.
 func (c *Config) GetPrivateKeyBytes() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -176,8 +181,13 @@ func (c *Config) GetPrivateKeyBytes() ([]byte, error) {
 }
 
 func (c *Config) getPrivateKeyBytes() ([]byte, error) {
+	// error if not private key exists
+	if c.user.PrivateKey == nil {
+		return nil, ErrNoPrivateKey
+	}
+
 	// unprotect key
-	pemBytes, err := protect.Decrypt(c.user.PrivateKey, keySecretName)
+	pemBytes, err := c.protector.Decrypt(c.user.PrivateKey, keySecretName)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +199,7 @@ func (c *Config) SetPrivateKeyBytes(pemBytes []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	protected, err := protect.Encrypt(pemBytes, keySecretName)
+	protected, err := c.protector.Encrypt(pemBytes, keySecretName)
 	if err != nil {
 		return err
 	}
@@ -223,6 +233,7 @@ func (c *Config) getPublicKeyBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer clearBytes(pemBytes)
 
 	// parse key
 	key, err := ssh.ParsePrivateKey(pemBytes)
@@ -293,10 +304,11 @@ func (c *Config) GetRefreshToken() (string, error) {
 	}
 
 	// unprotect token
-	token, err := protect.Decrypt(c.user.RefreshToken, tokenSecretName)
+	token, err := c.protector.Decrypt(c.user.RefreshToken, tokenSecretName)
 	if err != nil {
 		return "", err
 	}
+	defer clearBytes(token)
 
 	return string(token), nil
 }
@@ -305,7 +317,7 @@ func (c *Config) SetRefreshToken(token string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	protected, err := protect.Encrypt([]byte(token), tokenSecretName)
+	protected, err := c.protector.Encrypt([]byte(token), tokenSecretName)
 	if err != nil {
 		return err
 	}
@@ -330,7 +342,14 @@ func (c *Config) Signer() (ssh.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer clearBytes(pemBytes)
 
 	// parse key and return signer
 	return ssh.ParsePrivateKey(pemBytes)
+}
+
+func clearBytes(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
 }

@@ -13,3 +13,13 @@ func Decrypt(data []byte, name string) ([]byte, error) {
 func Encrypt(data []byte, name string) ([]byte, error) {
 	return dpapi.Encrypt(data, name)
 }
+
+// Decrypt will decrypt the secret called "name" using the Windows DPAPI
+func (p *DefaultProtector) Decrypt(data []byte, name string) ([]byte, error) {
+	return Decrypt(data, name)
+}
+
+// Encrypt will encrypt the secret called "name" using the Windows DPAPI
+func (p *DefaultProtector) Encrypt(data []byte, name string) ([]byte, error) {
+	return Encrypt(data, name)
+}
