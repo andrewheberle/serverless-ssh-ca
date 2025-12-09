@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/protect"
+	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
 )
 
 type mockProtector struct {
@@ -82,13 +83,22 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestConfig_Oidc(t *testing.T) {
+	// minimal test config
+	testconfig := &Config{
+		system: SystemConfig{
+			Issuer:      "OIDC Issuer",
+			ClientID:    "OIDC Client ID",
+			Scopes:      []string{"openid", "email", "profile"},
+			RedirectURL: "http://localhost:3000/auth/callback",
+		},
+	}
+
 	tests := []struct {
 		name   string
-		system string
-		user   string
+		config *Config
 		want   ClientOIDCConfig
 	}{
-		{"valid config", "testdata/validsystem.yml", "testdata/validuser.yml", ClientOIDCConfig{
+		{"valid config", testconfig, ClientOIDCConfig{
 			Issuer:      "OIDC Issuer",
 			ClientID:    "OIDC Client ID",
 			Scopes:      []string{"openid", "email", "profile"},
@@ -97,11 +107,7 @@ func TestConfig_Oidc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := LoadConfig(tt.system, tt.user)
-			if err != nil {
-				t.Fatalf("could not construct receiver type: %v", err)
-			}
-			got := c.Oidc()
+			got := tt.config.Oidc()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Oidc() = %v, want %v", got, tt.want)
 			}
@@ -110,21 +116,23 @@ func TestConfig_Oidc(t *testing.T) {
 }
 
 func TestConfig_CertificateAuthorityURL(t *testing.T) {
+	// minimal test config
+	testconfig := &Config{
+		system: SystemConfig{
+			CertificateAuthorityURL: "https://ssh-ca.example.com/",
+		},
+	}
+
 	tests := []struct {
 		name   string
-		system string
-		user   string
+		config *Config
 		want   string
 	}{
-		{"valid config", "testdata/validsystem.yml", "testdata/validuser.yml", "https://ssh-ca.example.com/"},
+		{"valid config", testconfig, "https://ssh-ca.example.com/"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := LoadConfig(tt.system, tt.user)
-			if err != nil {
-				t.Fatalf("could not construct receiver type: %v", err)
-			}
-			got := c.CertificateAuthorityURL()
+			got := tt.config.CertificateAuthorityURL()
 			if got != tt.want {
 				t.Errorf("CertificateAuthorityURL() = %v, want %v", got, tt.want)
 			}
@@ -133,25 +141,30 @@ func TestConfig_CertificateAuthorityURL(t *testing.T) {
 }
 
 func TestConfig_getPrivateKeyBytes(t *testing.T) {
+	// minimal test config
+	testconfig := &Config{
+		user: UserConfig{
+			PrivateKey: []byte("somedata"),
+		},
+		protector: &mockProtector{},
+	}
+
 	tests := []struct {
 		name    string
-		system  string
-		user    string
+		config  *Config
 		want    []byte
 		wantErr bool
 	}{
-		{"valid config", "testdata/validsystem.yml", "testdata/validuser.yml", []byte("somedataencodedasbase64"), false},
-		{"no key", "testdata/validsystem.yml", "missing.yml", nil, true},
+		{"valid config", testconfig, []byte("somedata"), false},
+		{"no key", &Config{
+			user: UserConfig{
+				PrivateKey: nil,
+			},
+		}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := LoadConfig(tt.system, tt.user)
-			if err != nil {
-				t.Fatalf("could not construct receiver type: %v", err)
-			}
-			// use mockProtector for test
-			c.protector = &mockProtector{}
-			got, gotErr := c.getPrivateKeyBytes()
+			got, gotErr := tt.config.getPrivateKeyBytes()
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("getPrivateKeyBytes() failed: %v", gotErr)
@@ -163,6 +176,83 @@ func TestConfig_getPrivateKeyBytes(t *testing.T) {
 			}
 			if !bytes.Equal(got, tt.want) {
 				t.Errorf("getPrivateKeyBytes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_GetRefreshToken(t *testing.T) {
+	// minimal test config
+	testconfig := &Config{
+		user: UserConfig{
+			RefreshToken: []byte("somedata"),
+		},
+		protector: &mockProtector{},
+	}
+
+	tests := []struct {
+		name    string
+		config  *Config
+		want    string
+		wantErr bool
+	}{
+		{"valid config", testconfig, "somedata", false},
+		{"missing token", &Config{
+			user: UserConfig{
+				PrivateKey: nil,
+			},
+		}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.config.GetRefreshToken()
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("GetRefreshToken() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("GetRefreshToken() succeeded unexpectedly")
+			}
+			if got != tt.want {
+				t.Errorf("GetRefreshToken() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_HasPrivateKey(t *testing.T) {
+	// generate test key
+	key, err := sshkey.GenerateKey("testkey")
+	if err != nil {
+		panic(err)
+	}
+
+	tests := []struct {
+		name   string
+		config *Config
+		want   bool
+	}{
+		{"no key", &Config{}, false},
+		{"invalid key", &Config{
+			user: UserConfig{
+				PrivateKey: []byte("somedatathatisntavalidprivatekey"),
+			},
+			protector: &mockProtector{},
+		}, false},
+		{"valid key", &Config{
+			user: UserConfig{
+				PrivateKey: key,
+			},
+			protector: &mockProtector{},
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.HasPrivateKey()
+			if got != tt.want {
+				t.Errorf("HasPrivateKey() = %v, want %v", got, tt.want)
 			}
 		})
 	}

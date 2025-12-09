@@ -47,8 +47,9 @@ type UserConfig struct {
 }
 
 var (
-	ErrNoPrivateKey  = errors.New("no private key found")
-	ErrNoCertificate = errors.New("no certificate found")
+	ErrNoPrivateKey   = errors.New("no private key found")
+	ErrNoCertificate  = errors.New("no certificate found")
+	ErrNoRefreshToken = errors.New("no refresh token found")
 )
 
 func LoadConfig(system, user string) (*Config, error) {
@@ -300,7 +301,7 @@ func (c *Config) GetRefreshToken() (string, error) {
 	defer c.mu.RUnlock()
 
 	if c.user.RefreshToken == nil {
-		return "", ErrNoCertificate
+		return "", ErrNoRefreshToken
 	}
 
 	// unprotect token
