@@ -27,6 +27,8 @@ const (
 	stateCertificateMissing appState = "CertificateMissing"
 	stateCertificateExpired appState = "CertificateExpired"
 
+	defaultIcon = okIcon
+
 	okIcon      = "ok"
 	warningIcon = "warning"
 	errorIcon   = "error"
@@ -51,6 +53,8 @@ type Application struct {
 	mu             sync.Mutex
 	refreshBackOff int
 	refreshFailure int
+
+	version string
 
 	logger *slog.Logger
 }
@@ -97,6 +101,14 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 
 		app.notificationIcons[name] = icon
 	}
+
+	// get version if available
+	version := "Unknown"
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		version = info.Main.Version
+	}
+	app.version = version
 
 	return app, nil
 }
@@ -164,7 +176,7 @@ func (app *Application) setState() {
 		app.mGenerate.Enable()
 		app.mRenew.Disable()
 		app.mExpiry.SetTitle("No certificate")
-		setTooltip("No private key found")
+		app.setTooltip("No private key found")
 		systray.SetIcon(app.trayIcons["error"])
 	case stateKeyOK:
 		// we have a key so check the state of the certificate
@@ -199,7 +211,7 @@ func (app *Application) setState() {
 		app.mRenew.SetTitle("Renew")
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle("Certificate expired")
-		setTooltip("Certificate expired")
+		app.setTooltip("Certificate expired")
 		systray.SetIcon(app.trayIcons["warning"])
 	case stateCertificateMissing:
 		// check we haven't renewed
@@ -214,7 +226,7 @@ func (app *Application) setState() {
 		app.mRenew.SetTitle("Request")
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle("No certificate")
-		setTooltip("No certificate found")
+		app.setTooltip("No certificate found")
 		systray.SetIcon(app.trayIcons["warning"])
 	case stateCertificateOK:
 		// check we haven't expired
@@ -283,7 +295,7 @@ func (app *Application) setState() {
 		app.mRenew.SetTitle("Renew")
 		app.mRenew.Enable()
 		app.mExpiry.SetTitle(fmt.Sprintf("%s left", timeLeft(app.client.CerificateExpiry())))
-		setTooltip("Current certificate valid")
+		app.setTooltip("Current certificate valid")
 		systray.SetIcon(app.trayIcons[okIcon])
 	}
 }
@@ -417,21 +429,23 @@ func (app *Application) generate() error {
 	return app.client.GenerateKey()
 }
 
+func (app *Application) getIcon(icon string) []byte {
+	// grab icon
+	b, ok := app.notificationIcons[icon]
+	if !ok {
+		return app.notificationIcons[defaultIcon]
+	}
+
+	return b
+}
+
 func timeLeft(t time.Time) string {
 	timeLeft := time.Until(t)
 	return fmt.Sprintf("%02dh%02dm", int(timeLeft.Hours()), int(timeLeft.Minutes())%60)
 }
 
-func setTooltip(message string) {
-	version := "Unknown"
-
-	// get version if available
-	info, ok := debug.ReadBuildInfo()
-	if ok {
-		version = info.Main.Version
-	}
-
+func (app *Application) setTooltip(message string) {
 	// set tooltip
-	tooltip := fmt.Sprintf("SSH CA Client (%s) - %s", version, message)
+	tooltip := fmt.Sprintf("SSH CA Client (%s) - %s", app.version, message)
 	systray.SetTooltip(tooltip)
 }
