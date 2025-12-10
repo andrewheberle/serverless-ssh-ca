@@ -85,6 +85,12 @@ func Execute(ctx context.Context, args []string) error {
 		return err
 	}
 
+	// load config
+	c, err := config.LoadConfig(systemConfigFile, userConfigFile)
+	if err != nil {
+		return err
+	}
+
 	// set location to write panics
 	crashFile := filepath.Join(logDir, "crash.log")
 	crash, err := os.Create(crashFile)
@@ -106,7 +112,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set up login client
-	lh, err := client.NewLoginHandler(systemConfigFile, userConfigFile, opts...)
+	lh, err := client.NewLoginHandler(c, opts...)
 	if err != nil {
 		return err
 	}
