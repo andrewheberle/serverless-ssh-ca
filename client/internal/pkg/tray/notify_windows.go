@@ -10,10 +10,7 @@ func (app *Application) prerun() {
 // Sends a desktop notification
 func (app *Application) notify(title string, message string, icon string) {
 	// grab icon
-	b, ok := app.notificationIcons[icon]
-	if !ok {
-		b = app.notificationIcons[defaultIcon]
-	}
+	b := app.getIcon(icon)
 
 	// set notification
 	if err := beeep.Notify(title, message, b); err != nil {

@@ -419,6 +419,16 @@ func (app *Application) generate() error {
 	return app.client.GenerateKey()
 }
 
+func (app *Application) getIcon(icon string) []byte {
+	// grab icon
+	b, ok := app.notificationIcons[icon]
+	if !ok {
+		return app.notificationIcons[defaultIcon]
+	}
+
+	return b
+}
+
 func timeLeft(t time.Time) string {
 	timeLeft := time.Until(t)
 	return fmt.Sprintf("%02dh%02dm", int(timeLeft.Hours()), int(timeLeft.Minutes())%60)

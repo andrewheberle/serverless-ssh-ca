@@ -44,12 +44,11 @@ func (app *Application) notify(title string, message string, icon string) {
 	n.Hints = map[string]dbus.Variant{}
 	n.SetUrgency(notify.UrgencyNormal)
 
-	iconData, ok := app.notificationIcons[icon]
-	if !ok {
-		iconData = app.notificationIcons[defaultIcon]
-	}
+	// grab icon
+	b := app.getIcon(icon)
 
-	rgba, err := bytesToRGBA(iconData)
+	// convert to PNG
+	rgba, err := bytesToRGBA(b)
 	if err == nil {
 		imageHint := notify.HintImageDataRGBA(rgba)
 		n.Hints[imageHint.ID] = imageHint.Variant
