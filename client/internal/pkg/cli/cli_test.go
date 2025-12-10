@@ -16,7 +16,7 @@ func TestExecute(t *testing.T) {
 		{"no args", []string{}, false},
 		{"generate sub-command", []string{"--config", "testdata/system.yml", "generate", "--dryrun"}, false},
 		{"generate sub-command with missing config", []string{"--config", "testdata/missing.yml", "generate", "--dryrun"}, true},
-		{"show sub-command", []string{"--config", "testdata/system.yml", "show"}, false},
+		{"show sub-command", []string{"--config", "testdata/system.yml", "show", "--status"}, false},
 		{"show sub-command with missing config", []string{"--config", "testdata/missing.yml", "show"}, true},
 		{"version sub-command", []string{"version"}, false},
 	}
