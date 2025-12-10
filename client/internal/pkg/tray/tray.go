@@ -27,6 +27,8 @@ const (
 	stateCertificateMissing appState = "CertificateMissing"
 	stateCertificateExpired appState = "CertificateExpired"
 
+	defaultIcon = okIcon
+
 	okIcon      = "ok"
 	warningIcon = "warning"
 	errorIcon   = "error"

@@ -2,8 +2,6 @@ package tray
 
 import "github.com/gen2brain/beeep"
 
-const defaultIcon = "ok"
-
 func (app *Application) prerun() {
 	// set app name in beeep
 	beeep.AppName = app.title
