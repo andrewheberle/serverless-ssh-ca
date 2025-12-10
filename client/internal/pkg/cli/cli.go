@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -14,8 +15,6 @@ import (
 type rootCommand struct {
 	systemConfigFile string
 	userConfigFile   string
-
-	config *config.Config
 
 	*simplecommand.Command
 }
@@ -45,18 +44,6 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if err := c.Command.PreRun(this, runner); err != nil {
 		return err
 	}
-
-	// make sure user config dir exists
-	if err := os.MkdirAll(filepath.Dir(c.userConfigFile), 0755); err != nil {
-		return err
-	}
-
-	// load config (do not error here on not found)
-	config, err := config.LoadConfig(c.systemConfigFile, c.userConfigFile)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	c.config = config
 
 	return nil
 }
@@ -92,4 +79,25 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	return nil
+}
+
+func loadconfig(this *simplecobra.Commandeer) (*config.Config, error) {
+	// get root command for config locations
+	root, ok := this.Root.Command.(*rootCommand)
+	if !ok {
+		return nil, fmt.Errorf("problem accessing root command")
+	}
+
+	// make sure user config dir exists
+	if err := os.MkdirAll(filepath.Dir(root.userConfigFile), 0755); err != nil {
+		return nil, err
+	}
+
+	// load config (do not error here on not found)
+	config, err := config.LoadConfig(root.systemConfigFile, root.userConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }

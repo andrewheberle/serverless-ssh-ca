@@ -81,13 +81,7 @@ var (
 )
 
 // NewLoginHandler creates a new handler
-func NewLoginHandler(system, user string, opts ...LoginHandlerOption) (*LoginHandler, error) {
-	// load config
-	config, err := config.LoadConfig(system, user)
-	if err != nil {
-		return nil, err
-	}
-
+func NewLoginHandler(config *config.Config, opts ...LoginHandlerOption) (*LoginHandler, error) {
 	// set up oidc provider
 	provider, err := oidc.NewProvider(context.Background(), config.Oidc().Issuer)
 	if err != nil {
