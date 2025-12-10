@@ -102,6 +102,7 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 }
 
 func (app *Application) Run() {
+	app.prerun()
 	systray.Run(app.onReady, func() {})
 }
 
@@ -110,6 +111,7 @@ func (app *Application) RunLogged(logger *slog.Logger) {
 		app.logger = logger
 		app.client.SetLogger(logger)
 	}
+	app.prerun()
 	systray.Run(app.onReady, func() {})
 }
 

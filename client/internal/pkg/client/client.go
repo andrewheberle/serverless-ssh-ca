@@ -25,7 +25,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/ndbeals/winssh-pageant/pageant"
 	"github.com/openpubkey/openpubkey/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
@@ -238,31 +237,6 @@ func (lh *LoginHandler) Shutdown() error {
 
 	// also return result
 	return err
-}
-
-// RunPageantProxy will proxy PuTTY Agent connections to the native OpenSSH
-// SSH Agent.
-//
-// This will block until the provided context is complete or
-// [*LoginHandler.ShutdownPageantProxy()] is run.
-func (lh *LoginHandler) RunPageantProxy(ctx context.Context) error {
-	if !lh.pageantProxy {
-		return ErrPageantProxyNotEnabled
-	}
-
-	// start as a goroutine
-	go func() {
-		p := pageant.NewDefaultHandler(`\\.\pipe\openssh-ssh-agent`, true)
-		p.Run()
-	}()
-
-	// block here until context is finished or ShutdownPageantProxy is run
-	select {
-	case <-lh.pageantProxyDone:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // ShutdownPageantProxy will shutdown a running PuTTY Agent proxy.

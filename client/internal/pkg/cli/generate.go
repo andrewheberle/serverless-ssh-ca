@@ -12,7 +12,8 @@ import (
 )
 
 type generateCommand struct {
-	force bool
+	force  bool
+	dryrun bool
 
 	config *config.Config
 
@@ -26,6 +27,7 @@ func (c *generateCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.force, "force", false, "Force replacing and existing key")
+	cmd.Flags().BoolVarP(&c.dryrun, "dryrun", "n", false, "Show what would be done")
 
 	return nil
 }
@@ -45,7 +47,19 @@ func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 
 func (c *generateCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	if c.config.HasPrivateKey() && !c.force {
+		if c.dryrun {
+			fmt.Printf("dry run: not overwriting existing private key without force option set")
+
+			return nil
+		}
+
 		return fmt.Errorf("not overwriting existing private key without force option set")
+	}
+
+	if c.dryrun {
+		fmt.Printf("dry run: generating SSH private key")
+
+		return nil
 	}
 
 	// set comment based on user@host if possible

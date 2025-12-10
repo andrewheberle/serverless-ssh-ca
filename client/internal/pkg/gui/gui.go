@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/tray"
-	"github.com/gen2brain/beeep"
 	"github.com/spf13/pflag"
 )
 
@@ -23,7 +23,7 @@ import (
 var resources embed.FS
 
 func Execute(ctx context.Context, args []string) error {
-	beeep.AppName = config.FriendlyAppName
+	// beeep.AppName = config.FriendlyAppName
 
 	// find config dirs
 	user, system, err := config.ConfigDirs()
@@ -43,7 +43,13 @@ func Execute(ctx context.Context, args []string) error {
 	flags.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
 	flags.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
 	flags.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
-	flags.BoolVar(&disableProxy, "disable-proxy", pageantProxyDefault, "Disable proxying of PuTTY Agent (pageant) requests")
+	// only proxy pageant on Windows
+	if runtime.GOOS == "windows" {
+		flags.BoolVar(&disableProxy, "disable-proxy", false, "Disable proxying of PuTTY Agent (pageant) requests")
+	} else {
+		// always disabled on non-Windows platforms
+		disableProxy = true
+	}
 	flags.BoolVar(&addOnStart, "add-on-start", true, "Add current key and certificate (if valid) to SSH agent on start")
 	flags.BoolVar(&install, "install", false, "Perform post-install steps")
 	_ = flags.MarkHidden("install")
@@ -106,7 +112,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 
 	// set up tray app
-	app, err := tray.New(beeep.AppName, listenAddr, resources, lh, renewAt)
+	app, err := tray.New(config.FriendlyAppName, listenAddr, resources, lh, renewAt)
 	if err != nil {
 		return err
 	}

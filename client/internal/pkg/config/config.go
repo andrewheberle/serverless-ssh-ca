@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -17,12 +16,12 @@ import (
 const FriendlyAppName = "Serverless SSH CA Client"
 
 type Config struct {
-	mu               sync.RWMutex
-	systemConfigName string
-	system           SystemConfig
-	userConfigName   string
-	user             UserConfig
-	protector        protect.Protector
+	mu     sync.RWMutex
+	system SystemConfig
+	// userConfigName string
+	user        UserConfig
+	protector   protect.Protector
+	persistence Persistence
 }
 
 type ClientOIDCConfig struct {
@@ -46,6 +45,10 @@ type UserConfig struct {
 	PrivateKey   []byte `json:"private_key,omitempty"`
 }
 
+type Persistence interface {
+	Save(config UserConfig) error
+}
+
 var (
 	ErrNoPrivateKey   = errors.New("no private key found")
 	ErrNoCertificate  = errors.New("no certificate found")
@@ -64,11 +67,10 @@ func LoadConfig(system, user string) (*Config, error) {
 	}
 
 	return &Config{
-		systemConfigName: system,
-		system:           s,
-		userConfigName:   user,
-		user:             u,
-		protector:        protect.NewDefaultProtector(),
+		system:      s,
+		user:        u,
+		protector:   protect.NewDefaultProtector(),
+		persistence: &YamlPersistence{name: user},
 	}, nil
 }
 
@@ -93,54 +95,7 @@ func loadUserConfig(name string) (UserConfig, error) {
 }
 
 func (c *Config) Save() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.save()
-}
-
-// this saves the user part of the config
-func (c *Config) save() error {
-	temp, err := func() (string, error) {
-		// save to a temp file first
-		t, err := os.CreateTemp(filepath.Dir(c.userConfigName), "user*")
-		if err != nil {
-			// creation failed
-			return "", err
-		}
-		defer func() {
-			_ = t.Close()
-		}()
-
-		// marshal yaml
-		y, err := yaml.Marshal(c.user)
-		if err != nil {
-			return t.Name(), err
-		}
-
-		// write config
-		if _, err := t.Write(y); err != nil {
-			return t.Name(), err
-		}
-
-		// return name and no error
-		return t.Name(), nil
-	}()
-
-	// ensure temp file is removed it it was created
-	if temp != "" {
-		defer func() {
-			_ = os.Remove(temp)
-		}()
-	}
-
-	// check save to temp was ok
-	if err != nil {
-		return err
-	}
-
-	// move into place
-	return os.Rename(temp, c.userConfigName)
+	return c.persistence.Save(c.user)
 }
 
 func (c *Config) Oidc() ClientOIDCConfig {
@@ -196,6 +151,8 @@ func (c *Config) getPrivateKeyBytes() ([]byte, error) {
 	return pemBytes, nil
 }
 
+// SetPrivateKeyBytes encrypts and persists the PEM private key []byte slice
+// via [Persistence]
 func (c *Config) SetPrivateKeyBytes(pemBytes []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -210,7 +167,7 @@ func (c *Config) SetPrivateKeyBytes(pemBytes []byte) error {
 	c.user.Certificate = nil
 
 	// save config
-	if err := c.save(); err != nil {
+	if err := c.persistence.Save(c.user); err != nil {
 		return err
 	}
 
@@ -275,14 +232,13 @@ func (c *Config) CerificateExpiry() time.Time {
 }
 
 func (c *Config) SetCertificateBytes(pemBytes []byte) error {
-
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.user.Certificate = pemBytes
 
 	// save config
-	if err := c.save(); err != nil {
+	if err := c.persistence.Save(c.user); err != nil {
 		return err
 	}
 
@@ -319,7 +275,7 @@ func (c *Config) SetRefreshToken(token string) error {
 	c.user.RefreshToken = protected
 
 	// save config
-	if err := c.save(); err != nil {
+	if err := c.persistence.Save(c.user); err != nil {
 		return err
 	}
 
@@ -341,8 +297,6 @@ func (c *Config) signer() (ssh.Signer, error) {
 		return nil, err
 	}
 	defer clearBytes(pemBytes)
-
-	fmt.Printf("Key Bytes (from signer()): %v\n", pemBytes)
 
 	// parse key and return signer
 	return ssh.ParsePrivateKey(pemBytes)

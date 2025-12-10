@@ -4,6 +4,11 @@ import "github.com/gen2brain/beeep"
 
 const defaultIcon = "ok"
 
+func (app *Application) prerun() {
+	// set app name in beeep
+	beeep.AppName = app.title
+}
+
 // Sends a desktop notification
 func (app *Application) notify(title string, message string, icon string) {
 	// grab icon
