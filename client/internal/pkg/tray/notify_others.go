@@ -65,7 +65,9 @@ func (app *Application) notify(title string, message string, icon string) {
 		)
 		return
 	}
-	defer notifier.Close()
+	defer func() {
+		_ = notifier.Close()
+	}()
 
 	_, err = notifier.SendNotification(n)
 	if err != nil {
