@@ -51,9 +51,9 @@ func (c *rootCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return err
 	}
 
-	// load config
+	// load config (do not error here on not found)
 	config, err := config.LoadConfig(c.systemConfigFile, c.userConfigFile)
-	if err != nil {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	c.config = config

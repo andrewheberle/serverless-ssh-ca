@@ -41,6 +41,9 @@ func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if !ok {
 		return fmt.Errorf("problem accessing root command")
 	}
+	if root.config == nil {
+		return fmt.Errorf("config not loaded")
+	}
 	c.config = root.config
 	return nil
 }

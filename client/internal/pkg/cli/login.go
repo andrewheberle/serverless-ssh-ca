@@ -59,6 +59,9 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if !ok {
 		return fmt.Errorf("problem accessing root command")
 	}
+	if root.config == nil {
+		return fmt.Errorf("config not loaded")
+	}
 
 	// set options
 	opts := []client.LoginHandlerOption{
