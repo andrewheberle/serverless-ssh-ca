@@ -8,7 +8,9 @@ import (
 
 func TestConfigDirs(t *testing.T) {
 	// set variable so we can test result
-	os.Setenv("AppData", "C:\\Users\\testuser\\AppData")
+	if err := os.Setenv("AppData", "C:\\Users\\testuser\\AppData"); err != nil {
+		panic(err)
+	}
 
 	tests := []struct {
 		name    string // description of this test case

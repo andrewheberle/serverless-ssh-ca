@@ -10,7 +10,9 @@ import (
 
 func TestConfigDirs(t *testing.T) {
 	// set variable so we can test result
-	os.Setenv("XDG_CONFIG_HOME", "/home/testuser/.config")
+	if err := os.Setenv("XDG_CONFIG_HOME", "/home/testuser/.config"); err != nil {
+		panic(err)
+	}
 
 	tests := []struct {
 		name    string
