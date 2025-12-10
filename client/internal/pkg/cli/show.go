@@ -40,11 +40,13 @@ func (c *showCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return err
 	}
 
-	root, ok := this.Root.Command.(*rootCommand)
-	if !ok {
-		return fmt.Errorf("problem accessing root command")
+	// load config
+	config, err := loadconfig(this)
+	if err != nil {
+		return err
 	}
-	c.config = root.config
+	c.config = config
+
 	return nil
 }
 

@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -55,9 +54,10 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return err
 	}
 
-	root, ok := this.Root.Command.(*rootCommand)
-	if !ok {
-		return fmt.Errorf("problem accessing root command")
+	// load config
+	config, err := loadconfig(this)
+	if err != nil {
+		return err
 	}
 
 	// set options
@@ -82,7 +82,7 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	}
 
 	// set up login client
-	lh, err := client.NewLoginHandler(root.systemConfigFile, root.userConfigFile, opts...)
+	lh, err := client.NewLoginHandler(config, opts...)
 	if err != nil {
 		return err
 	}

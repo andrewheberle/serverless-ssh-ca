@@ -1,6 +1,9 @@
-//go:build !windows
+//go:build linux
 
 package tray
+
+func (app *Application) prerun() {
+}
 
 // This currently does nothing as "github.com/gen2brain/beeep.Notify" causes
 // the entire GUI to panic on Linux

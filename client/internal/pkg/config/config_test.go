@@ -11,6 +11,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+var _ protect.Protector = &mockProtector{}
+
 type mockProtector struct {
 }
 
@@ -20,6 +22,17 @@ func (p *mockProtector) Encrypt(data []byte, name string) ([]byte, error) {
 
 func (p *mockProtector) Decrypt(data []byte, name string) ([]byte, error) {
 	return bytes.Clone(data), nil
+}
+
+var _ Persistence = &mockPersistence{}
+
+type mockPersistence struct {
+	data UserConfig
+}
+
+func (p *mockPersistence) Save(c UserConfig) error {
+	p.data = c
+	return nil
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -34,7 +47,6 @@ func TestLoadConfig(t *testing.T) {
 		{"system missing", "missing.yml", "testdata/validuser.yml", nil, true},
 		{"user missing", "testdata/validsystem.yml", "missing.yml",
 			&Config{
-				systemConfigName: "testdata/validsystem.yml",
 				system: SystemConfig{
 					Issuer:                  "OIDC Issuer",
 					ClientID:                "OIDC Client ID",
@@ -42,15 +54,14 @@ func TestLoadConfig(t *testing.T) {
 					RedirectURL:             "http://localhost:3000/auth/callback",
 					CertificateAuthorityURL: "https://ssh-ca.example.com/",
 				},
-				userConfigName: "missing.yml",
-				user:           UserConfig{},
-				protector:      protect.NewDefaultProtector(),
+				user:        UserConfig{},
+				persistence: &YamlPersistence{name: "missing.yml"},
+				protector:   protect.NewDefaultProtector(),
 			}, false},
 		{"invalid system", "testdata/invalidsystem.yml", "testdata/validuser.yml", nil, true},
 		{"invalid user", "testdata/validsystem.yml", "testdata/invaliduser.yml", nil, true},
 		{"both valid", "testdata/validsystem.yml", "testdata/validuser.yml",
 			&Config{
-				systemConfigName: "testdata/validsystem.yml",
 				system: SystemConfig{
 					Issuer:                  "OIDC Issuer",
 					ClientID:                "OIDC Client ID",
@@ -58,11 +69,11 @@ func TestLoadConfig(t *testing.T) {
 					RedirectURL:             "http://localhost:3000/auth/callback",
 					CertificateAuthorityURL: "https://ssh-ca.example.com/",
 				},
-				userConfigName: "testdata/validuser.yml",
 				user: UserConfig{
 					PrivateKey: []byte("somedataencodedasbase64"),
 				},
-				protector: protect.NewDefaultProtector(),
+				persistence: &YamlPersistence{name: "testdata/validuser.yml"},
+				protector:   protect.NewDefaultProtector(),
 			}, false},
 	}
 	for _, tt := range tests {
@@ -311,6 +322,83 @@ func TestConfig_getPublicKeyBytes(t *testing.T) {
 			}
 			if !bytes.Equal(got, tt.want) {
 				t.Errorf("getPublicKeyBytes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_SetAndGetPrivateKeyBytes(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *Config
+		pemBytes []byte
+		wantErr  bool
+	}{
+		{"mock save", &Config{
+			persistence: &mockPersistence{},
+			protector:   &mockProtector{},
+		}, []byte("somebytes"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotErr := tt.config.SetPrivateKeyBytes(tt.pemBytes)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("SetPrivateKeyBytes() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("SetPrivateKeyBytes() succeeded unexpectedly")
+			}
+
+			saved := tt.config.persistence.(*mockPersistence).data.PrivateKey
+			if !bytes.Equal(saved, tt.config.user.PrivateKey) {
+				t.Fatalf("SetPrivateKeyBytes() did not save: %v, want %v", saved, tt.config.user.PrivateKey)
+			}
+
+			got, gotErr := tt.config.GetPrivateKeyBytes()
+			if gotErr != nil {
+				t.Fatal("GetPrivateKeyBytes() failed")
+			}
+			if !bytes.Equal(got, tt.config.user.PrivateKey) {
+				t.Errorf("GetPrivateKeyBytes() = %v, want %v", got, tt.config.user.PrivateKey)
+			}
+		})
+	}
+}
+
+func TestConfig_HasCertificate(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *Config
+		want   bool
+	}{
+		{"no certificate", &Config{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.HasCertificate()
+			if got != tt.want {
+				t.Errorf("HasCertificate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_CertificateValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *Config
+		want   bool
+	}{
+		{"no certificate", &Config{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.CertificateValid()
+			if got != tt.want {
+				t.Errorf("CertificateValid() = %v, want %v", got, tt.want)
 			}
 		})
 	}
