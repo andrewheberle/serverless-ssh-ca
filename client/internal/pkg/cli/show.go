@@ -12,6 +12,7 @@ import (
 
 type showCommand struct {
 	private     bool
+	public      bool
 	certificate bool
 	status      bool
 
@@ -28,9 +29,12 @@ func (c *showCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.private, "private", false, "Display private key")
 	cmd.Flags().BoolVar(&c.certificate, "certificate", false, "Display certificate if one exists")
+	cmd.Flags().BoolVar(&c.public, "public", false, "Display public key")
 	cmd.Flags().BoolVar(&c.status, "status", false, "Display status only")
+	cmd.MarkFlagsMutuallyExclusive("public", "private", "certificate")
 	cmd.MarkFlagsMutuallyExclusive("status", "private")
 	cmd.MarkFlagsMutuallyExclusive("status", "certificate")
+	cmd.MarkFlagsMutuallyExclusive("status", "public")
 
 	return nil
 }
@@ -41,7 +45,7 @@ func (c *showCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	}
 
 	// load config
-	config, err := loadconfig(this)
+	config, err := loaduserconfig(this)
 	if err != nil {
 		return err
 	}
@@ -87,27 +91,28 @@ func (c *showCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args 
 		return ErrNoPrivateKey
 	}
 
-	if c.private {
+	switch {
+	case c.private:
 		pemBytes, err := c.config.GetPrivateKeyBytes()
 		if err != nil {
 			return err
 		}
 
 		fmt.Printf("%s", pemBytes)
-	}
-
-	pemBytes, err := c.config.GetPublicKeyBytes()
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("SSH Public Key: %s", pemBytes)
-
-	if c.certificate {
+	case c.certificate:
 		certBytes, err := c.config.GetCertificateBytes()
-		if err == nil {
-			fmt.Printf("SSH Certificate: %s", certBytes)
+		if err != nil {
+			return err
 		}
+
+		fmt.Printf("%s\n", certBytes)
+	default:
+		pemBytes, err := c.config.GetPublicKeyBytes()
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("%s", pemBytes)
 	}
 
 	return nil

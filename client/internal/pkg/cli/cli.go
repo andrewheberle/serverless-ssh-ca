@@ -81,6 +81,7 @@ func Execute(ctx context.Context, args []string) error {
 	return nil
 }
 
+// loadconfig will load both system and user configuration
 func loadconfig(this *simplecobra.Commandeer) (*config.Config, error) {
 	// get root command for config locations
 	root, ok := this.Root.Command.(*rootCommand)
@@ -95,6 +96,27 @@ func loadconfig(this *simplecobra.Commandeer) (*config.Config, error) {
 
 	// load config (do not error here on not found)
 	config, err := config.LoadConfig(root.systemConfigFile, root.userConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+// loaduserconfig will only attempt to load the user config
+func loaduserconfig(this *simplecobra.Commandeer) (*config.Config, error) {
+	// get root command for config locations
+	root, ok := this.Root.Command.(*rootCommand)
+	if !ok {
+		return nil, fmt.Errorf("problem accessing root command")
+	}
+
+	// make sure user config dir exists
+	if err := os.MkdirAll(filepath.Dir(root.userConfigFile), 0755); err != nil {
+		return nil, err
+	}
+
+	config, err := config.LoadUserConfigOnly(root.userConfigFile)
 	if err != nil {
 		return nil, err
 	}

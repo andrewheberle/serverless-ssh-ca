@@ -15,9 +15,13 @@ func TestExecute(t *testing.T) {
 	}{
 		{"no args", []string{}, false},
 		{"generate sub-command", []string{"--config", "testdata/system.yml", "generate", "--dryrun"}, false},
-		{"generate sub-command with missing config", []string{"--config", "testdata/missing.yml", "generate", "--dryrun"}, true},
+		{"generate sub-command should ignore system config", []string{"--config", "testdata/missing.yml", "generate", "--dryrun"}, false},
 		{"show sub-command", []string{"--config", "testdata/system.yml", "show", "--status"}, false},
-		{"show sub-command with missing config", []string{"--config", "testdata/missing.yml", "show"}, true},
+		{"show sub-command should ignore missing system config", []string{"--config", "testdata/missing.yml", "show", "--status"}, false},
+		{"show --private sub-command should error with missing user config", []string{"--user", "missing.yml", "show", "--private"}, true},
+		{"show --public sub-command should error with missing user config", []string{"--user", "missing.yml", "show", "--public"}, true},
+		{"show --certificate sub-command should error with missing user config", []string{"--user", "missing.yml", "show", "--certificate"}, true},
+		{"login sub-command should error with missing system config", []string{"--config", "missing.yml", "login"}, true},
 		{"version sub-command", []string{"version"}, false},
 	}
 	for _, tt := range tests {
