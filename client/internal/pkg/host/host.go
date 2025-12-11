@@ -61,6 +61,7 @@ type CertificateSignerResponse struct {
 type LoginHandler struct {
 	key          ssh.Signer
 	keypath      string
+	principals   []string
 	srv          *http.Server
 	started      bool
 	verifier     *oidc.IDTokenVerifier
@@ -102,12 +103,13 @@ func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...Lo
 
 	// set defaults
 	lh := &LoginHandler{
-		key:      key,
-		keypath:  keypath,
-		config:   config,
-		lifetime: DefaultLifetime,
-		store:    sessions.NewCookieStore(securecookie.GenerateRandomKey(32)),
-		verifier: provider.Verifier(&oidc.Config{ClientID: config.ClientID}),
+		key:        key,
+		keypath:    keypath,
+		config:     config,
+		lifetime:   DefaultLifetime,
+		principals: make([]string, 0),
+		store:      sessions.NewCookieStore(securecookie.GenerateRandomKey(32)),
+		verifier:   provider.Verifier(&oidc.Config{ClientID: config.ClientID}),
 		oauth2Config: oauth2.Config{
 			ClientID:    config.ClientID,
 			RedirectURL: config.RedirectURL,
@@ -372,9 +374,10 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	payload := CertificateSignerPayload{
-		PublicKey: publicKey,
-		Lifetime:  int(lh.lifetime.Seconds()),
-		Nonce:     nonce,
+		Principals: lh.principals,
+		PublicKey:  publicKey,
+		Lifetime:   int(lh.lifetime.Seconds()),
+		Nonce:      nonce,
 	}
 	if err := enc.Encode(payload); err != nil {
 		return nil, err
@@ -392,6 +395,7 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
 		"nonce", payload.Nonce,
+		"principals", payload.Principals,
 	)
 	res, err := httpclient.Post(caCertUrl, "application/json", buf)
 	if err != nil {

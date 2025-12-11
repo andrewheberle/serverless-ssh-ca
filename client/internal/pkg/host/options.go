@@ -21,3 +21,10 @@ func WithLogger(logger *slog.Logger) LoginHandlerOption {
 		lh.logger = logger
 	}
 }
+
+// WithPrincipals allows providing a list of principals for the host certificate
+func WithPrincipals(principals []string) LoginHandlerOption {
+	return func(lh *LoginHandler) {
+		lh.principals = principals
+	}
+}
