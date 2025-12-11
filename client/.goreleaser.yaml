@@ -40,6 +40,8 @@ builds:
       - -H=windowsgui
   - id: gui
     binary: ssh-ca-client
+    env:
+      - CGO_ENABLED=0
     goarch:
       - amd64
     goos:

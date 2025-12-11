@@ -103,7 +103,7 @@ export class Nonce {
      */
     verify(key: Key) {
         // create verifier from public key
-        const verifier = key.createVerify("sha256")
+        const verifier = key.createVerify(key.type === "ed25519" ? "sha512" : "sha256")
         verifier.update(this.dataToVerify)
 
         return verifier.verify(this.signature)
@@ -161,8 +161,9 @@ export class HostNonce extends Nonce {
      * @returns true or false if verification succeeds
      */
     verify(key: Key): boolean {
+        
         // create verifier from public key
-        const verifier = key.createVerify("sha256")
+        const verifier = key.createVerify(key.type === "ed25519" ? "sha512" : "sha256")
         verifier.update(this.hostDataToVerify)
 
         console.log(this.hostDataToVerify)
