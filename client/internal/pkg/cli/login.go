@@ -28,10 +28,6 @@ type loginCommand struct {
 	*simplecommand.Command
 }
 
-type CertificateSignerResponse struct {
-	Certificate []byte `json:"certificate"`
-}
-
 func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 	if err := c.Command.Init(cd); err != nil {
 		return err

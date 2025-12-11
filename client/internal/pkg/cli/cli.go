@@ -56,6 +56,9 @@ func Execute(ctx context.Context, args []string) error {
 		&generateCommand{
 			Command: simplecommand.New("generate", "Generate a SSH private key"),
 		},
+		&hostCommand{
+			Command: simplecommand.New("host", "Request or renew host certificates"),
+		},
 		&loginCommand{
 			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
 		},
@@ -96,6 +99,22 @@ func loadconfig(this *simplecobra.Commandeer) (*config.Config, error) {
 
 	// load config (do not error here on not found)
 	config, err := config.LoadConfig(root.systemConfigFile, root.userConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+// loadsystemconfig will only attempt to load the system config file
+func loadsystemconfig(this *simplecobra.Commandeer) (*config.Config, error) {
+	// get root command for config locations
+	root, ok := this.Root.Command.(*rootCommand)
+	if !ok {
+		return nil, fmt.Errorf("problem accessing root command")
+	}
+
+	config, err := config.LoadConfig(root.systemConfigFile, "")
 	if err != nil {
 		return nil, err
 	}

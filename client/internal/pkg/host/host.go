@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
+	"github.com/openpubkey/openpubkey/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -31,13 +33,13 @@ const (
 )
 
 var (
-	ErrNoKeys                 = errors.New("no SSH host keys found")
-	ErrAlreadyStarted         = errors.New("server has already started")
-	ErrNotStarted             = errors.New("server has not been started")
-	ErrPageantProxyNotEnabled = errors.New("pageant proxy not enabled")
-	ErrConnectingToAgent      = errors.New("could not connect to agent")
-	ErrAddingToAgent          = errors.New("could not add to agent")
-	ErrCertificateNotValid    = errors.New("certificate validity not ok")
+	ErrNoKeys              = errors.New("no SSH host keys found")
+	ErrAlreadyStarted      = errors.New("server has already started")
+	ErrNotStarted          = errors.New("server has not been started")
+	ErrUnsupportedKey      = errors.New("key type is not supported")
+	ErrConnectingToAgent   = errors.New("could not connect to agent")
+	ErrAddingToAgent       = errors.New("could not add to agent")
+	ErrCertificateNotValid = errors.New("certificate validity not ok")
 
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
@@ -56,8 +58,9 @@ type CertificateSignerResponse struct {
 	Certificate []byte `json:"certificate"`
 }
 
-type HostLoginHandler struct {
-	key          interface{}
+type LoginHandler struct {
+	key          ssh.Signer
+	keypath      string
 	srv          *http.Server
 	started      bool
 	verifier     *oidc.IDTokenVerifier
@@ -72,7 +75,7 @@ type HostLoginHandler struct {
 }
 
 // NewLoginHandler creates a new handler
-func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...HostLoginHandlerOption) (*HostLoginHandler, error) {
+func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...LoginHandlerOption) (*LoginHandler, error) {
 	// check key exists
 	b, err := os.ReadFile(keypath)
 	if err != nil {
@@ -80,7 +83,7 @@ func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...Ho
 	}
 
 	// parse key
-	key, err := ssh.ParseRawPrivateKey(b)
+	key, err := ssh.ParsePrivateKey(b)
 	if err != nil {
 		return nil, err
 	}
@@ -98,8 +101,9 @@ func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...Ho
 	}
 
 	// set defaults
-	lh := &HostLoginHandler{
+	lh := &LoginHandler{
 		key:      key,
+		keypath:  keypath,
 		config:   config,
 		lifetime: DefaultLifetime,
 		store:    sessions.NewCookieStore(securecookie.GenerateRandomKey(32)),
@@ -136,7 +140,7 @@ func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...Ho
 }
 
 // RedirectPath returns the redirect path for the configured OIDC IdP
-func (lh *HostLoginHandler) RedirectPath() string {
+func (lh *LoginHandler) RedirectPath() string {
 	return lh.redirectURL.Path
 }
 
@@ -146,7 +150,7 @@ func (lh *HostLoginHandler) RedirectPath() string {
 //
 // This will start the OIDC auth flow process and redirect the user to
 // the configured OIDC IdP.
-func (lh *HostLoginHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (lh *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// store codeVerifier in session
 	codeVerifier, codeChallenge := generatePKCE()
 	session, _ := lh.store.Get(r, "auth-session")
@@ -183,7 +187,7 @@ func (lh *HostLoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 // The Callback method is intended for use as the handler function for
 // the callback URL of the OIDC auth flow process as part of the Serverless
 // SSH CA
-func (lh *HostLoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
+func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		// Put this in a go func so that it will not block process
 		go func() {
@@ -266,18 +270,53 @@ func (lh *HostLoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func (lh *HostLoginHandler) doLogin(token *oauth2.Token) error {
-	cert, err := lh.doSigningRequest(token.AccessToken)
+func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
+	csr, err := lh.doSigningRequest(token.AccessToken)
 	if err != nil {
 		return err
 	}
 
-	// add and save the config
-	if err := lh.config.SetCertificateBytes(cert.Certificate); err != nil {
+	temp, err := func() (string, error) {
+		// save to a temp file first
+		t, err := os.CreateTemp(filepath.Dir(lh.keypath), "cert*")
+		if err != nil {
+			// creation failed
+			return "", err
+		}
+		defer func() {
+			_ = t.Close()
+		}()
+
+		// write config
+		if _, err := t.Write(csr.Certificate); err != nil {
+			return t.Name(), err
+		}
+
+		// return name and no error
+		return t.Name(), nil
+	}()
+
+	// ensure temp file is removed it it was created
+	if temp != "" {
+		defer func() {
+			_ = os.Remove(temp)
+		}()
+	}
+
+	// check save to temp was ok
+	if err != nil {
 		return err
 	}
 
-	return nil
+	// move into place
+	return os.Rename(temp, certPath(lh.keypath))
+}
+
+func certPath(keypath string) string {
+	dir := filepath.Dir(keypath)
+	name := strings.TrimSuffix(filepath.Base(keypath), filepath.Ext(keypath))
+
+	return filepath.Join(dir, fmt.Sprintf("%s-cert.pub", name))
 }
 
 type customTransport struct {
@@ -306,8 +345,8 @@ func (t *customTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func (lh *HostLoginHandler) doSigningRequest(access string) (*CertificateSignerResponse, error) {
-	client := &http.Client{
+func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerResponse, error) {
+	httpclient := &http.Client{
 		Timeout: time.Second * 3,
 		Transport: &customTransport{
 			Headers: map[string]string{
@@ -318,13 +357,13 @@ func (lh *HostLoginHandler) doSigningRequest(access string) (*CertificateSignerR
 	}
 
 	// get public key
-	publicKey, err := lh.config.GetPublicKeyBytes()
+	publicKey, err := lh.getPublicKeyBytes()
 	if err != nil {
 		return nil, err
 	}
 
 	// generate nonce
-	nonce, err := lh.generateNonce()
+	nonce, err := client.GenerateNonce(lh.key)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +381,7 @@ func (lh *HostLoginHandler) doSigningRequest(access string) (*CertificateSignerR
 	}
 
 	// build url
-	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL(), "/api/v2/certificate")
+	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL, "/api/v2/host/request")
 	if err != nil {
 		return nil, err
 	}
@@ -352,10 +391,9 @@ func (lh *HostLoginHandler) doSigningRequest(access string) (*CertificateSignerR
 	lh.logger.Debug("certificate request",
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
-		"identity", payload.Identity,
 		"nonce", payload.Nonce,
 	)
-	res, err := client.Post(caCertUrl, "application/json", buf)
+	res, err := httpclient.Post(caCertUrl, "application/json", buf)
 	if err != nil {
 		return nil, err
 	}
@@ -378,6 +416,10 @@ func (lh *HostLoginHandler) doSigningRequest(access string) (*CertificateSignerR
 	return &csr, nil
 }
 
+func (lh *LoginHandler) getPublicKeyBytes() ([]byte, error) {
+	return lh.key.PublicKey().Marshal(), nil
+}
+
 func generatePKCE() (string, string) {
 	b := make([]byte, 90)
 	if _, err := rand.Read(b); err != nil {
@@ -389,16 +431,109 @@ func generatePKCE() (string, string) {
 	return codeVerifier, codeChallenge
 }
 
-func hasKeys() bool {
-	keyTypes := []string{"ecdsa", "ed25518", "rsa"}
+// ExecuteLogin performs [*LoginHandler.Start()], attempts to open the users
+// browser to start the OIDC auth flow, followed by [*LoginHandler.Wait()]
+func (lh *LoginHandler) ExecuteLogin(addr string) error {
+	return lh.executeLogin(context.Background(), addr)
+}
 
-	for _, t := range keyTypes {
-		// if stat gives no error then we found one
-		_, err := os.Stat(filepath.Join("/etc/ssh", fmt.Sprintf("ssh_host_%s_key", t)))
-		if err == nil {
-			return true
-		}
+// ExecuteLoginWithContext is identitical to [*LoginHandler.ExecuteLogin()]
+// however the provided context is used rather than the default of
+// [context.Background()]
+func (lh *LoginHandler) ExecuteLoginWithContext(ctx context.Context, addr string) error {
+	return lh.executeLogin(ctx, addr)
+}
+
+func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
+	// start web server now
+	lh.logger.Info("starting web server", "address", addr)
+	if err := lh.Start(addr); err != nil {
+		return err
 	}
 
-	return false
+	// at this point do interactive login flow
+	loginUrl := fmt.Sprintf("http://%s/auth/login", addr)
+	if err := util.OpenUrl(loginUrl); err != nil {
+		lh.logger.Error("could not open browser, please visit URL manually", "url", loginUrl)
+	}
+
+	lh.logger.Info("starting interactive login flow", "url", loginUrl)
+
+	// wait here until done
+	if err := lh.Wait(ctx); err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+// Start performs ListenAndServe() for the login handler HTTP service
+// however unlike [*http.Server.ListenAndServe()] this will return
+// immediately so you should run [*LoginHandler.Wait()] after.
+//
+// If the server has already started this will return [ErrAlreadyStarted]
+func (lh *LoginHandler) Start(address string) error {
+	lh.mu.Lock()
+	defer lh.mu.Unlock()
+
+	if lh.started {
+		return ErrAlreadyStarted
+	}
+
+	lh.srv.Addr = address
+	lh.started = true
+	lh.done = make(chan error)
+	go func() {
+		// make sure to set we are no longer running when this completes
+		defer func() {
+			lh.started = false
+		}()
+
+		// run in a goroutine so this returns immediately
+		lh.done <- lh.srv.ListenAndServe()
+	}()
+
+	return nil
+}
+
+// Wait will block until the provided context completes or the login handler
+// HTTP service is stopped via [*LoginHandler.Shutdown()].
+//
+// If the service has not been started this will return [ErrNotStarted]
+func (lh *LoginHandler) Wait(ctx context.Context) error {
+	if !lh.mu.TryRLock() {
+		return ErrAlreadyStarted
+	}
+	defer lh.mu.RUnlock()
+
+	if !lh.started {
+		return ErrNotStarted
+	}
+
+	select {
+	case err := <-lh.done:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Shutdown gracefully shuts down the HTTP service
+func (lh *LoginHandler) Shutdown() error {
+	// shut down the service
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	// shutdown and send result to channel
+	lh.logger.Info("shutting down web server")
+	err := lh.srv.Shutdown(ctx)
+	lh.done <- err
+	close(lh.done)
+
+	// also return result
+	return err
 }

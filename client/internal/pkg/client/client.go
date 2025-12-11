@@ -590,12 +590,15 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 }
 
 func (lh *LoginHandler) generateNonce() (string, error) {
-	// get signer
 	signer, err := lh.config.Signer()
 	if err != nil {
 		return "", err
 	}
 
+	return GenerateNonce(signer)
+}
+
+func GenerateNonce(signer ssh.Signer) (string, error) {
 	// generate data to sign
 	timestamp := time.Now().UnixMilli()
 	fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
