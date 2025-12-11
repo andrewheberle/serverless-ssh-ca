@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -58,7 +59,7 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		c.logger.Warn("this command should be run as root", "uid", os.Geteuid())
 	}
 
-	sys, err := loadsystemconfig(this)
+	config, err := loadsystemconfig(this)
 	if err != nil {
 		return err
 	}
@@ -74,13 +75,7 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		logLevel.Set(slog.LevelDebug)
 	}
 
-	lh, err := host.NewHostLoginHandler(c.keypath, &config.SystemConfig{
-		Issuer:                  sys.Oidc().Issuer,
-		ClientID:                sys.Oidc().ClientID,
-		Scopes:                  sys.Oidc().Scopes,
-		RedirectURL:             sys.Oidc().RedirectURL,
-		CertificateAuthorityURL: sys.CertificateAuthorityURL(),
-	}, opts...)
+	lh, err := host.NewHostLoginHandler(c.keypath, config, opts...)
 	if err != nil {
 		return err
 	}
@@ -96,4 +91,26 @@ func (c *hostCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args 
 	defer cancel()
 
 	return c.client.ExecuteLoginWithContext(ctx, c.listenAddr)
+}
+
+// loadsystemconfig will only attempt to load the system config file
+func loadsystemconfig(this *simplecobra.Commandeer) (*config.SystemConfig, error) {
+	// get root command for config locations
+	root, ok := this.Root.Command.(*rootCommand)
+	if !ok {
+		return nil, fmt.Errorf("problem accessing root command")
+	}
+
+	c, err := config.LoadConfig(root.systemConfigFile, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return &config.SystemConfig{
+		Issuer:                  c.Oidc().Issuer,
+		ClientID:                c.Oidc().ClientID,
+		Scopes:                  c.Oidc().Scopes,
+		RedirectURL:             c.Oidc().RedirectURL,
+		CertificateAuthorityURL: c.CertificateAuthorityURL(),
+	}, nil
 }
