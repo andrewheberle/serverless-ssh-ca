@@ -7,9 +7,9 @@ import { AppContext } from "../router"
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 import { CertificateSignerResponse } from "../types"
-import { CreateCertificateOptions, createSignedCertificate, createSignedHostCertificate } from "../certificate"
-import { parseIdentity, refineCertificateRequest, refineHostCertificateRequest, split, transformAuthorizationHeader, transformNonce, transformPublicKey } from "../utils"
-import { CaPublicKeyEndpoint } from "./v1"
+import { BadIssuerError, CreateCertificateOptions, CreateHostCertificateOptions, createSignedCertificate, createSignedHostCertificate } from "../certificate"
+import { parseIdentity, refineCertificateRequest, refineHostCertificateRenewal, refineHostCertificateRequest, split, transformAuthorizationHeader, transformCertificate, transformHostNonce, transformNonce, transformPublicKey } from "../utils"
+import { KeyParseError, parsePrivateKey } from "sshpk"
 
 const logger = new Logger()
 
@@ -22,7 +22,43 @@ const HeaderSchema = z.object({
         .describe("Access Token JWT from OIDC IdP")
 })
 
-// use /ca endpoint as-is from v1
+class CaPublicKeyEndpoint extends OpenAPIRoute {
+    schema = {
+        responses: {
+            "200": {
+                content: {
+                    "text/plain": {
+                        schema: z.string()
+                    }
+                },
+                description: "Returns SSH Certificate Authority Public Key",
+            },
+            "500": {
+                description: "There was an internal error",
+                ...contentJson(z.object({
+                    status: z.literal(500),
+                    error: z.literal("Internal Server Error")
+                }))
+            }
+        }
+    }
+
+    async handle(c: AppContext) {
+        try {
+            const key = parsePrivateKey(await c.env.PRIVATE_KEY.get())
+            const pub = key.toPublic()
+            pub.comment = c.env.ISSUER_DN
+
+            return c.text(`${pub.toString("ssh")}\n`)
+        } catch (err) {
+            if (err instanceof KeyParseError) {
+                throw new HTTPException(500, { message: "error parsing private key", cause: err})
+            }
+
+            throw err
+        }
+    }
+}
 api.get("/ca", CaPublicKeyEndpoint)
 
 class CertificateRequestEndpoint extends OpenAPIRoute {
@@ -212,7 +248,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                 throw new HTTPException(403, { message: "user not allowed to issue host certificates" })
             }
 
-            const opts: CreateCertificateOptions = {
+            const opts: CreateHostCertificateOptions = {
                 lifetime: data.body.lifetime,
                 principals: data.body.principals,
             }
@@ -237,7 +273,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
         }
     }
 }
-// api.post("/host/request", HostCertificateRequestEndpoint)
+api.post("/host/request", HostCertificateRequestEndpoint)
 
 class HostCertificateRenewEndpoint extends OpenAPIRoute {
     schema = {
@@ -249,26 +285,27 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
         request: {
             body: contentJson(
                 z.object({
+                    certificate: z.string()
+                        .transform(transformCertificate)
+                        .describe("SSH certificate to renew"),
                     public_key: z.string()
                         .transform(transformPublicKey)
-                        .describe("SSH public key to sign"),
+                        .describe("SSH public key of certificate to be renewed"),
                     nonce: z.string()
-                        .transform(transformNonce)
-                        .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}"),
-                    principals: z.array(z.string())
-                        .describe("List of principals to include on the issued certificate"),
+                        .transform(transformHostNonce)
+                        .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${certfingerprint}.${signature}"),
                     lifetime: z.number()
                         .min(seconds("24 hours"))
                         .max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
                         .default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-                        .describe("Lifetime of issued Host SSH certificate"),
+                        .describe("Lifetime of renewed Host SSH certificate"),
                 })
-                    .superRefine(refineHostCertificateRequest)
+                    .superRefine(refineHostCertificateRenewal)
             )
         },
         responses: {
             "200": {
-                description: "SSH Host Certificate issued successfully",
+                description: "SSH Host Certificate renewed successfully",
                 ...contentJson(z.object({
                     certificate: z.string(),
                 }))
@@ -311,9 +348,15 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 
             logger.info("handling host certificate renewal")
 
-            const opts: CreateCertificateOptions = {
-                lifetime: data.body.lifetime,
-                principals: data.body.principals,
+            // use smaller of the current certificate lifetime and the requested lifetime 
+            const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
+            const lifetime = originalLifetime > data.body.lifetime
+                ? data.body.lifetime
+                : originalLifetime
+
+            const opts: CreateHostCertificateOptions = {
+                lifetime: lifetime,
+                subjects: data.body.certificate.subjects
             }
 
             const certificate = await createSignedHostCertificate(data.body.public_key, opts)
@@ -328,6 +371,8 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
                     if (err.name === "InvalidCharacterError") {
                         throw new HTTPException(422, { message: "the content was not valid base64 encoded data", cause: err })
                     }
+                case (err instanceof BadIssuerError):
+                    throw new HTTPException(422, { message: err.message })
             }
 
             // otherwise just re-throw error
@@ -336,4 +381,4 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
         }
     }
 }
-// api.post("/host/renew", HostCertificateRenewEndpoint)
+api.post("/host/renew", HostCertificateRenewEndpoint)

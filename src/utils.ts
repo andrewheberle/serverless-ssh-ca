@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers"
 import { JWKInvalid, JWKSInvalid, JWSInvalid, JWTInvalid } from "jose/errors"
-import { Key, KeyParseError, parseKey } from "sshpk"
+import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificate, parseKey } from "sshpk"
 import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
 import { Logger } from "@andrewheberle/ts-slog"
-import { Nonce, NonceParseError } from "./nonce"
+import { HostNonce, Nonce, NonceParseError } from "./nonce"
 
 const logger = new Logger()
 
@@ -162,6 +162,42 @@ export const parseIdentity = async (jwt: string | undefined): Promise<ParsedIden
     }
 }
 
+export const transformCertificate = (val: string, ctx: z.RefinementCtx): Certificate | never => {
+    try {
+        const decoded = atob(val)
+        const cert = parseCertificate(decoded, "openssh")
+
+        return cert
+    } catch (err) {
+        switch (true) {
+            case (err instanceof DOMException):
+                if (err.name === "InvalidCharacterError") {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: "the content was not valid base64 encoded data"
+                    })
+                } else {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: "unhandled error parsing base64 certificate"
+                    })
+                }
+            case (err instanceof CertificateParseError):
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: err.message
+                })
+            default:
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "unhandled error parsing certificate"
+                })
+        }
+
+        return z.NEVER
+    }
+}
+
 type ParsedCertificateRequest = {
     nonce: Nonce
     public_key: Key
@@ -188,12 +224,27 @@ export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.R
     }
 }
 
-type ParsedHostCertificateRequest = {
-    nonce: Nonce
+export const transformHostNonce = (val: string, ctx: z.RefinementCtx): HostNonce | never => {
+    try {
+        return new HostNonce(val)
+    } catch (err) {
+        if (err instanceof NonceParseError) {
+            return fatalIssue(ctx, err.message)
+        }
+
+        return fatalIssue(ctx, "nonce transform unhandled error")
+    }
+}
+
+type ParsedHostRequest = {
     public_key: Key
     lifetime: number
     principals: string[]
 }
+
+type ParsedHostCertificateRequest = {
+    nonce: Nonce
+} & ParsedHostRequest
 
 export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): never => {
     try {
@@ -213,7 +264,34 @@ export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, 
     }
 }
 
+type ParsedHostCertificateRenewal = {
+    certificate: Certificate
+    nonce: HostNonce
+} & Omit<ParsedHostRequest, "principals">
+
+export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): never => {
+    try {
+        // check certificate is not expired
+        if (val.certificate.isExpired()) {
+            return fatalIssue(ctx, "certificate is expired")
+        }
+
+        // check nonce fingerprint matches public key
+        if (!val.nonce.certificatematches(val.public_key, val.certificate)) {
+            return fatalIssue(ctx, "nonce fingerprints did not match public_key and/or certificate")
+        }
+
+        // verify nonce signature
+        if (!val.nonce.verify(val.public_key)) {
+            return fatalIssue(ctx, "nonce signature validation failed")
+        }
+
+        return z.NEVER
+    } catch (err) {
+        return fatalIssue(ctx, "nonce verification unhandled error")
+    }
+}
+
 export const split = (v: string): string[] => {
     return v.split(",")
 }
-

@@ -21,11 +21,11 @@ export class Nonce {
 
     constructor(nonce: string) {
         const parts = nonce.split(".")
-        if (parts.length !== 3) {
+        if (parts.length !== 3 && parts.length !== 4) {
             throw new NonceParseError("invalid nonce format")
         }
 
-        const [timestampStr, fingerprintHex, signatureBase64] = parts
+        const [timestampStr, fingerprintHex, signatureBase64] = parts.length === 4 ? [parts[0], parts[1], parts[3]] : parts
 
         // verify timestamp
         const timestamp: number = parseInt(timestampStr, 10)
@@ -68,7 +68,7 @@ export class Nonce {
 
     /**
      * 
-     * @param key public key to use to verify fingerprint and signature against
+     * @param key public key to use to verify signature against
      * @returns true or false if verification succeeds
      */
     verify(key: Key) {
@@ -85,20 +85,19 @@ export class Nonce {
 }
 
 
-export class HostNonce {
-    readonly timestamp: number
-    readonly fingerprint: Fingerprint
+export class HostNonce extends Nonce {
     readonly certificateFingerprint: Fingerprint
-    readonly signature: Signature
-    private readonly dataToVerify: string
+    private readonly hostDataToVerify: string
 
     constructor(nonce: string) {
+        super(nonce)
+        
         const parts = nonce.split(".")
         if (parts.length !== 4) {
             throw new NonceParseError("invalid nonce format")
         }
 
-        const [timestampStr, fingerprintHex, certificateFingerprintHex, signatureBase64] = parts
+        const [timestampStr, fingerprintHex, certificateFingerprintHex] = parts
 
         // verify timestamp
         const timestamp: number = parseInt(timestampStr, 10)
@@ -106,33 +105,15 @@ export class HostNonce {
             throw new NonceParseError("timestamp was not a number")
         }
 
-        const now = Date.now()
-        const age = now - timestamp
-        if (age > ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
-            throw new NonceParseError("nonce timestamp too old")
-        }
-
         // verify fingerprint matches public key
         try {
-            const fingerprint = parseFingerprint(fingerprintHex)
-            if (fingerprint === undefined) {
-                throw new NonceParseError("nonce fingerprint did not parse")
-            }
-
-            const certificateFingerprint = parseFingerprint(certificateFingerprintHex)
+            const fingerprint = parseFingerprint(certificateFingerprintHex, { type: "certificate" })
             if (fingerprint === undefined) {
                 throw new NonceParseError("nonce certificate fingerprint did not parse")
             }
 
-            // parse signature
-            const signature = parseSignature(signatureBase64, "ecdsa", "ssh")
-
-            // set our values
-            this.timestamp = timestamp
-            this.fingerprint = fingerprint
-            this.certificateFingerprint = certificateFingerprint
-            this.signature = signature
-            this.dataToVerify = `${timestamp}.${fingerprintHex}.${certificateFingerprintHex}`
+            this.certificateFingerprint = fingerprint
+            this.hostDataToVerify = `${timestamp}.${fingerprintHex}.${certificateFingerprintHex}`
         } catch (err) {
             switch (true) {
                 case (err instanceof FingerprintFormatError):
@@ -147,29 +128,30 @@ export class HostNonce {
 
     /**
      * 
-     * @param key public key to use to verify fingerprint and signature against
+     * @param key public key to use to verify signature against
      * @returns true or false if verification succeeds
      */
     verify(key: Key): boolean {
         // create verifier from public key
         const verifier = key.createVerify("sha256")
-        verifier.update(this.dataToVerify)
+        verifier.update(this.hostDataToVerify)
+
+        console.log(this.hostDataToVerify)
 
         return verifier.verify(this.signature)
     }
 
-    matches(key: Key): boolean
-    matches(certificate: Certificate): boolean
-    matches(v: Key | Certificate): boolean {
-        if (Key.isKey(v, [1, 7])) {
-            return this.fingerprint.matches(v)
+    certificatematches(key: Key, cert: Certificate): boolean {
+        // check provided public key matches fingerprint of public key
+        if (!this.matches(key)) {
+            return false
         }
 
-        if (Certificate.isCertificate(v, [1, 1])) {
-            return this.certificateFingerprint.matches(v)
+        // check that certificate public key matches fingerprint too
+        if (!this.matches(cert.subjectKey)) {
+            return false
         }
 
-        return false
+        return this.certificateFingerprint.matches(cert)
     }
-
 }

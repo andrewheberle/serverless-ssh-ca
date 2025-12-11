@@ -15,43 +15,26 @@ const logger = new Logger()
 
 export const api = fromHono(new Hono())
 
-export class CaPublicKeyEndpoint extends OpenAPIRoute {
+class CaPublicKeyRedirectEndpoint extends OpenAPIRoute {
     schema = {
         responses: {
-            "200": {
-                content: {
-                    "text/plain": {
-                        schema: z.string()
-                    }
-                },
-                description: "Returns SSH Certificate Authority Public Key",
+            "301": {
+                headers: z.object({
+                    "Location": z.string()
+                }),
+                description: "Redirect to v2 API endpoint",
             },
-            "500": {
-                description: "There was an internal error",
-                ...contentJson(z.object({
-                    status: z.literal(500),
-                    error: z.literal("Internal Server Error")
-                }))
-            }
         }
     }
 
     async handle(c: AppContext) {
-        try {
-            const key = parsePrivateKey(await c.env.PRIVATE_KEY.get())
-            const pub = key.toPublic()
-            pub.comment = c.env.ISSUER_DN
-
-            return c.text(`${pub.toString("ssh")}\n`)
-        } catch (err) {
-            if (err instanceof KeyParseError) {
-                throw new HTTPException(500, { message: "error parsing private key", cause: err})
-            }
-
-            throw err
-        }
+        const headers = new Headers
+        headers.set("Location", "/api/v2/ca")
+        
+        return new Response(null, { status: 301, headers: headers })
     }
 }
+api.get("/ca", CaPublicKeyRedirectEndpoint)
 
 const HeaderSchema = z.object({
     "Authorization": z.string()
@@ -167,6 +150,4 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
         }
     }
 }
-
-api.get("/ca", CaPublicKeyEndpoint)
 api.post("/certificate", CertificateRequestEndpoint)
