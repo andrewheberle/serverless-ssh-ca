@@ -77,7 +77,7 @@ var (
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
 
-	userAgentFull = getUserAgent(UserAgent)
+	userAgentFull = GenerateUserAgent(UserAgent)
 )
 
 // NewLoginHandler creates a new handler
@@ -590,12 +590,15 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 }
 
 func (lh *LoginHandler) generateNonce() (string, error) {
-	// get signer
 	signer, err := lh.config.Signer()
 	if err != nil {
 		return "", err
 	}
 
+	return GenerateNonce(signer)
+}
+
+func GenerateNonce(signer ssh.Signer) (string, error) {
 	// generate data to sign
 	timestamp := time.Now().UnixMilli()
 	fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
@@ -679,7 +682,7 @@ func (lh *LoginHandler) CertificateAuthorityURL() string {
 	return lh.config.CertificateAuthorityURL()
 }
 
-func getUserAgent(name string) string {
+func GenerateUserAgent(name string) string {
 	version := "Unknown"
 
 	// get version if available

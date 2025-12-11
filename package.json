@@ -30,6 +30,9 @@
 			"SSH_CERTIFICATE_EXTENSIONS": {
 				"description": "A comma serverless list of SSH extensions to add to the certificate, although the client may request a smaller list"
 			},
+			"SSH_HOST_CERTIFICATE_LIFETIME": {
+				"description": "The lifetime of issued Host SSH certificates in human readable form (ie \"45 days\"), although the client may request a shorter duration"
+			},
 			"PRIVATE_KEY": {
 				"description": "The ECDSA private key to use in OpenSSH format"
 			},

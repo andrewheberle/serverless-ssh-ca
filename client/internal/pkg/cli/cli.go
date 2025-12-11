@@ -56,6 +56,9 @@ func Execute(ctx context.Context, args []string) error {
 		&generateCommand{
 			Command: simplecommand.New("generate", "Generate a SSH private key"),
 		},
+		&hostCommand{
+			Command: simplecommand.New("host", "Request or renew host certificates"),
+		},
 		&loginCommand{
 			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
 		},

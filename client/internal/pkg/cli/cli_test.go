@@ -16,6 +16,7 @@ func TestExecute(t *testing.T) {
 		{"no args", []string{}, false},
 		{"generate sub-command", []string{"--config", "testdata/system.yml", "generate", "--dryrun"}, false},
 		{"generate sub-command should ignore system config", []string{"--config", "testdata/missing.yml", "generate", "--dryrun"}, false},
+		{"host sub-command with non-existent key", []string{"--config", "testdata/system.yml", "host", "--key", "missing_key"}, true},
 		{"show sub-command", []string{"--config", "testdata/system.yml", "show", "--status"}, false},
 		{"show sub-command should ignore missing system config", []string{"--config", "testdata/missing.yml", "show", "--status"}, false},
 		{"show --private sub-command should error with missing user config", []string{"--user", "missing.yml", "show", "--private"}, true},

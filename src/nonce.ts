@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers"
 import { ms } from "itty-time"
-import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseSignature, Signature, SignatureParseError } from "sshpk"
+import { Certificate, Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseSignature, Signature, SignatureParseError } from "sshpk"
 
 export class NonceParseError extends Error {
     constructor(message: string, cause?: unknown) {
@@ -21,11 +21,11 @@ export class Nonce {
 
     constructor(nonce: string) {
         const parts = nonce.split(".")
-        if (parts.length !== 3) {
+        if (parts.length !== 3 && parts.length !== 4) {
             throw new NonceParseError("invalid nonce format")
         }
 
-        const [timestampStr, fingerprintHex, signatureBase64] = parts
+        const [timestampStr, fingerprintHex, signatureBase64] = parts.length === 4 ? [parts[0], parts[1], parts[3]] : parts
 
         // verify timestamp
         const timestamp: number = parseInt(timestampStr, 10)
@@ -68,7 +68,7 @@ export class Nonce {
 
     /**
      * 
-     * @param key public key to use to verify fingerprint and signature against
+     * @param key public key to use to verify signature against
      * @returns true or false if verification succeeds
      */
     verify(key: Key) {
@@ -77,5 +77,81 @@ export class Nonce {
         verifier.update(this.dataToVerify)
 
         return verifier.verify(this.signature)
+    }
+
+    matches(key: Key): boolean {
+        return this.fingerprint.matches(key)
+    }
+}
+
+
+export class HostNonce extends Nonce {
+    readonly certificateFingerprint: Fingerprint
+    private readonly hostDataToVerify: string
+
+    constructor(nonce: string) {
+        super(nonce)
+        
+        const parts = nonce.split(".")
+        if (parts.length !== 4) {
+            throw new NonceParseError("invalid nonce format")
+        }
+
+        const [timestampStr, fingerprintHex, certificateFingerprintHex] = parts
+
+        // verify timestamp
+        const timestamp: number = parseInt(timestampStr, 10)
+        if (isNaN(timestamp)) {
+            throw new NonceParseError("timestamp was not a number")
+        }
+
+        // verify fingerprint matches public key
+        try {
+            const fingerprint = parseFingerprint(certificateFingerprintHex, { type: "certificate" })
+            if (fingerprint === undefined) {
+                throw new NonceParseError("nonce certificate fingerprint did not parse")
+            }
+
+            this.certificateFingerprint = fingerprint
+            this.hostDataToVerify = `${timestamp}.${fingerprintHex}.${certificateFingerprintHex}`
+        } catch (err) {
+            switch (true) {
+                case (err instanceof FingerprintFormatError):
+                    throw new NonceParseError("nonce fingerprint was an invalid format", err)
+                case (err instanceof SignatureParseError):
+                    throw new NonceParseError("nonce signature could not be parsed", err)
+                default:
+                    throw err
+            }
+        }
+    }
+
+    /**
+     * 
+     * @param key public key to use to verify signature against
+     * @returns true or false if verification succeeds
+     */
+    verify(key: Key): boolean {
+        // create verifier from public key
+        const verifier = key.createVerify("sha256")
+        verifier.update(this.hostDataToVerify)
+
+        console.log(this.hostDataToVerify)
+
+        return verifier.verify(this.signature)
+    }
+
+    certificatematches(key: Key, cert: Certificate): boolean {
+        // check provided public key matches fingerprint of public key
+        if (!this.matches(key)) {
+            return false
+        }
+
+        // check that certificate public key matches fingerprint too
+        if (!this.matches(cert.subjectKey)) {
+            return false
+        }
+
+        return this.certificateFingerprint.matches(cert)
     }
 }

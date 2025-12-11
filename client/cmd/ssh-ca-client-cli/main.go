@@ -9,8 +9,11 @@ import (
 )
 
 func main() {
+	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})
+	logger := slog.New(h)
+
 	if err := cli.Execute(context.Background(), os.Args[1:]); err != nil {
-		slog.Error("error during execution", "error", err)
+		logger.Error("error during execution", "error", err)
 		os.Exit(1)
 	}
 }
