@@ -374,9 +374,10 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	payload := CertificateSignerPayload{
-		PublicKey: publicKey,
-		Lifetime:  int(lh.lifetime.Seconds()),
-		Nonce:     nonce,
+		Principals: lh.principals,
+		PublicKey:  publicKey,
+		Lifetime:   int(lh.lifetime.Seconds()),
+		Nonce:      nonce,
 	}
 	if err := enc.Encode(payload); err != nil {
 		return nil, err
@@ -394,6 +395,7 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
 		"nonce", payload.Nonce,
+		"principals", payload.Principals,
 	)
 	res, err := httpclient.Post(caCertUrl, "application/json", buf)
 	if err != nil {

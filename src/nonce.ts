@@ -2,6 +2,36 @@ import { env } from "cloudflare:workers"
 import { ms } from "itty-time"
 import { Certificate, Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseSignature, Signature, SignatureParseError } from "sshpk"
 
+// try to parse as ecdsa, ed25519 then rsa
+const parsesignature = (s: string): Signature => {
+    try {
+        // try ecdsa
+        return parseSignature(s, "ecdsa", "ssh")
+    } catch (err) {
+        if (err instanceof SignatureParseError) {
+            try {
+                // try ed25519
+                return parseSignature(s, "ed25519", "ssh")
+            } catch (err) {
+                if (err instanceof SignatureParseError) {
+                    try {
+                        // try rsa
+                        return parseSignature(s, "rsa", "ssh")
+                    } catch (err) {
+                        // just throw here as we are out of options
+                        throw err
+                    }
+                } else {
+                    throw err
+                }
+            }
+        } else {
+            throw err
+        }
+    }
+}
+
+
 export class NonceParseError extends Error {
     constructor(message: string, cause?: unknown) {
         super(message)
@@ -47,7 +77,7 @@ export class Nonce {
             }
 
             // parse signature
-            const signature = parseSignature(signatureBase64, "ecdsa", "ssh")
+            const signature = parsesignature(signatureBase64)
 
             // set our values
             this.timestamp = timestamp
@@ -84,14 +114,13 @@ export class Nonce {
     }
 }
 
-
 export class HostNonce extends Nonce {
     readonly certificateFingerprint: Fingerprint
     private readonly hostDataToVerify: string
 
     constructor(nonce: string) {
         super(nonce)
-        
+
         const parts = nonce.split(".")
         if (parts.length !== 4) {
             throw new NonceParseError("invalid nonce format")
