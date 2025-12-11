@@ -10,7 +10,7 @@ require (
 	github.com/bep/simplecobra v0.6.1
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/esiqveland/notify v0.13.3
-	github.com/gen2brain/beeep v0.11.1
+	github.com/gen2brain/beeep v0.11.2
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
