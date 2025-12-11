@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func Test_getUserAgent(t *testing.T) {
+func Test_GenerateUserAgent(t *testing.T) {
 	tests := []struct {
 		name    string
 		appName string
@@ -16,10 +16,9 @@ func Test_getUserAgent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getUserAgent(tt.appName)
-			// TODO: update the condition below to compare got with tt.want.
+			got := GenerateUserAgent(tt.appName)
 			if tt.want != got {
-				t.Errorf("getUserAgent() = %v, want %v", got, tt.want)
+				t.Errorf("GenerateUserAgent() = %v, want %v", got, tt.want)
 			}
 		})
 	}

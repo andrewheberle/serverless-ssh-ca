@@ -277,11 +277,6 @@ api.post("/host/request", HostCertificateRequestEndpoint)
 
 class HostCertificateRenewEndpoint extends OpenAPIRoute {
     schema = {
-        security: [
-            {
-                oidcAuth: []
-            }
-        ],
         request: {
             body: contentJson(
                 z.object({
