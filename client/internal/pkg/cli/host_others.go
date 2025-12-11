@@ -22,6 +22,7 @@ type hostCommand struct {
 	listenAddr string
 	debug      bool
 	force      bool
+	principals []string
 
 	client *host.LoginHandler
 
@@ -35,10 +36,18 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 		return err
 	}
 
+	// add hostname to list by default
+	principals := make([]string, 0)
+	hostname, err := os.Hostname()
+	if err == nil {
+		principals = append(principals, hostname)
+	}
+
 	cmd := cd.CobraCommand
 	cmd.Flags().DurationVar(&c.lifetime, "life", host.DefaultLifetime, "Lifetime of SSH certificate")
 	cmd.Flags().StringVar(&c.keypath, "key", "", "Path to private key")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
+	cmd.Flags().StringSliceVar(&c.principals, "principals", principals, "Principals to add to the host certificate request")
 	cmd.Flags().BoolVar(&c.renew, "renew", false, "Renew existing certificate")
 	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 	cmd.Flags().BoolVar(&c.force, "force", false, "Force renewal even if current certificate has more than 50% validity left")
@@ -67,6 +76,7 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	// set options
 	opts := []host.LoginHandlerOption{
 		host.WithLifetime(c.lifetime),
+		host.WithPrincipals(c.principals),
 	}
 
 	opts = append(opts, host.WithLogger(c.logger))
