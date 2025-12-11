@@ -25,7 +25,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/ndbeals/winssh-pageant/pageant"
 	"github.com/openpubkey/openpubkey/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
@@ -68,7 +67,6 @@ const (
 
 var (
 	ErrNoPrivateKey           = config.ErrNoPrivateKey
-	ErrNoRefreshToken         = errors.New("no refresh token found")
 	ErrAlreadyStarted         = errors.New("server has already started")
 	ErrNotStarted             = errors.New("server has not been started")
 	ErrPageantProxyNotEnabled = errors.New("pageant proxy not enabled")
@@ -83,13 +81,7 @@ var (
 )
 
 // NewLoginHandler creates a new handler
-func NewLoginHandler(system, user string, opts ...LoginHandlerOption) (*LoginHandler, error) {
-	// load config
-	config, err := config.LoadConfig(system, user)
-	if err != nil {
-		return nil, err
-	}
-
+func NewLoginHandler(config *config.Config, opts ...LoginHandlerOption) (*LoginHandler, error) {
 	// set up oidc provider
 	provider, err := oidc.NewProvider(context.Background(), config.Oidc().Issuer)
 	if err != nil {
@@ -239,31 +231,6 @@ func (lh *LoginHandler) Shutdown() error {
 
 	// also return result
 	return err
-}
-
-// RunPageantProxy will proxy PuTTY Agent connections to the native OpenSSH
-// SSH Agent.
-//
-// This will block until the provided context is complete or
-// [*LoginHandler.ShutdownPageantProxy()] is run.
-func (lh *LoginHandler) RunPageantProxy(ctx context.Context) error {
-	if !lh.pageantProxy {
-		return ErrPageantProxyNotEnabled
-	}
-
-	// start as a goroutine
-	go func() {
-		p := pageant.NewDefaultHandler(`\\.\pipe\openssh-ssh-agent`, true)
-		p.Run()
-	}()
-
-	// block here until context is finished or ShutdownPageantProxy is run
-	select {
-	case <-lh.pageantProxyDone:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // ShutdownPageantProxy will shutdown a running PuTTY Agent proxy.
@@ -452,6 +419,7 @@ func (lh *LoginHandler) AddToAgent() error {
 	if err != nil {
 		return err
 	}
+	defer clearBytes(keyBytes)
 
 	key, err := sshkey.ParseKey(keyBytes)
 	if err != nil {
@@ -493,10 +461,6 @@ func (lh *LoginHandler) Refresh() error {
 	refresh, err := lh.config.GetRefreshToken()
 	if err != nil {
 		return err
-	}
-
-	if refresh == "" {
-		return ErrNoRefreshToken
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -725,4 +689,10 @@ func getUserAgent(name string) string {
 	}
 
 	return fmt.Sprintf("%s/%s (%s-%s)", name, version, runtime.GOOS, runtime.GOARCH)
+}
+
+func clearBytes(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
 }

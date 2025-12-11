@@ -1,0 +1,48 @@
+name: Run tests and upload coverage
+
+permissions:
+  contents: read
+
+on: [push]
+
+jobs:
+  test:
+    name: Run tests and collect coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: client/go.mod
+          cache: false
+
+      - name: Install Go dependencies
+        run: |
+          cd client
+          go mod download
+
+      - name: Run Go tests with coverage
+        run: |
+          cd client
+          go test -coverprofile=../coverage.txt ./...
+      
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        
+      - name: Install NPM dependencies
+        run: npm install
+
+      - name: Run Typescript tests with coverage
+        run: npm run coverage
+
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: andrewheberle/serverless-ssh-ca

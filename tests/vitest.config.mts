@@ -7,6 +7,9 @@ export default defineWorkersConfig({
 		target: "esnext",
 	},
 	test: {
+		coverage: {
+			provider: "istanbul",
+		},
 		poolOptions: {
 			workers: {
 				singleWorker: true,

@@ -13,6 +13,7 @@ import (
 )
 
 type Application struct {
+	logger *slog.Logger
 }
 
 var ErrNotSupported = errors.New("not supported on this platform")
