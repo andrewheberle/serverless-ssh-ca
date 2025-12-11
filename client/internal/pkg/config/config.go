@@ -74,6 +74,19 @@ func LoadConfig(system, user string) (*Config, error) {
 	}, nil
 }
 
+func LoadUserConfigOnly(name string) (*Config, error) {
+	u, err := loadUserConfig(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		user:        u,
+		protector:   protect.NewDefaultProtector(),
+		persistence: &YamlPersistence{name: name},
+	}, nil
+}
+
 func loadUserConfig(name string) (UserConfig, error) {
 	y, err := os.ReadFile(name)
 	if err != nil {

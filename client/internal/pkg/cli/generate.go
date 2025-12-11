@@ -38,7 +38,7 @@ func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	}
 
 	// load config
-	config, err := loadconfig(this)
+	config, err := loaduserconfig(this)
 	if err != nil {
 		return err
 	}

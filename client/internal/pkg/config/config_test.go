@@ -95,6 +95,47 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
+func TestLoadUserConfigOnly(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  string
+		want    *Config
+		wantErr bool
+	}{
+		{"missing", "missing.yml", &Config{
+			user:        UserConfig{},
+			persistence: &YamlPersistence{name: "missing.yml"},
+			protector:   protect.NewDefaultProtector(),
+		}, false},
+		{"valid config", "testdata/validuser.yml",
+			&Config{
+				user: UserConfig{
+					PrivateKey: []byte("somedataencodedasbase64"),
+				},
+				persistence: &YamlPersistence{name: "testdata/validuser.yml"},
+				protector:   protect.NewDefaultProtector(),
+			}, false},
+		{"invalid config", "testdata/invaliduser.yml", nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := LoadUserConfigOnly(tt.config)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("LoadUserConfigOnly() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("LoadUserConfigOnly() succeeded unexpectedly")
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LoadUserConfigOnly() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestConfig_Oidc(t *testing.T) {
 	// minimal test config
 	testconfig := &Config{
