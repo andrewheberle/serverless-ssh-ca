@@ -611,7 +611,7 @@ func GenerateNonce(signer ssh.Signer) (string, error) {
 	}
 
 	// return encoded data
-	return fmt.Sprintf("%s.%s", dataToSign, base64.StdEncoding.EncodeToString(signature.Blob)), nil
+	return fmt.Sprintf("%s.%s:%s", dataToSign, signature.Format, base64.StdEncoding.EncodeToString(signature.Blob)), nil
 }
 
 // ExecuteLogin performs [*LoginHandler.Start()], attempts to open the users

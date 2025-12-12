@@ -43,6 +43,20 @@ export class NonceParseError extends Error {
     }
 }
 
+const format = (s: string): "ecdsa" | "ed25519" | "rsa" => {
+    switch (s) {
+        case "ecdsa-sha2-nistp25":
+            return "ecdsa"
+        case "ssh-ed25519":
+            return "ed25519"
+        case "ssh-rsa":
+            return "rsa"
+        default:
+            // default to this to support older clients
+            return "ecdsa"
+    }
+}
+
 export class Nonce {
     readonly timestamp: number
     readonly fingerprint: Fingerprint
@@ -55,7 +69,7 @@ export class Nonce {
             throw new NonceParseError("invalid nonce format")
         }
 
-        const [timestampStr, fingerprintHex, signatureBase64] = parts.length === 4 ? [parts[0], parts[1], parts[3]] : parts
+        const [timestampStr, fingerprintHex, signatureString] = parts.length === 4 ? [parts[0], parts[1], parts[3]] : parts
 
         // verify timestamp
         const timestamp: number = parseInt(timestampStr, 10)
@@ -76,8 +90,11 @@ export class Nonce {
                 throw new NonceParseError("nonce fingerprint did not parse")
             }
 
+            const signatureParts = signatureString.split(":")
+            const [signatureFormat, signatureBase64] = signatureParts.length === 1 ? ["", signatureParts[0]] : signatureParts
+
             // parse signature
-            const signature = parsesignature(signatureBase64)
+            const signature = parseSignature(signatureBase64, format(signatureFormat), "ssh")
 
             // set our values
             this.timestamp = timestamp
@@ -101,9 +118,9 @@ export class Nonce {
      * @param key public key to use to verify signature against
      * @returns true or false if verification succeeds
      */
-    verify(key: Key) {
+    verify(key: Key): boolean {
         // create verifier from public key
-        const verifier = key.createVerify(key.type === "ed25519" ? "sha512" : "sha256")
+        const verifier = key.createVerify(key.type == "ed25519" ? "sha512" : "sha256")
         verifier.update(this.dataToVerify)
 
         return verifier.verify(this.signature)
@@ -161,14 +178,12 @@ export class HostNonce extends Nonce {
      * @returns true or false if verification succeeds
      */
     verify(key: Key): boolean {
-        
         // create verifier from public key
-        const verifier = key.createVerify(key.type === "ed25519" ? "sha512" : "sha256")
+        const verifier = key.createVerify(key.type == "ed25519" ? "sha512" : "sha256")
         verifier.update(this.hostDataToVerify)
 
-        console.log(this.hostDataToVerify)
-
         return verifier.verify(this.signature)
+
     }
 
     certificatematches(key: Key, cert: Certificate): boolean {

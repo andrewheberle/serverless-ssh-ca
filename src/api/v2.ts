@@ -77,7 +77,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
                         .describe("SSH public key to sign"),
                     nonce: z.string()
                         .transform(transformNonce)
-                        .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}"),
+                        .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
                     identity: z.string()
                         .describe("Identity Token JWT from OIDC IdP"),
                     extensions: z.array(z.string())
@@ -186,7 +186,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                         .describe("SSH public key to sign"),
                     nonce: z.string()
                         .transform(transformNonce)
-                        .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}"),
+                        .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
                     principals: z.array(z.string())
                         .describe("List of principals to include on the issued certificate"),
                     lifetime: z.number()
@@ -288,7 +288,7 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
                         .describe("SSH public key of certificate to be renewed"),
                     nonce: z.string()
                         .transform(transformHostNonce)
-                        .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${certfingerprint}.${signature}"),
+                        .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${certfingerprint}.${format}:${signature}"),
                     lifetime: z.number()
                         .min(seconds("24 hours"))
                         .max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
