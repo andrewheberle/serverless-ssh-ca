@@ -8,7 +8,11 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"runtime"
+	"slices"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -31,7 +35,7 @@ func Test_GenerateUserAgent(t *testing.T) {
 	}
 }
 
-func TestGenerateNonce(t *testing.T) {
+func Test_GenerateNonce(t *testing.T) {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
 	if err != nil {
 		panic(err)
@@ -70,7 +74,7 @@ func TestGenerateNonce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, gotErr := GenerateNonce(tt.signer)
+			got, gotErr := GenerateNonce(tt.signer)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("GenerateNonce() failed: %v", gotErr)
@@ -80,6 +84,34 @@ func TestGenerateNonce(t *testing.T) {
 			if tt.wantErr {
 				t.Fatal("GenerateNonce() succeeded unexpectedly")
 			}
+
+			// no verification, just make sure it looks right
+			parts := strings.Split(got, ".")
+			if len(parts) != 3 {
+				t.Fatalf("GenerateNonce() generated wrong number of parts: %v", len(parts))
+			}
+
+			// check timestamp seems ok
+			ms, err := strconv.Atoi(parts[0])
+			if err != nil {
+				t.Fatalf("GenerateNonce() timestamp was not an integer: %v", err)
+			}
+			ts := time.Unix(int64(ms/1000), int64((ms%1000)*1000000))
+			if ts.After(time.Now()) {
+				t.Fatalf("GenerateNonce() timestamp was in the future: %v", ts)
+			}
+
+			// check signature format is expected
+			sig := strings.Split(parts[2], ":")
+			if len(sig) != 2 {
+				t.Fatalf("GenerateNonce() generated wrong number of parts for signature: %v", len(sig))
+			}
+			format := sig[0]
+			validFormats := []string{"ecdsa-sha2-nistp256", "ssh-ed25519", "ssh-rsa"}
+			if !slices.Contains(validFormats, format) {
+				t.Fatalf("GenerateNonce() signature did not include supported format: %v", format)
+			}
+
 		})
 	}
 }

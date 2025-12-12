@@ -48,10 +48,11 @@ var (
 )
 
 type CertificateSignerPayload struct {
-	Lifetime   int      `json:"lifetime"`
-	Principals []string `json:"principals"`
-	PublicKey  []byte   `json:"public_key"`
-	Nonce      string   `json:"nonce"`
+	Lifetime    int      `json:"lifetime"`
+	Principals  []string `json:"principals,omitempty"`
+	PublicKey   []byte   `json:"public_key"`
+	Certificate []byte   `json:"certificate,omitempty"`
+	Nonce       string   `json:"nonce"`
 }
 
 type CertificateSignerResponse struct {
@@ -73,6 +74,8 @@ type LoginHandler struct {
 	done         chan error
 	logger       *slog.Logger
 	mu           sync.RWMutex
+	renewal      bool
+	cert         *ssh.Certificate
 }
 
 // NewLoginHandler creates a new handler
@@ -124,6 +127,26 @@ func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...Lo
 	// set from options
 	for _, o := range opts {
 		o(lh)
+	}
+
+	// try to parse certificate if we are doing a renewal
+	if lh.renewal {
+		certBytes, err := os.ReadFile(certPath(lh.keypath))
+		if err != nil {
+			return nil, err
+		}
+
+		pubKey, _, _, _, err := ssh.ParseAuthorizedKey(certBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		cert, ok := pubKey.(*ssh.Certificate)
+		if !ok {
+			return nil, fmt.Errorf("not a valid SSH certificate")
+		}
+
+		lh.cert = cert
 	}
 
 	// set up last resort http server
@@ -365,7 +388,7 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 	}
 
 	// generate nonce
-	nonce, err := client.GenerateNonce(lh.key)
+	nonce, err := lh.generateNonce()
 	if err != nil {
 		return nil, err
 	}
@@ -374,17 +397,23 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	payload := CertificateSignerPayload{
-		Principals: lh.principals,
-		PublicKey:  publicKey,
-		Lifetime:   int(lh.lifetime.Seconds()),
-		Nonce:      nonce,
+		PublicKey: publicKey,
+		Lifetime:  int(lh.lifetime.Seconds()),
+		Nonce:     nonce,
+	}
+	if lh.renewal {
+		// add certificate if doing a renewal
+		payload.Certificate = lh.cert.Key.Marshal()
+	} else {
+		// add principals if doing intial request
+		payload.Principals = lh.principals
 	}
 	if err := enc.Encode(payload); err != nil {
 		return nil, err
 	}
 
 	// build url
-	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL, "/api/v2/host/request")
+	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL, lh.apiPath())
 	if err != nil {
 		return nil, err
 	}
@@ -420,8 +449,20 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 	return &csr, nil
 }
 
+func (lh *LoginHandler) apiPath() string {
+	if lh.renewal {
+		return "/api/v2/host/renew"
+	}
+
+	return "/api/v2/host/request"
+}
+
 func (lh *LoginHandler) getPublicKeyBytes() ([]byte, error) {
 	return lh.key.PublicKey().Marshal(), nil
+}
+
+func (lh *LoginHandler) generateNonce() (string, error) {
+	return client.GenerateNonce(lh.key)
 }
 
 func generatePKCE() (string, string) {

@@ -288,7 +288,7 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
                         .describe("SSH public key of certificate to be renewed"),
                     nonce: z.string()
                         .transform(transformHostNonce)
-                        .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${certfingerprint}.${format}:${signature}"),
+                        .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}"),
                     lifetime: z.number()
                         .min(seconds("24 hours"))
                         .max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))

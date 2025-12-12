@@ -28,3 +28,10 @@ func WithPrincipals(principals []string) LoginHandlerOption {
 		lh.principals = principals
 	}
 }
+
+// WithRenewal triggers the renewal logic from an existing certificate
+func WithRenewal() LoginHandlerOption {
+	return func(lh *LoginHandler) {
+		lh.renewal = true
+	}
+}

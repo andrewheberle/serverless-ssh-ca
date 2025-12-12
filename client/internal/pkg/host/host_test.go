@@ -1,6 +1,8 @@
 package host
 
-import "testing"
+import (
+	"testing"
+)
 
 func Test_certPath(t *testing.T) {
 	tests := []struct {

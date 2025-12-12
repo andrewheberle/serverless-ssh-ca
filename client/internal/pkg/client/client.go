@@ -15,6 +15,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -602,16 +603,21 @@ func GenerateNonce(signer ssh.Signer) (string, error) {
 	// generate data to sign
 	timestamp := time.Now().UnixMilli()
 	fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
-	dataToSign := fmt.Sprintf("%d.%s", timestamp, fingerprint)
+	dataToSign := []string{
+		fmt.Sprintf("%d", timestamp),
+		fingerprint,
+	}
 
-	// sign data
-	signature, err := signer.Sign(rand.Reader, []byte(dataToSign))
+	// sign data and add to end
+	data := []byte(strings.Join(dataToSign, "."))
+	signature, err := signer.Sign(rand.Reader, data)
 	if err != nil {
 		return "", err
 	}
+	signedData := append(dataToSign, fmt.Sprintf("%s:%s", signature.Format, base64.StdEncoding.EncodeToString(signature.Blob)))
 
 	// return encoded data
-	return fmt.Sprintf("%s.%s:%s", dataToSign, signature.Format, base64.StdEncoding.EncodeToString(signature.Blob)), nil
+	return strings.Join(signedData, "."), nil
 }
 
 // ExecuteLogin performs [*LoginHandler.Start()], attempts to open the users
