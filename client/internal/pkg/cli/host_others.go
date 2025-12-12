@@ -65,7 +65,7 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	c.logger = slog.New(h)
 
 	if os.Geteuid() != 0 {
-		c.logger.Warn("this command should be run as root", "uid", os.Geteuid())
+		c.logger.Warn("not running as root", "uid", os.Geteuid())
 	}
 
 	config, err := loadsystemconfig(this)
@@ -77,9 +77,12 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	opts := []host.LoginHandlerOption{
 		host.WithLifetime(c.lifetime),
 		host.WithPrincipals(c.principals),
+		host.WithLogger(c.logger),
 	}
 
-	opts = append(opts, host.WithLogger(c.logger))
+	if c.renew {
+		opts = append(opts, host.WithRenewal())
+	}
 
 	if c.debug {
 		logLevel.Set(slog.LevelDebug)

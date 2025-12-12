@@ -236,15 +236,15 @@ export const transformHostNonce = (val: string, ctx: z.RefinementCtx): HostNonce
     }
 }
 
-type ParsedHostRequest = {
+type HostCertificateRequest = {
     public_key: Key
     lifetime: number
-    principals: string[]
 }
 
 type ParsedHostCertificateRequest = {
+    principals: string[]
     nonce: Nonce
-} & ParsedHostRequest
+} & HostCertificateRequest
 
 export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): never => {
     try {
@@ -267,7 +267,7 @@ export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, 
 type ParsedHostCertificateRenewal = {
     certificate: Certificate
     nonce: HostNonce
-} & Omit<ParsedHostRequest, "principals">
+} & HostCertificateRequest
 
 export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): never => {
     try {
@@ -276,8 +276,8 @@ export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, 
             return fatalIssue(ctx, "certificate is expired")
         }
 
-        // check nonce fingerprint matches public key
-        if (!val.nonce.certificatematches(val.public_key, val.certificate)) {
+        // check nonce fingerprint matches public key and certificate subject key
+        if (!val.nonce.matches(val.public_key, val.certificate.subjectKey)) {
             return fatalIssue(ctx, "nonce fingerprints did not match public_key and/or certificate")
         }
 
