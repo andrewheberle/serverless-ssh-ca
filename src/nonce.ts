@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers"
 import { ms } from "itty-time"
-import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseSignature, Signature, SignatureParseError } from "sshpk"
+import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseKey, parseSignature, Signature, SignatureParseError } from "sshpk"
 import { verify } from "./sshsig"
 import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
@@ -46,29 +46,11 @@ export class NonceParseError extends Error {
     }
 }
 
-const format = (s: string): "ecdsa" | "ed25519" | "rsa" => {
-    switch (s) {
-        case "ecdsa-sha2-nistp25":
-            return "ecdsa"
-        case "ssh-ed25519":
-            return "ed25519"
-        case "ssh-rsa":
-            return "rsa"
-        default:
-            // default to this to support older clients
-            return "ecdsa"
-    }
-}
-
-function base64ToBuffer(base64: string): Buffer<ArrayBufferLike> {
-    return Buffer.from(base64, "base64")
-}
-
-
 export class Nonce {
     readonly timestamp: number
     readonly fingerprint: Fingerprint
     readonly signature: Sig
+    private readonly signaturePubkey: Key
     private readonly data: string
 
     constructor(nonce: string, from?: number) {
@@ -110,6 +92,7 @@ export class Nonce {
             }
             this.fingerprint = fingerprint
             this.data = `${timestamp}.${fingerprintHex}`
+            this.signaturePubkey = parseKey(this.signature.publickey.toString())
         } catch (err) {
             switch (true) {
                 case (err instanceof FingerprintFormatError):
@@ -149,8 +132,15 @@ export class Nonce {
             return this.fingerprint.matches(keys[0])
         }
 
+        this.signature.publickey.toString
+
         for (const key of keys) {
+            // confirm nonce fingerprint matches keys
             if (!this.fingerprint.matches(key))
+                return false
+        
+            // also config key used to sign nonce matches
+            if (!this.signaturePubkey.fingerprint().matches(key))
                 return false
         }
 
