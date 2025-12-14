@@ -1,7 +1,9 @@
 import { env } from "cloudflare:workers"
 import { ms } from "itty-time"
 import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseSignature, Signature, SignatureParseError } from "sshpk"
-import { verify } from "sshsig"
+import { verify } from "./sshsig"
+import { parse } from "./sshsig/sig_parser"
+import { Sig } from "./sshsig/sig"
 
 // try to parse as ecdsa, ed25519 then rsa
 const parsesignature = (s: string): Signature => {
@@ -66,7 +68,7 @@ function base64ToBuffer(base64: string): Buffer<ArrayBufferLike> {
 export class Nonce {
     readonly timestamp: number
     readonly fingerprint: Fingerprint
-    readonly signature: string
+    readonly signature: Sig
     private readonly data: string
 
     constructor(nonce: string, from?: number) {
@@ -96,15 +98,26 @@ export class Nonce {
                 throw new NonceParseError("nonce fingerprint did not parse")
             }
 
+            // convert siganture from base64
+            const signature = atob(signatureBase64)
+
             // set values
             this.timestamp = timestamp
-            this.signature = atob(signatureBase64)
+            try {
+                this.signature = parse(signature)
+            } catch (err) {
+                throw new NonceParseError("nonce signature could not be parsed", err)
+            }
             this.fingerprint = fingerprint
             this.data = `${timestamp}.${fingerprintHex}`
         } catch (err) {
             switch (true) {
                 case (err instanceof FingerprintFormatError):
                     throw new NonceParseError("nonce fingerprint was an invalid format", err)
+                case (err instanceof DOMException):
+                    if (err.name == "InvalidCharacterError") {
+                        throw new NonceParseError("nonce signature could not be parsed", err)
+                    }
                 default:
                     throw err
             }

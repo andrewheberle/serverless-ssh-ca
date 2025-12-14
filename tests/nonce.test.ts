@@ -76,6 +76,7 @@ const tests: testSig[] = [
         sig: "invalid",
         data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg",
         from: 1765696780000,
+        wantErr: "nonce signature could not be parsed",
         want: false
     },
 ]
