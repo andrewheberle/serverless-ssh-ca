@@ -18,6 +18,12 @@ export default defineWorkersConfig({
 				},
 				miniflare: {
 					compatibilityFlags: ["experimental", "nodejs_compat"],
+					secretsStoreSecrets: {
+						PRIVATE_KEY: {
+							store_id: "demo",
+							secret_name: "ssh-ca-private-key"
+						}
+					}
 				},
 			},
 		},
