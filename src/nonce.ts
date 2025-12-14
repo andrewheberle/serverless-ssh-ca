@@ -69,10 +69,13 @@ export class Nonce {
 
         const now = from !== undefined ? from : Date.now()
         const age = now - timestamp
-        if (age > ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
+        const skew = ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)
+        if (age > skew) {
             throw new NonceParseError("nonce timestamp too old")
         }
-
+        if (age + skew < 0) {
+            throw new NonceParseError("nonce timestamp was from the future")
+        }
         try {
             // parse fingerprint
             const fingerprint = parseFingerprint(fingerprintHex)
