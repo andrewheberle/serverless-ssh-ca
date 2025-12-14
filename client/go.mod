@@ -14,6 +14,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
+	github.com/hiddeco/sshsig v0.2.0
 	github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec
 	github.com/openpubkey/openpubkey v0.20.0
 	github.com/spf13/pflag v1.0.10

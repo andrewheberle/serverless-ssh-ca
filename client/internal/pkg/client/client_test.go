@@ -1,19 +1,21 @@
 package client
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/base64"
 	"fmt"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hiddeco/sshsig"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -36,7 +38,7 @@ func Test_GenerateUserAgent(t *testing.T) {
 }
 
 func Test_GenerateNonce(t *testing.T) {
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic(err)
 	}
@@ -101,17 +103,24 @@ func Test_GenerateNonce(t *testing.T) {
 				t.Fatalf("GenerateNonce() timestamp was in the future: %v", ts)
 			}
 
-			// check signature format is expected
-			sig := strings.Split(parts[2], ":")
-			if len(sig) != 2 {
-				t.Fatalf("GenerateNonce() generated wrong number of parts for signature: %v", len(sig))
+			// check signature format is expected and can be parsed back
+			signature, err := base64.StdEncoding.DecodeString(parts[2])
+			if err != nil {
+				t.Fatalf("GenerateNonce() signature was not base64: %v", err)
 			}
-			format := sig[0]
-			validFormats := []string{"ecdsa-sha2-nistp256", "ssh-ed25519", "ssh-rsa"}
-			if !slices.Contains(validFormats, format) {
-				t.Fatalf("GenerateNonce() signature did not include supported format: %v", format)
+			sig, err := sshsig.Unarmor(signature)
+			if err != nil {
+				t.Fatalf("GenerateNonce() could not dearmor signature: %v", err)
 			}
-
+			if err := sshsig.Verify(
+				bytes.NewReader([]byte(fmt.Sprintf("%s.%s", parts[0], parts[1]))),
+				sig,
+				tt.signer.PublicKey(),
+				sshsig.HashSHA512,
+				SignatureNamespace,
+			); err != nil {
+				t.Fatalf("GenerateNonce() signature did not verify: %v", err)
+			}
 		})
 	}
 }
