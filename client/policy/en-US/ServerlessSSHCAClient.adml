@@ -20,6 +20,8 @@
             <string id="RedirectURL_Explain">Redirect URL of client for OIDC authentication flow</string>
             <string id="CertificateAuthorityURL">Certificate Authority URL</string>
             <string id="CertificateAuthorityURL_Explain">The URL of the SSH Certificate Authority (CA)</string>
+            <string id="TrustedCertificateAuthority">Trusted Certificate Authority</string>
+            <string id="TrustedCertificateAuthority_Explain">The public key of the SSH Cerificate Authority (CA). This is optional but recommended to validate CA response.</string>
         </stringTable>
         <presentationTable>
             <presentation id="ClientID">
@@ -43,6 +45,11 @@
             <presentation id="CertificateAuthorityURL">
                 <textBox refId="CertificateAuthorityURL_Element">
                     <label>Enter the Certificate Authority (CA) URL:</label>
+                </textBox>
+            </presentation>
+            <presentation id="TrustedCertificateAuthority">
+                <textBox refId="TrustedCertificateAuthority_Element">
+                    <label>Enter the Certificate Authority (CA) Public Key (optional):</label>
                 </textBox>
             </presentation>
         </presentationTable>

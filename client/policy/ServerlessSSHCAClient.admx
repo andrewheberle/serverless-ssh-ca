@@ -49,5 +49,12 @@
                 <text id="CertificateAuthorityURL_Element" valueName="CertificateAuthorityURL" />
             </elements>
         </policy>
+        <policy name="SSHCAClient_TrustedCertificateAuthority" class="Machine" displayName="$(string.TrustedCertificateAuthority)" explainText="$(string.TrustedCertificateAuthority_Explain)" presentation="$(presentation.TrustedCertificateAuthority)" key="Software\Policies\Serverless SSH CA Client">
+            <parentCategory ref="SSHCAClient_Category" />
+            <supportedOn ref="SUPPORTED_All" />
+            <elements>
+                <text id="TrustedCertificateAuthority_Element" valueName="TrustedCertificateAuthority" />
+            </elements>
+        </policy>
     </policies>
 </policyDefinitions>
