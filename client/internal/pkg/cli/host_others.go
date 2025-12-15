@@ -16,7 +16,7 @@ import (
 )
 
 type hostCommand struct {
-	keypath    string
+	keypath    []string
 	renew      bool
 	lifetime   time.Duration
 	listenAddr string
@@ -45,7 +45,7 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().DurationVar(&c.lifetime, "life", host.DefaultLifetime, "Lifetime of SSH certificate")
-	cmd.Flags().StringVar(&c.keypath, "key", "", "Path to private key")
+	cmd.Flags().StringSliceVar(&c.keypath, "key", []string{}, "Path to private key(s)")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	cmd.Flags().StringSliceVar(&c.principals, "principals", principals, "Principals to add to the host certificate request")
 	cmd.Flags().BoolVar(&c.renew, "renew", false, "Renew existing certificate")

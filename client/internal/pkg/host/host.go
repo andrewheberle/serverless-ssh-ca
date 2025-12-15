@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	ErrNoKeys              = errors.New("no SSH host keys found")
+	ErrNoKeys              = errors.New("no valid SSH host keys found")
 	ErrAlreadyStarted      = errors.New("server has already started")
 	ErrNotStarted          = errors.New("server has not been started")
 	ErrUnsupportedKey      = errors.New("key type is not supported")
@@ -58,10 +58,8 @@ type CertificateSignerPayload struct {
 type CertificateSignerResponse struct {
 	Certificate []byte `json:"certificate"`
 }
-
 type LoginHandler struct {
-	key          ssh.Signer
-	keypath      string
+	keys         []sshKey
 	principals   []string
 	srv          *http.Server
 	started      bool
@@ -75,23 +73,16 @@ type LoginHandler struct {
 	logger       *slog.Logger
 	mu           sync.RWMutex
 	renewal      bool
-	cert         *ssh.Certificate
+}
+
+type sshKey struct {
+	certBytes []byte
+	key       ssh.Signer
+	keypath   string
 }
 
 // NewLoginHandler creates a new handler
-func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...LoginHandlerOption) (*LoginHandler, error) {
-	// check key exists
-	b, err := os.ReadFile(keypath)
-	if err != nil {
-		return nil, err
-	}
-
-	// parse key
-	key, err := ssh.ParsePrivateKey(b)
-	if err != nil {
-		return nil, err
-	}
-
+func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...LoginHandlerOption) (*LoginHandler, error) {
 	// set up oidc provider
 	provider, err := oidc.NewProvider(context.Background(), config.Issuer)
 	if err != nil {
@@ -106,8 +97,6 @@ func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...Lo
 
 	// set defaults
 	lh := &LoginHandler{
-		key:        key,
-		keypath:    keypath,
 		config:     config,
 		lifetime:   DefaultLifetime,
 		principals: make([]string, 0),
@@ -129,25 +118,66 @@ func NewHostLoginHandler(keypath string, config *config.SystemConfig, opts ...Lo
 		o(lh)
 	}
 
-	// try to parse certificate if we are doing a renewal
-	if lh.renewal {
-		certBytes, err := os.ReadFile(certPath(lh.keypath))
+	// tweak logger
+	lh.logger = lh.logger.With("renewal", lh.renewal)
+
+	// go through list of keys
+	keys := make([]sshKey, 0)
+	for _, k := range keypath {
+		// check key exists
+		b, err := os.ReadFile(k)
 		if err != nil {
-			return nil, err
+			lh.logger.Warn("could not read key", "path", k, "error", err)
+			continue
 		}
 
-		pubKey, _, _, _, err := ssh.ParseAuthorizedKey(certBytes)
+		// parse key
+		key, err := ssh.ParsePrivateKey(b)
 		if err != nil {
-			return nil, err
+			lh.logger.Warn("could not parse key", "path", k, "error", err)
+			continue
 		}
 
-		cert, ok := pubKey.(*ssh.Certificate)
-		if !ok {
-			return nil, fmt.Errorf("not a valid SSH certificate")
-		}
+		// try to parse certificate if we are doing a renewal
+		if lh.renewal {
+			certBytes, err := os.ReadFile(certPath(k))
+			if err != nil {
+				lh.logger.Warn("could not read certificate", "path", certPath(k), "error", err)
+				continue
+			}
 
-		lh.cert = cert
+			pubKey, _, _, _, err := ssh.ParseAuthorizedKey(certBytes)
+			if err != nil {
+				lh.logger.Warn("could not parse SSH certificate", "path", certPath(k), "error", err)
+				continue
+			}
+
+			_, ok := pubKey.(*ssh.Certificate)
+			if !ok {
+				lh.logger.Warn("not a valid SSH certificate", "path", certPath(k))
+				continue
+			}
+
+			keys = append(keys, sshKey{
+				certBytes: certBytes,
+				key:       key,
+				keypath:   k,
+			})
+		} else {
+			keys = append(keys, sshKey{
+				key:     key,
+				keypath: k,
+			})
+		}
 	}
+
+	// check we have any valid keys
+	if len(keys) == 0 {
+		return nil, ErrNoKeys
+	}
+
+	// set out keys in the LoginHandler
+	lh.keys = keys
 
 	// set up last resort http server
 	if lh.srv == nil {
@@ -296,45 +326,67 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
-	csr, err := lh.doSigningRequest(token.AccessToken)
+	errs := make([]error, 0)
+
+	client, err := lh.httpClient(token)
 	if err != nil {
 		return err
 	}
 
-	temp, err := func() (string, error) {
-		// save to a temp file first
-		t, err := os.CreateTemp(filepath.Dir(lh.keypath), "cert*")
+	for _, k := range lh.keys {
+		logger := lh.logger.With("key", k.keypath)
+		logger.Info("starting signing request process")
+		csr, err := lh.doSigningRequest(client, k.key, k.certBytes)
 		if err != nil {
-			// creation failed
-			return "", err
-		}
-		defer func() {
-			_ = t.Close()
-		}()
-
-		// write config
-		if _, err := t.Write(csr.Certificate); err != nil {
-			return t.Name(), err
+			logger.Warn("error completing signing request", "error", err)
+			errs = append(errs, err)
+			continue
 		}
 
-		// return name and no error
-		return t.Name(), nil
-	}()
+		temp, err := func() (string, error) {
+			// save to a temp file first
+			t, err := os.CreateTemp(filepath.Dir(k.keypath), "cert*")
+			if err != nil {
+				// creation failed
+				return "", err
+			}
+			defer func() {
+				_ = t.Close()
+			}()
 
-	// ensure temp file is removed it it was created
-	if temp != "" {
-		defer func() {
-			_ = os.Remove(temp)
+			// write config
+			if _, err := t.Write(csr.Certificate); err != nil {
+				return t.Name(), err
+			}
+
+			// return name and no error
+			return t.Name(), nil
 		}()
+
+		// ensure temp file is removed it it was created
+		if temp != "" {
+			defer func() {
+				_ = os.Remove(temp)
+			}()
+		}
+
+		// check save to temp was ok
+		if err != nil {
+			logger.Warn("error saving certificate to temporaray file", "temp", temp, "error", err)
+			errs = append(errs, err)
+			continue
+		}
+
+		// move into place
+		if err := os.Rename(temp, certPath(k.keypath)); err != nil {
+			logger.Warn("error moving certificate into place", "temp", temp, "error", err)
+			errs = append(errs, err)
+			continue
+		}
 	}
 
-	// check save to temp was ok
-	if err != nil {
-		return err
-	}
-
-	// move into place
-	return os.Rename(temp, certPath(lh.keypath))
+	// return errors (if any)
+	return errors.Join(errs...)
 }
 
 func certPath(keypath string) string {
@@ -370,32 +422,46 @@ func (t *customTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerResponse, error) {
-	httpclient := &http.Client{
+func (lh *LoginHandler) httpClient(token *oauth2.Token) (*http.Client, error) {
+	if lh.renewal {
+		return &http.Client{
+			Timeout: time.Second * 3,
+			Transport: &customTransport{
+				Headers: map[string]string{
+					"User-Agent": userAgentFull,
+				},
+			},
+		}, nil
+	}
+
+	if token == nil {
+		return nil, fmt.Errorf("token was nil")
+	}
+	return &http.Client{
 		Timeout: time.Second * 3,
 		Transport: &customTransport{
 			Headers: map[string]string{
-				"Authorization": "Bearer " + access,
+				"Authorization": "Bearer " + token.AccessToken,
 				"User-Agent":    userAgentFull,
 			},
 		},
-	}
+	}, nil
+}
 
+func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, cert []byte) (*CertificateSignerResponse, error) {
 	// get public key
-	publicKey, err := lh.getPublicKeyBytes()
+	publicKey, err := lh.getPublicKeyBytes(key)
 	if err != nil {
 		return nil, err
 	}
 
 	// generate nonce
-	nonce, err := lh.generateNonce()
+	nonce, err := lh.generateNonce(key)
 	if err != nil {
 		return nil, err
 	}
 
 	// encode json
-	buf := new(bytes.Buffer)
-	enc := json.NewEncoder(buf)
 	payload := CertificateSignerPayload{
 		PublicKey: publicKey,
 		Lifetime:  int(lh.lifetime.Seconds()),
@@ -403,12 +469,13 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 	}
 	if lh.renewal {
 		// add certificate if doing a renewal
-		payload.Certificate = lh.cert.Key.Marshal()
+		payload.Certificate = cert
 	} else {
 		// add principals if doing intial request
 		payload.Principals = lh.principals
 	}
-	if err := enc.Encode(payload); err != nil {
+	b, err := json.Marshal(payload)
+	if err != nil {
 		return nil, err
 	}
 
@@ -425,8 +492,10 @@ func (lh *LoginHandler) doSigningRequest(access string) (*CertificateSignerRespo
 		"lifetime", payload.Lifetime,
 		"nonce", payload.Nonce,
 		"principals", payload.Principals,
+		"certificate", payload.Certificate,
+		"json", b,
 	)
-	res, err := httpclient.Post(caCertUrl, "application/json", buf)
+	res, err := client.Post(caCertUrl, "application/json", bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -457,12 +526,12 @@ func (lh *LoginHandler) apiPath() string {
 	return "/api/v2/host/request"
 }
 
-func (lh *LoginHandler) getPublicKeyBytes() ([]byte, error) {
-	return lh.key.PublicKey().Marshal(), nil
+func (lh *LoginHandler) getPublicKeyBytes(key ssh.Signer) ([]byte, error) {
+	return key.PublicKey().Marshal(), nil
 }
 
-func (lh *LoginHandler) generateNonce() (string, error) {
-	return client.GenerateNonce(lh.key)
+func (lh *LoginHandler) generateNonce(key ssh.Signer) (string, error) {
+	return client.GenerateNonce(key)
 }
 
 func generatePKCE() (string, string) {
@@ -490,6 +559,10 @@ func (lh *LoginHandler) ExecuteLoginWithContext(ctx context.Context, addr string
 }
 
 func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
+	// for renewals just jump into the doLogin step
+	if lh.renewal {
+		return lh.doLogin(nil)
+	}
 	// start web server now
 	lh.logger.Info("starting web server", "address", addr)
 	if err := lh.Start(addr); err != nil {
