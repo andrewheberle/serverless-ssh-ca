@@ -83,34 +83,13 @@ type sshKey struct {
 
 // NewLoginHandler creates a new handler
 func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...LoginHandlerOption) (*LoginHandler, error) {
-	// set up oidc provider
-	provider, err := oidc.NewProvider(context.Background(), config.Issuer)
-	if err != nil {
-		return nil, err
-	}
-
-	// set redirectURL
-	redirectURL, err := url.Parse(config.RedirectURL)
-	if err != nil {
-		return nil, err
-	}
-
 	// set defaults
 	lh := &LoginHandler{
 		config:     config,
 		lifetime:   DefaultLifetime,
 		principals: make([]string, 0),
-		store:      sessions.NewCookieStore(securecookie.GenerateRandomKey(32)),
-		verifier:   provider.Verifier(&oidc.Config{ClientID: config.ClientID}),
-		oauth2Config: oauth2.Config{
-			ClientID:    config.ClientID,
-			RedirectURL: config.RedirectURL,
-			Endpoint:    provider.Endpoint(),
-			Scopes:      config.Scopes,
-		},
-		redirectURL: redirectURL,
-		done:        make(chan error),
-		logger:      DefaultLogger,
+		done:       make(chan error),
+		logger:     DefaultLogger,
 	}
 
 	// set from options
@@ -179,15 +158,40 @@ func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...
 	// set out keys in the LoginHandler
 	lh.keys = keys
 
-	// set up last resort http server
-	if lh.srv == nil {
-		// set up our http handler
-		mux := http.NewServeMux()
-		mux.HandleFunc("/auth/login", lh.Login)
-		mux.HandleFunc(lh.RedirectPath(), lh.Callback)
+	if !lh.renewal {
+		// set up oidc provider
+		provider, err := oidc.NewProvider(context.Background(), config.Issuer)
+		if err != nil {
+			return nil, err
+		}
 
-		lh.srv = &http.Server{
-			Handler: mux,
+		// set redirectURL
+		redirectURL, err := url.Parse(config.RedirectURL)
+		if err != nil {
+			return nil, err
+		}
+
+		// set up oidc stuff if we ren't renewing
+		lh.store = sessions.NewCookieStore(securecookie.GenerateRandomKey(32))
+		lh.verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
+		lh.oauth2Config = oauth2.Config{
+			ClientID:    config.ClientID,
+			RedirectURL: config.RedirectURL,
+			Endpoint:    provider.Endpoint(),
+			Scopes:      config.Scopes,
+		}
+		lh.redirectURL = redirectURL
+
+		// set up last resort http server
+		if lh.srv == nil {
+			// set up our http handler
+			mux := http.NewServeMux()
+			mux.HandleFunc("/auth/login", lh.Login)
+			mux.HandleFunc(lh.RedirectPath(), lh.Callback)
+
+			lh.srv = &http.Server{
+				Handler: mux,
+			}
 		}
 	}
 
