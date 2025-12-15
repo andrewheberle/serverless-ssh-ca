@@ -14,6 +14,7 @@ import (
 
 	"fyne.io/systray"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
+	"github.com/gen2brain/beeep"
 )
 
 type appState string
@@ -111,6 +112,22 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 	app.version = version
 
 	return app, nil
+}
+
+func (app *Application) prerun() {
+	// set app name in beeep
+	beeep.AppName = app.title
+}
+
+// Sends a desktop notification
+func (app *Application) notify(title string, message string, icon string) {
+	// grab icon
+	b := app.getIcon(icon)
+
+	// set notification
+	if err := beeep.Notify(title, message, b); err != nil {
+		app.logger.Error("could not send notification", "error", err)
+	}
 }
 
 func (app *Application) Run() {
