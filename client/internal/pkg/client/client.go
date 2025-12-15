@@ -589,6 +589,22 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		return nil, err
 	}
 
+	// parse the cert we got back
+	newCert, err := sshcert.ParseCert(csr.Certificate)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse cert from CA: %w", err)
+	}
+
+	key, err := lh.config.Signer()
+	if err != nil {
+		return nil, fmt.Errorf("could not verify cert from CA: %w", err)
+	}
+
+	// check its as we expect by comparing the subject key to our public key
+	if !bytes.Equal(newCert.Key.Marshal(), key.PublicKey().Marshal()) {
+		return nil, fmt.Errorf("certficate from CA had different subject key than expected")
+	}
+
 	return &csr, nil
 }
 

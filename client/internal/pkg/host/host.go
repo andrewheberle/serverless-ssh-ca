@@ -20,6 +20,7 @@ import (
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
@@ -30,6 +31,7 @@ import (
 
 const (
 	DefaultLifetime = (time.Hour * 24) * 30
+	DefaultDelay    = time.Second * 10
 	DefaultRenewAt  = 0.2
 )
 
@@ -76,6 +78,7 @@ type LoginHandler struct {
 	logger       *slog.Logger
 	mu           sync.RWMutex
 	renewal      bool
+	delay        time.Duration
 }
 
 type sshKey struct {
@@ -95,6 +98,7 @@ func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...
 		done:       make(chan error),
 		logger:     DefaultLogger,
 		renewat:    DefaultRenewAt,
+		delay:      DefaultDelay,
 	}
 
 	// set from options
@@ -135,15 +139,9 @@ func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...
 				continue
 			}
 
-			pubKey, _, _, _, err := ssh.ParseAuthorizedKey(certBytes)
+			cert, err := sshcert.ParseCert(certBytes)
 			if err != nil {
-				lh.logger.Warn("could not parse SSH certificate", "path", certPath(k), "error", err)
-				continue
-			}
-
-			cert, ok := pubKey.(*ssh.Certificate)
-			if !ok {
-				lh.logger.Warn("not a valid SSH certificate", "path", certPath(k))
+				lh.logger.Warn("could not parse certificate", "path", certPath(k), "error", err)
 				continue
 			}
 
@@ -348,14 +346,18 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 		return err
 	}
 
-	for _, k := range lh.keys {
+	for n, k := range lh.keys {
 		logger := lh.logger.With("key", k.keypath)
-		expiry := time.Unix(int64(k.cert.ValidBefore), 0)
-		timeleft := time.Until(expiry)
 
-		if !(lh.lifetime*time.Duration(lh.renewat) > timeleft) {
-			logger.Info("skipping renewal as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
-			continue
+		// check if renewal is needed
+		if lh.renewal {
+			expiry := time.Unix(int64(k.cert.ValidBefore), 0)
+			timeleft := time.Until(expiry)
+
+			if !(lh.lifetime*time.Duration(lh.renewat) > timeleft) {
+				logger.Info("skipping renewal as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
+				continue
+			}
 		}
 
 		logger.Info("starting signing request process")
@@ -405,6 +407,14 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			logger.Warn("error moving certificate into place", "temp", temp, "error", err)
 			errs = append(errs, err)
 			continue
+		}
+
+		logger.Info("completed signing request process")
+
+		// insert a delay if this isn't the last (or only) request
+		if n != len(lh.keys)-1 {
+			logger.Info("sleeping until next request", "delay", lh.delay)
+			time.Sleep(lh.delay)
 		}
 	}
 
@@ -537,6 +547,17 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 	dec := json.NewDecoder(res.Body)
 	if err := dec.Decode(&csr); err != nil {
 		return nil, err
+	}
+
+	// parse the cert we got back
+	newCert, err := sshcert.ParseCert(csr.Certificate)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse cert from CA: %w", err)
+	}
+
+	// check its as we expect by comparing the subject key to our public key
+	if !bytes.Equal(newCert.Key.Marshal(), key.PublicKey().Marshal()) {
+		return nil, fmt.Errorf("certficate from CA had different subject key than expected")
 	}
 
 	return &csr, nil
