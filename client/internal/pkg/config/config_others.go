@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"golang.org/x/crypto/ssh"
 	"sigs.k8s.io/yaml"
 )
 
@@ -35,6 +36,15 @@ func loadSystemConfig(name string) (SystemConfig, error) {
 	var config SystemConfig
 	if err := yaml.UnmarshalStrict(y, &config); err != nil {
 		return SystemConfig{}, fmt.Errorf("problem parsing system config: %w", err)
+	}
+
+	if config.TrustedCertificateAuthority != "" {
+		ca, _, _, _, err := ssh.ParseAuthorizedKey([]byte(config.TrustedCertificateAuthority))
+		if err != nil {
+			return SystemConfig{}, fmt.Errorf("problem parsing trusted_ca: %w", err)
+		}
+
+		config.ca = ca
 	}
 
 	return config, nil

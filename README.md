@@ -251,6 +251,8 @@ client_id: OIDC Client ID
 scopes: ["openid", "email", "profile"]
 redirect_url: http://localhost:3000/auth/callback
 ca_url: https://ssh-ca.example.com/
+# Providing the public key of the CA is optional but recommended so the response can be verified
+trusted_ca: ecdsa-sha2-nistp256 ....
 ```
 
 The default location of this configuration file is `$HOME/.ssh-serverless-ca/config.yml`
