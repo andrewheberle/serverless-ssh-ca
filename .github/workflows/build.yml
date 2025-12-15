@@ -31,7 +31,7 @@ jobs:
           args: release --clean --snapshot
           workdir: client
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: dist-artifact
           path: client/dist/**/*.exe
@@ -52,7 +52,7 @@ jobs:
           go-version-file: client/go.mod
           cache: false
       - name: Download artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: dist-artifact
           path: client/dist
@@ -66,7 +66,7 @@ jobs:
           go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client.msi" --version "$(git describe --tags)"
           Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client.msi").Hash) ssh-ca-client.msi" | Out-File -FilePath ".\dist\ssh-ca-client.msi.sha256sum"
       - name: Upload MSI as artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: msi-artifact
           path: client/dist/**/*.msi
