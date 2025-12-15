@@ -49,6 +49,7 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	cmd.Flags().StringSliceVar(&c.principals, "principals", principals, "Principals to add to the host certificate request")
 	cmd.Flags().BoolVar(&c.renew, "renew", false, "Renew existing certificate")
+	cmd.MarkFlagsMutuallyExclusive("renew", "principals")
 	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 	cmd.Flags().BoolVar(&c.force, "force", false, "Force renewal even if current certificate has more than 50% validity left")
 

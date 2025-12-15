@@ -474,6 +474,8 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 		// add principals if doing intial request
 		payload.Principals = lh.principals
 	}
+
+	// convert to JSON
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -493,7 +495,6 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 		"nonce", payload.Nonce,
 		"principals", payload.Principals,
 		"certificate", payload.Certificate,
-		"json", b,
 	)
 	res, err := client.Post(caCertUrl, "application/json", bytes.NewReader(b))
 	if err != nil {
