@@ -82,7 +82,9 @@ to be unlocked, which is usually the default in most desktop environments.
 
 The client can be run in the following ways:
 
-### Generating a Key
+### User Cerificates
+
+#### Generating a private key
 
 To generate a new private key, run as follows:
 
@@ -90,16 +92,17 @@ To generate a new private key, run as follows:
 ssh-ca-client-cli generate
 ```
 
-### Show Existing Key/Public Key/Certificate
+#### Show Existing Key/Public Key/Certificate
 
 ```sh
-ssh-ca-client-cli show [--private] [--certificate]
+ssh-ca-client-cli show [--private|--certificate|--public|--status]
 ```
 
 By default the client only displays the users public key, however the
-`--private` and `--certificate` options may be provided.
+`--private` and `--certificate` options may be provided or the `--status`
+option can be passed to display a summary of the users key/certificate.
 
-### Requesting a Certificate
+#### Requesting a Certificate
 
 To request a certificate from the CA, run the client as follows:
 
@@ -115,21 +118,88 @@ If a refresh token was provided by the OIDC IdP, this will be used initially to
 attempt a renewal of the authentication token so the process can avoid an
 interactive authentication flow.
 
+### Host certificates
+
+The client can request certificates for pre-exisiting SSH host keys using the
+`host` sub-command as follows:
+
+```sh
+# request certificates
+ssh-ca-client-cli host
+
+# renew existing certificates
+ssh-ca-client-cli host --renew
+```
+
+By default the CLI will attempt to request certificates for the following keys:
+
+* /etc/ssh/ssh_host_rsa_key
+* /etc/ssh/ssh_host_ecdsa_key
+* /etc/ssh/ssh_host_ed25519_key
+
+Certificates will be saved as `KEYNAME-cert.pub` and can be used by `sshd` by
+adding the following to your `sshd_config` (or `/etc/ssh/sshd_conf.d/*.conf`):
+
+```
+HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+HostCertificate /etc/ssh/ssh_host_ecdsa_key-cert.pub
+HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
+```
+
+To ensure your ssh client trusts hosts with certificates issued by your CA you
+must add the following to your `authorized_keys` file:
+
+```
+@cert-authority *.example.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdH...
+```
+
+The value of `*.example.com` sets what hosts should be trusted when they present
+a certificate signed by the specified CA public key (ie the
+`ecdsa-sha2-nistp256...` value). It is also possible to have `*` to trust the
+CA for all hosts.
+
+By default the CLI will request a certificate with the hostname of the system
+you are running the command on, however it is recommeded to include the FQDN
+and IP addresses of the host using the `--principals` option as follows:
+
+```sh
+ssh-ca-client-cli host --principals hostname,hostname.example.com,192.168.1.1,etc
+```
+
+The CA does not currently enforce any restrictions on what principals it will
+issue a certificate for at this time.
+
+#### Renewals
+
+If the host possesses a valid (ie unexpired) certificate issued by the CA the
+renewal of the certificate can be completed without requiring an interactive
+SSO process via OIDC.
+
+The renewed certificate will be issued with identical principals and extensions
+as the current certificate with renewals being skipped unless the certificate
+has less than 20% of validity left (based on the default of 30-days validity)
+
+This allows the renewal process to be executed via cron as follows:
+
+```crontab
+15 1 * * *   root   ssh-ca-client-cli host --renew
+```
+
 ## As a GUI
 
 The GUI supports the following command line flags:
 
-| Flag              | Type            | Description                                                      | Default (Windows)                                  | Default (Linux) | 
-|-------------------|-----------------|------------------------------------------------------------------|----------------------------------------------------|
-| `--life`          | `time.Duration` | Lifetime of SSH certificate                                      | `24h`                                              | 
-| `--renew`         | `time.Duration` | Renew once remaining time gets below this value                  | `1h`                                               |
-| `--addr`          | `string`        | Listen address for OIDC auth flow                                | `localhost:3000`                                   |
-| `--log`           | `string`        | Path to log file                                                 | `%PROGRAMDATA%\Serverless SSH CA Client/tray.log`  |
-| `--crash`         | `string`        | Path to log file for panics/crashes                              | `%PROGRAMDATA%\Serverless SSH CA Client/crash.log` |
-| `--config`        | `string`        | Path to configuration file                                       | `%APPDATA%\Serverless SSH CA Client/config.yml`    |
-| `--user`          | `string`        | Path to user configuration file                                  | `%PROGRAMDATA%\Serverless SSH CA Client/user.yml`  |
-| `--disable-proxy` | `bool`          | Disable proxying of PuTTY Agent (pageant) requests               | `false`                                            |
-| `--add-on-start`  | `bool`          | Add current key and certificate (if valid) to SSH agent on start | `true`                                             |
+| Flag              | Type            | Description                                                      |
+|-------------------|-----------------|------------------------------------------------------------------|
+| `--life`          | `time.Duration` | Lifetime of SSH certificate                                      | 
+| `--renew`         | `time.Duration` | Renew once remaining time gets below this value                  |
+| `--addr`          | `string`        | Listen address for OIDC auth flow                                |
+| `--log`           | `string`        | Path to log file                                                 |
+| `--crash`         | `string`        | Path to log file for panics/crashes                              |
+| `--config`        | `string`        | Path to configuration file                                       |
+| `--user`          | `string`        | Path to user configuration file                                  |
+| `--disable-proxy` | `bool`          | Disable proxying of PuTTY Agent (pageant) requests               |
+| `--add-on-start`  | `bool`          | Add current key and certificate (if valid) to SSH agent on start |
 
 The defaults are as follows:
 
