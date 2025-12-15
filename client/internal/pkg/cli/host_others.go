@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
@@ -16,7 +17,7 @@ import (
 )
 
 type hostCommand struct {
-	keypath    string
+	keypath    []string
 	renew      bool
 	lifetime   time.Duration
 	listenAddr string
@@ -40,15 +41,16 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 	principals := make([]string, 0)
 	hostname, err := os.Hostname()
 	if err == nil {
-		principals = append(principals, hostname)
+		principals = append(principals, strings.ToLower(hostname))
 	}
 
 	cmd := cd.CobraCommand
 	cmd.Flags().DurationVar(&c.lifetime, "life", host.DefaultLifetime, "Lifetime of SSH certificate")
-	cmd.Flags().StringVar(&c.keypath, "key", "", "Path to private key")
+	cmd.Flags().StringSliceVar(&c.keypath, "key", []string{"/etc/ssh/ssh_host_ed25519_key", "/etc/ssh/ssh_host_ecdsa_key", "/etc/ssh/ssh_host_rsa_key"}, "Path to private key(s)")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	cmd.Flags().StringSliceVar(&c.principals, "principals", principals, "Principals to add to the host certificate request")
 	cmd.Flags().BoolVar(&c.renew, "renew", false, "Renew existing certificate")
+	cmd.MarkFlagsMutuallyExclusive("renew", "principals")
 	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 	cmd.Flags().BoolVar(&c.force, "force", false, "Force renewal even if current certificate has more than 50% validity left")
 
