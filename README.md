@@ -16,7 +16,9 @@ The IdP may be any OIDC compatible service that returns a JWT with at least
 an `email` claim in the OIDC access token, however at this time only
 Cloudflare Access has been tested.
 
-The flow to obtain a certificate using the CLI version is as follows:
+### User Certificates
+
+The flow to obtain a User SSH certificate using the CLI version is as follows:
 
 1. The user initiates `ssh-ca-client-cli login`
 2. If required a new SSH key is generated and the a browser is opened to
@@ -87,6 +89,68 @@ If the process to request a new authentication token fails using the refresh
 token, the standard authentication process is followed which requires user
 interaction.
 
+### Host Certificates
+
+#### Initial Request
+
+The process to request an intitial Host certificate is similar to obtaining
+a User certificate once `ssh-ca-client-cli host` is run, however instead of
+adding the obtained certificate to a SSH Agent, it is written to
+`<KEYPATH>-cert.pub` instead:
+
+```mermaid
+sequenceDiagram
+    User->>Client: GET /auth/login
+    activate Client
+    Client-->>User: Redirect to IdP
+    deactivate Client
+    activate User
+    User->>IdP: OIDC authentication flow
+    deactivate User
+    activate IdP
+    IdP-->>User: Redirect to Client
+    deactivate IdP
+    activate User
+    User->>Client: Completes OIDC redirect
+    deactivate User
+    activate Client
+    activate Client
+    Client-->>User: Auth flow completed
+    deactivate Client
+    Client->>CA: POST /api/v2/host/request
+    deactivate Client
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>Writes Certificate: Certificate written to disk
+    deactivate Client
+```
+
+#### Renewals
+
+Renewals are done using the existing certificate and will succeed if:
+
+1. The certificate is not expired
+2. It was issued by the CA
+3. The public key used to obtain the certificate is the same as the one
+currently presented
+
+This means the OIDC authentication flow is not required in this case as shown
+below when `ssh-ca-client-cli host --renew` is run:
+
+```mermaid
+sequenceDiagram
+    Client->>CA: POST /api/v2/host/renew
+    deactivate Client
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>Writes Certificate: Certificate written to disk
+    deactivate Client
+```
+
 ## Deployment
 
 Once you have cloned this repository, firstly install the dependencies:
@@ -143,7 +207,8 @@ The secret should be an OpenSSH private key generated as follows:
 ssh-keygen -t ecdsa -b 256 -f path/to/ca_key
 ```
 
-Other key types and sizes apart from ECDSA should work fine but are untested.
+At this time only ECDSA and ED25519 key types are supported for the CA,
+however RSA, ECDSA and ED25519 keys are supported for users and hosts.
 
 3. Generate the Worker types for your deployment:
 
@@ -205,6 +270,9 @@ ssh-ca-client-cli generate
 
 # perform a login to the IdP and request a signed certificate
 ssh-ca-client-cli login
+
+# issue host keys
+ssh-ca-client-cli host
 ```
 
 This should automatically start a web browser to initiate the OIDC login flow,
@@ -244,6 +312,10 @@ changes must be made:
 PubkeyAuthentication yes
 TrustedUserCAKeys /etc/ssh/ca.pub
 AuthorizedPrincipalsFile /etc/ssh/principals.d/%u
+# Uncomment the following lines to enable host certificates
+# HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+# HostCertificate /etc/ssh/ssh_host_ecdsa_key-cert.pub
+# HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
 ```
 
 The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be
