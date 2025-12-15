@@ -214,7 +214,7 @@ export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.R
         }
 
         // verify nonce signature
-        if (!val.nonce.verify(val.public_key)) {
+        if (!val.nonce.verify()) {
             return fatalIssue(ctx, "nonce signature validation failed")
         }
 
@@ -254,7 +254,7 @@ export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, 
         }
 
         // verify nonce signature
-        if (!val.nonce.verify(val.public_key)) {
+        if (!val.nonce.verify()) {
             return fatalIssue(ctx, "nonce signature validation failed")
         }
 
@@ -282,7 +282,7 @@ export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, 
         }
 
         // verify nonce signature
-        if (!val.nonce.verify(val.public_key)) {
+        if (!val.nonce.verify()) {
             return fatalIssue(ctx, "nonce signature validation failed")
         }
 
@@ -293,5 +293,9 @@ export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, 
 }
 
 export const split = (v: string): string[] => {
+    if (v === "") {
+        return []
+    }
+    
     return v.split(",")
 }

@@ -2,7 +2,6 @@ package config
 
 import (
 	"bytes"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -318,7 +317,6 @@ func TestConfig_getPublicKeyBytes(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Key PEM Bytes: %v\n", pemBytes)
 
 	// parse into a private key
 	key, err := ssh.ParsePrivateKey(pemBytes)

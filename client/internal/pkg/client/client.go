@@ -26,6 +26,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
+	"github.com/hiddeco/sshsig"
 	"github.com/openpubkey/openpubkey/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
@@ -62,8 +63,9 @@ type LoginHandler struct {
 }
 
 const (
-	DefaultLifetime = time.Hour * 24
-	UserAgent       = "Serverless-SSH-CA-Client"
+	DefaultLifetime    = time.Hour * 24
+	UserAgent          = "Serverless-SSH-CA-Client"
+	SignatureNamespace = "file"
 )
 
 var (
@@ -610,11 +612,12 @@ func GenerateNonce(signer ssh.Signer) (string, error) {
 
 	// sign data and add to end
 	data := []byte(strings.Join(dataToSign, "."))
-	signature, err := signer.Sign(rand.Reader, data)
+	sig, err := sshsig.Sign(bytes.NewReader(data), signer, sshsig.HashSHA512, "file")
 	if err != nil {
 		return "", err
 	}
-	signedData := append(dataToSign, fmt.Sprintf("%s:%s", signature.Format, base64.StdEncoding.EncodeToString(signature.Blob)))
+	armoredSignature := sshsig.Armor(sig)
+	signedData := append(dataToSign, base64.StdEncoding.EncodeToString(armoredSignature))
 
 	// return encoded data
 	return strings.Join(signedData, "."), nil
