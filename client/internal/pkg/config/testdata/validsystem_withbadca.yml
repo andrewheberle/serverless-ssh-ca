@@ -1,0 +1,6 @@
+issuer: OIDC Issuer
+client_id: OIDC Client ID
+scopes: ["openid", "email", "profile"]
+redirect_url: http://localhost:3000/auth/callback
+ca_url: https://ssh-ca.example.com/
+trusted_ca: somerandomdata

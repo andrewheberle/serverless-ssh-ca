@@ -605,6 +605,13 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		return nil, fmt.Errorf("certficate from CA had different subject key than expected")
 	}
 
+	// check against CA
+	if ca := lh.config.CertificateAuthority(); ca != nil {
+		if !bytes.Equal(ca.Marshal(), newCert.SignatureKey.Marshal()) {
+			return nil, fmt.Errorf("certficate was signed by an unknown CA")
+		}
+	}
+
 	return &csr, nil
 }
 

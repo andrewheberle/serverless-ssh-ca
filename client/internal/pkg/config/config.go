@@ -16,9 +16,8 @@ import (
 const FriendlyAppName = "Serverless SSH CA Client"
 
 type Config struct {
-	mu     sync.RWMutex
-	system SystemConfig
-	// userConfigName string
+	mu          sync.RWMutex
+	system      SystemConfig
 	user        UserConfig
 	protector   protect.Protector
 	persistence Persistence
@@ -32,11 +31,13 @@ type ClientOIDCConfig struct {
 }
 
 type SystemConfig struct {
-	Issuer                  string   `json:"issuer"`
-	ClientID                string   `json:"client_id"`
-	Scopes                  []string `json:"scopes"`
-	RedirectURL             string   `json:"redirect_url"`
-	CertificateAuthorityURL string   `json:"ca_url"`
+	Issuer                      string   `json:"issuer"`
+	ClientID                    string   `json:"client_id"`
+	Scopes                      []string `json:"scopes"`
+	RedirectURL                 string   `json:"redirect_url"`
+	CertificateAuthorityURL     string   `json:"ca_url"`
+	TrustedCertificateAuthority string   `json:"trusted_ca"`
+	ca                          ssh.PublicKey
 }
 
 type UserConfig struct {
@@ -303,6 +304,14 @@ func (c *Config) Signer() (ssh.Signer, error) {
 	return c.signer()
 }
 
+// CertificateAuthority returns the CA PublicKey
+func (c *Config) CertificateAuthority() ssh.PublicKey {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.system.CertificateAuthority()
+}
+
 func (c *Config) signer() (ssh.Signer, error) {
 	// get key
 	pemBytes, err := c.getPrivateKeyBytes()
@@ -319,4 +328,8 @@ func clearBytes(b []byte) {
 	for i := range b {
 		b[i] = 0
 	}
+}
+
+func (c *SystemConfig) CertificateAuthority() ssh.PublicKey {
+	return c.ca
 }

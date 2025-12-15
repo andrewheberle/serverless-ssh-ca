@@ -35,6 +35,11 @@ func (p *mockPersistence) Save(c UserConfig) error {
 }
 
 func TestLoadConfig(t *testing.T) {
+	ca, _, _, _, err := ssh.ParseAuthorizedKey([]byte("ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMgJTsYW+tHl0lz/rnO8djbwq0B3uZ5sGugXU6Ha5S2rTdzMDgit2DO+hoivdT4I07rMrRtmFI179wUY06gIf00="))
+	if err != nil {
+		panic(err)
+	}
+
 	tests := []struct {
 		name    string
 		system  string
@@ -57,6 +62,22 @@ func TestLoadConfig(t *testing.T) {
 				persistence: &YamlPersistence{name: "missing.yml"},
 				protector:   protect.NewDefaultProtector(),
 			}, false},
+		{"system only with ca", "testdata/validsystem_withca.yml", "missing.yml",
+			&Config{
+				system: SystemConfig{
+					Issuer:                      "OIDC Issuer",
+					ClientID:                    "OIDC Client ID",
+					Scopes:                      []string{"openid", "email", "profile"},
+					RedirectURL:                 "http://localhost:3000/auth/callback",
+					CertificateAuthorityURL:     "https://ssh-ca.example.com/",
+					TrustedCertificateAuthority: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMgJTsYW+tHl0lz/rnO8djbwq0B3uZ5sGugXU6Ha5S2rTdzMDgit2DO+hoivdT4I07rMrRtmFI179wUY06gIf00=",
+					ca:                          ca,
+				},
+				user:        UserConfig{},
+				persistence: &YamlPersistence{name: "missing.yml"},
+				protector:   protect.NewDefaultProtector(),
+			}, false},
+		{"system only with invalid ca", "testdata/validsystem_withbadca.yml", "missing.yml", nil, true},
 		{"invalid system", "testdata/invalidsystem.yml", "testdata/validuser.yml", nil, true},
 		{"invalid user", "testdata/validsystem.yml", "testdata/invaliduser.yml", nil, true},
 		{"both valid", "testdata/validsystem.yml", "testdata/validuser.yml",

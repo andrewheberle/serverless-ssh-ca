@@ -59,6 +59,11 @@ func loadPolicy() SystemConfig {
 		config.RedirectURL = redirectURL
 	}
 
+	trustedCA, _, err := k.GetStringValue("TrustedCertificateAuthority")
+	if err == nil {
+		config.TrustedCertificateAuthority = trustedCA
+	}
+
 	certificateAuthorityURL, _, err := k.GetStringValue("CertificateAuthorityURL")
 	if err == nil {
 		config.CertificateAuthorityURL = certificateAuthorityURL
