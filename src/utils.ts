@@ -293,5 +293,9 @@ export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, 
 }
 
 export const split = (v: string): string[] => {
+    if (v === "") {
+        return []
+    }
+    
     return v.split(",")
 }

@@ -1,5 +1,5 @@
 import { seconds } from "itty-time"
-import { Certificate, createCertificate, Identity, identityForHost, identityForUser, identityFromDN, Key, parsePrivateKey } from "sshpk"
+import { Certificate, createCertificate, Identity, identityForHost, identityForUser, identityFromDN, Key, parsePrivateKey, PrivateKey } from "sshpk"
 import { SSHExtension } from "./types"
 import { env } from "cloudflare:workers"
 import { split } from "./utils"
@@ -24,28 +24,27 @@ export class CertificateExtraExtensionsError extends Error {
     // This is necessary for proper stack trace in TypeScript
     Object.setPrototypeOf(this, CertificateExtraExtensionsError.prototype)
   }
-} 
+}
 
-export async function createSignedCertificate(email: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
+export const generateCertificate = (email: string, key: PrivateKey, public_key: Key, lifetime?: number, principals?: string[], extensions?: string[]): Certificate => {
     // add identities
     const identity = env.SSH_CERTIFICATE_INCLUDE_SELF as string === "true"
         ? [identityForUser(email.split("@")[0])]
         : []
-    if (options.principals !== undefined) {
-        for (const p of options.principals) {
+    if (principals !== undefined) {
+        for (const p of principals) {
             identity.push(identityForUser(p))
         }
     }
-    for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
-        identity.push(identityForUser(p))
+    if (env.SSH_CERTIFICATE_PRINCIPALS as string !== "") {
+        for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
+            identity.push(identityForUser(p))
+        }
     }
 
-    // grab private key from secret store
-    const key = parsePrivateKey(await env.PRIVATE_KEY.get())
-
     // lifetime is the smaller of what was provided in the options or the default
-    const lifetime = options.lifetime !== undefined
-        ? Math.min(options.lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
+    lifetime = lifetime !== undefined
+        ? Math.min(lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
         : seconds(env.SSH_CERTIFICATE_LIFETIME)
 
     // generate value for serial of certificate
@@ -60,16 +59,16 @@ export async function createSignedCertificate(email: string, public_key: Key, op
     const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
 
     // add usage extensions
-    const extensions: SSHExtension[] = []
-    if (options.extensions !== undefined) {
+    const sshextensions: SSHExtension[] = []
+    if (extensions !== undefined) {
         // if extensions are provided in request, ensure they do not include extra extensions beyond the defaults
-        for (const ext of options.extensions) {
+        for (const ext of extensions) {
             if (!split(env.SSH_CERTIFICATE_EXTENSIONS).includes(ext)) {
                 throw new CertificateExtraExtensionsError(`${ext} is not allowed`)
             }
 
             // add to list of allowed extensions
-            extensions.push({
+            sshextensions.push({
                 critical: false,
                 name: ext,
                 data: Buffer.alloc(0)
@@ -78,7 +77,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
     } else {
         // use defaults if not provided
         split(env.SSH_CERTIFICATE_EXTENSIONS).forEach((ext: string) => {
-            extensions.push({
+            sshextensions.push({
                 critical: false,
                 name: ext,
                 data: Buffer.alloc(0)
@@ -94,7 +93,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
                 nonce: certificate.signatures.openssh.nonce,
                 keyId: email,
                 signature: certificate.signatures.openssh.signature,
-                exts: extensions,
+                exts: sshextensions,
             }
         }
     }
@@ -103,6 +102,13 @@ export async function createSignedCertificate(email: string, public_key: Key, op
     certificate.signWith(key)
 
     return certificate
+}
+
+export async function createSignedCertificate(email: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
+    // grab private key from secret store
+    const key = parsePrivateKey(await env.PRIVATE_KEY.get())
+
+    return generateCertificate(email, key, public_key, options.lifetime, options.principals, options.extensions)
 }
 
 export type CreateHostCertificateOptions = {
