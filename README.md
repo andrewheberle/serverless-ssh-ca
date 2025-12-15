@@ -322,7 +322,7 @@ The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be
 retrieved as follows:
 
 ```sh
-curl https://ssh-ca.example.com/api/v1/ca | sudo tee /etc/ssh/ca.pub
+curl https://ssh-ca.example.com/api/v2/ca | sudo tee /etc/ssh/ca.pub
 ```
 
 The `/etc/ssh/principals.d` directory should contain a file corresponding to
