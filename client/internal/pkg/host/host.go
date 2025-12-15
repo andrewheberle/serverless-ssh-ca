@@ -30,6 +30,7 @@ import (
 
 const (
 	DefaultLifetime = (time.Hour * 24) * 30
+	DefaultRenewAt  = 0.2
 )
 
 var (
@@ -40,6 +41,7 @@ var (
 	ErrConnectingToAgent   = errors.New("could not connect to agent")
 	ErrAddingToAgent       = errors.New("could not add to agent")
 	ErrCertificateNotValid = errors.New("certificate validity not ok")
+	ErrInvalidRenewAt      = errors.New("renewat must be between 0.0 and 1.0")
 
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
@@ -68,6 +70,7 @@ type LoginHandler struct {
 	store        *sessions.CookieStore
 	config       *config.SystemConfig
 	lifetime     time.Duration
+	renewat      float32
 	redirectURL  *url.URL
 	done         chan error
 	logger       *slog.Logger
@@ -76,6 +79,7 @@ type LoginHandler struct {
 }
 
 type sshKey struct {
+	cert      *ssh.Certificate
 	certBytes []byte
 	key       ssh.Signer
 	keypath   string
@@ -90,11 +94,17 @@ func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...
 		principals: make([]string, 0),
 		done:       make(chan error),
 		logger:     DefaultLogger,
+		renewat:    DefaultRenewAt,
 	}
 
 	// set from options
 	for _, o := range opts {
 		o(lh)
+	}
+
+	// check renewat is valid
+	if lh.renewat > 1 || lh.renewat < 0 {
+		return nil, ErrInvalidRenewAt
 	}
 
 	// tweak logger
@@ -131,13 +141,14 @@ func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...
 				continue
 			}
 
-			_, ok := pubKey.(*ssh.Certificate)
+			cert, ok := pubKey.(*ssh.Certificate)
 			if !ok {
 				lh.logger.Warn("not a valid SSH certificate", "path", certPath(k))
 				continue
 			}
 
 			keys = append(keys, sshKey{
+				cert:      cert,
 				certBytes: certBytes,
 				key:       key,
 				keypath:   k,
@@ -339,6 +350,14 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 
 	for _, k := range lh.keys {
 		logger := lh.logger.With("key", k.keypath)
+		expiry := time.Unix(int64(k.cert.ValidBefore), 0)
+		timeleft := time.Until(expiry)
+
+		if !(lh.lifetime*time.Duration(lh.renewat) > timeleft) {
+			logger.Info("skipping renewal as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
+			continue
+		}
+
 		logger.Info("starting signing request process")
 		csr, err := lh.doSigningRequest(client, k.key, k.certBytes)
 		if err != nil {

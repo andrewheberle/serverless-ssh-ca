@@ -52,7 +52,7 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.Flags().BoolVar(&c.renew, "renew", false, "Renew existing certificate")
 	cmd.MarkFlagsMutuallyExclusive("renew", "principals")
 	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
-	cmd.Flags().BoolVar(&c.force, "force", false, "Force renewal even if current certificate has more than 50% validity left")
+	cmd.Flags().BoolVar(&c.force, "force", false, fmt.Sprintf("Force renewal even if current certificate has more than %0.1f%% validity left", host.DefaultRenewAt*100.0))
 
 	return nil
 }
@@ -84,6 +84,9 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 
 	if c.renew {
 		opts = append(opts, host.WithRenewal())
+		if c.force {
+			opts = append(opts, host.WithRenewAt(1.0))
+		}
 	}
 
 	if c.debug {
