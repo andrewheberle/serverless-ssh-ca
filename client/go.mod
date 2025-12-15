@@ -17,7 +17,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/crypto v0.45.0
-	golang.org/x/oauth2 v0.33.0
+	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sys v0.38.0
 	golang.zx2c4.com/wireguard/windows v0.5.3
 	sigs.k8s.io/yaml v1.6.0
