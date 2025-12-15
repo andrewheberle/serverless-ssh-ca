@@ -42,3 +42,10 @@ func WithRenewAt(renewat float32) LoginHandlerOption {
 		lh.renewat = renewat
 	}
 }
+
+// WithDelay sets the delay between requests when handling multiple requests
+func WithDelay(delay time.Duration) LoginHandlerOption {
+	return func(lh *LoginHandler) {
+		lh.delay = delay
+	}
+}
