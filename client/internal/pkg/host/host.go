@@ -20,10 +20,10 @@ import (
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/openpubkey/openpubkey/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
