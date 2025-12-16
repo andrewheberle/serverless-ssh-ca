@@ -14,7 +14,7 @@ func sandbox(systemConfig, userConfig, logDir, listenAddr string) error {
 		return err
 	}
 
-	port, err := strconv.Atoi(p)
+	port, err := strconv.ParseUint(p, 10, 16)
 	if err != nil {
 		return err
 	}
