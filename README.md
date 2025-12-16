@@ -142,7 +142,6 @@ below when `ssh-ca-client-cli host --renew` is run:
 ```mermaid
 sequenceDiagram
     Client->>CA: POST /api/v2/host/renew
-    deactivate Client
     activate CA
     CA-->>Client: Signed certificate
     deactivate CA
