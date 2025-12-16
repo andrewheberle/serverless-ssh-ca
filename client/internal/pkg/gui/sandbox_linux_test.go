@@ -11,7 +11,7 @@ func Test_sandbox(t *testing.T) {
 		listenAddr   string
 		wantErr      bool
 	}{
-		{"should pass", "/a/apth/to/somewhere.yml", "/a/apth/to/somewhere/else.yml", "/a/path/to/logs", "localhost:3000", false},
+		{"should pass", "/etc/config.yml", "/tmp/user.yml", "/var/log/tray.log", "localhost:3000", false},
 		{"expected to fail with no port", "/a/apth/to/somewhere.yml", "/a/apth/to/somewhere/else.yml", "/a/path/to/logs", "localhost", true},
 		{"expected to fail with number too big", "/a/apth/to/somewhere.yml", "/a/apth/to/somewhere/else.yml", "/a/path/to/logs", "localhost:99000", true},
 	}
