@@ -22,6 +22,14 @@ builds:
       - arm64
     goos:
       - linux
+    main: ./cmd/ssh-ca-client-cli
+  - id: windowscli
+    binary: ssh-ca-client-cli
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+    goos:
       - windows
     main: ./cmd/ssh-ca-client-cli
   - id: windowsgui
