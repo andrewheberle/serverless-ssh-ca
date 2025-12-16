@@ -2,7 +2,7 @@
 
 <policyDefinitions revision="1.0" schemaVersion="1.0">
     <policyNamespaces>
-        <target prefix="sshcaclient" namespace="SSHCAClient_v0.9.6" />
+        <target prefix="sshcaclient" namespace="SSHCAClient_v0.12.5" />
     </policyNamespaces>
     <resources minRequiredRevision="1.0" />
     <supportedOn>
