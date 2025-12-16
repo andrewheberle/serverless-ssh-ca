@@ -20,10 +20,10 @@ func sandbox(systemConfig, userConfig, logDir, listenAddr string) error {
 	}
 
 	return landlock.V5.BestEffort().Restrict(
-		landlock.ROFiles(systemConfig),
-		landlock.RWDirs(filepath.Dir(userConfig)),
-		landlock.RWFiles(userConfig),
-		landlock.RWDirs(logDir),
+		landlock.ROFiles(systemConfig).IgnoreIfMissing(),
+		landlock.RWDirs(filepath.Dir(userConfig)).IgnoreIfMissing(),
+		landlock.RWFiles(userConfig).IgnoreIfMissing(),
+		landlock.RWDirs(logDir).IgnoreIfMissing(),
 		landlock.BindTCP(uint16(port)),
 		landlock.ConnectTCP(53),
 		landlock.ConnectTCP(443),
