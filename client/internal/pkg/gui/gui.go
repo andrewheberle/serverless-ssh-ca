@@ -75,6 +75,11 @@ func Execute(ctx context.Context, args []string) error {
 		return fmt.Errorf("--renew cannot be larger than --life")
 	}
 
+	// sandbox process
+	if err := sandbox(systemConfigFile, userConfigFile, logDir, listenAddr); err != nil {
+		return err
+	}
+
 	// make sure user config dir exists
 	if err := os.MkdirAll(user, 0755); err != nil {
 		return err
