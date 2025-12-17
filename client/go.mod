@@ -13,7 +13,6 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/hiddeco/sshsig v0.2.0
-	github.com/landlock-lsm/go-landlock v0.0.0-20251103212306-430f8e5cd97c
 	github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec
 	github.com/spf13/pflag v1.0.10
 	github.com/zalando/go-keyring v0.2.6
@@ -44,5 +43,4 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
-	kernel.org/pub/linux/libs/security/libcap/psx v1.2.77 // indirect
 )
