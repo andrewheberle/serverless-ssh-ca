@@ -9,6 +9,8 @@ description: |
   
   Also included is the CLI version, however the snap version does not include
   host key management features.
+
+  This requires the deployment of the CA component on Cloudflare Workers.
 contact: https://github.com/andrewheberle/serverless-ssh-ca/issues
 source-code: https://github.com/andrewheberle/serverless-ssh-ca
 issues: https://github.com/andrewheberle/serverless-ssh-ca/issues
