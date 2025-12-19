@@ -19,6 +19,7 @@ apps:
   ssh-ca-client:
     command: bin/ssh-ca-client
     plugs:
+      - desktop
       - network
       - network-bind
   cli:
