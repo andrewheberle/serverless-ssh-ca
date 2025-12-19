@@ -19,6 +19,11 @@ const (
 )
 
 func ConfigDirs() (user, system string, err error) {
+	// are we running as a snap?
+	if os.Getenv("SNAP_USER_COMMON") != "" && os.Getenv("SNAP_COMMON") != "" && os.Getenv("IGNORE_SNAP_DURING_TEST") == "" {
+		return os.Getenv("SNAP_USER_COMMON"), os.Getenv("SNAP_COMMON"), nil
+	}
+
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", "", err
