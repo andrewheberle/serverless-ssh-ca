@@ -14,6 +14,7 @@ source-code: https://github.com/andrewheberle/serverless-ssh-ca
 issues: https://github.com/andrewheberle/serverless-ssh-ca/issues
 website: https://github.com/andrewheberle/serverless-ssh-ca
 license: Apache-2.0
+icon: snap/ssh-ca-client/icon.png
 
 grade: stable
 confinement: strict
