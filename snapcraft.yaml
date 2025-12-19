@@ -18,8 +18,14 @@ confinement: strict
 apps:
   ssh-ca-client:
     command: bin/ssh-ca-client
+    plugs:
+      - network
+      - network-bind
   cli:
     command: bin/ssh-ca-client-cli
+    plugs:
+      - network
+      - network-bind
 
 parts:
   version:
