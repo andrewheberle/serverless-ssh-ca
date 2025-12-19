@@ -1,0 +1,65 @@
+name: ssh-ca-client
+title: Serverless SSH CA Client
+base: core24
+adopt-info: version
+summary: A client for a Serverless SSH CA
+description: |
+  This snap includes the graphical client side component of a Serverless SSH CA
+  that handles requesting and renewing user certificates on your device.
+  
+  Also included is the CLI version, however the snap version does not include
+  host key management features.
+
+  This requires the deployment of the CA component on Cloudflare Workers.
+contact: https://github.com/andrewheberle/serverless-ssh-ca/issues
+source-code: https://github.com/andrewheberle/serverless-ssh-ca
+issues: https://github.com/andrewheberle/serverless-ssh-ca/issues
+website: https://github.com/andrewheberle/serverless-ssh-ca
+license: Apache-2.0
+icon: snap/gui/ssh-ca-client.png
+
+grade: stable
+confinement: strict
+
+apps:
+  ssh-ca-client:
+    command: bin/ssh-ca-client
+    plugs:
+      - desktop
+      - desktop-legacy
+      - network
+      - network-bind
+      - password-manager-service
+  cli:
+    command: bin/ssh-ca-client-cli
+    plugs:
+      - desktop
+      - network
+      - network-bind
+      - password-manager-service
+parts:
+  version:
+    plugin: dump
+    source: .
+    source-type: local
+    build-packages:
+      - git
+    override-pull: |
+      craftctl default
+      TAG="$(git describe --tags)"
+      craftctl set version="${TAG#v}"
+    stage:
+      - -*
+
+  go-build:
+    plugin: go
+    source: ./client
+    source-type: local
+    build-snaps:
+      - go/1.25/stable
+    go-buildtags:
+      - snap
+
+platforms:
+  amd64:
+

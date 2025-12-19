@@ -1,7 +1,5 @@
 al.essio.dev/pkg/shellescape v1.5.1 h1:86HrALUujYS/h+GtqoB26SBEdkWfmMI6FubjXlsXyho=
 al.essio.dev/pkg/shellescape v1.5.1/go.mod h1:6sIqp7X2P6mThCQ7twERpZTuigpr6KbZWtls1U8I890=
-fyne.io/systray v1.11.0 h1:D9HISlxSkx+jHSniMBR6fCFOUjk1x/OOOJLa9lJYAKg=
-fyne.io/systray v1.11.0/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 git.sr.ht/~jackmordaunt/go-toast v1.1.2 h1:/yrfI55LRt1M7H1vkaw+NaH1+L1CDxrqDltwm5euVuE=
 git.sr.ht/~jackmordaunt/go-toast v1.1.2/go.mod h1:jA4OqHKTQ4AFBdwrSnwnskUIIS3HYzlJSgdzCKqfavo=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
@@ -12,6 +10,8 @@ github.com/andrewheberle/simplecommand v0.5.0 h1:xFHc96leV1SdochxzDwz8puAEsk6dfm
 github.com/andrewheberle/simplecommand v0.5.0/go.mod h1:CjhYjrAAQaelwcX0/c3ecK2Um6PpWMAOfX5xr7ke0Uk=
 github.com/andrewheberle/sshagent v1.0.0 h1:fqyiiEJGHc2nxDAhtQnYYeh+nxlKGLjSphAVU/YDH7Y=
 github.com/andrewheberle/sshagent v1.0.0/go.mod h1:n/xAqd896rpytmQnumHk7qVPN2yixUbfgq6fsEP/nBU=
+github.com/andrewheberle/systray v0.0.0-20251219052716-cd486f095dbb h1:2txUimIxi9W92pajnIBN3DsTlyBYny/zhnOPSeUIwtI=
+github.com/andrewheberle/systray v0.0.0-20251219052716-cd486f095dbb/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 github.com/bep/simplecobra v0.6.1 h1:ORBAC5CSar99/NPZ5fCthCx/uvlm7ry58wwDsZ23a20=
 github.com/bep/simplecobra v0.6.1/go.mod h1:hmtjyHv6xwD637ScIRP++0NKkR5szrHuMw5BxMUH66s=
 github.com/coreos/go-oidc/v3 v3.17.0 h1:hWBGaQfbi0iVviX4ibC7bk8OKT5qNr4klBaCHVNvehc=

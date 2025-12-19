@@ -52,23 +52,7 @@ func Execute(ctx context.Context, args []string) error {
 	rootCmd := &rootCommand{
 		Command: simplecommand.New("ssh-ca-client-cli", "A CLI based client for a serverless SSH CA"),
 	}
-	rootCmd.SubCommands = []simplecobra.Commander{
-		&generateCommand{
-			Command: simplecommand.New("generate", "Generate a SSH private key"),
-		},
-		&hostCommand{
-			Command: simplecommand.New("host", "Request or renew host certificates"),
-		},
-		&loginCommand{
-			Command: simplecommand.New("login", "Login via OIDC and request a certificate from CA"),
-		},
-		&showCommand{
-			Command: simplecommand.New("show", "Show existing private/public key"),
-		},
-		&versionCommand{
-			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client"),
-		},
-	}
+	rootCmd.SubCommands = commands()
 
 	// Set up simplecobra
 	x, err := simplecobra.New(rootCmd)
