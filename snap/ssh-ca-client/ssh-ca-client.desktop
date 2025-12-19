@@ -1,0 +1,3 @@
+[Desktop Entry]
+Exec=ssh-ca-client
+Icon=${SNAP}/meta/ssh-ca-client/icon.png
