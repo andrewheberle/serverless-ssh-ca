@@ -53,8 +53,8 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
-          name: snap
-          path: ${{ steps.snapcraft.outputs.snap }}
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
   msi-release:
     name: Package as an MSI
     runs-on: windows-latest
