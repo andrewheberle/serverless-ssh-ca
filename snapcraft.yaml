@@ -23,13 +23,13 @@ apps:
       - desktop-legacy
       - network
       - network-bind
+      - password-manager-service
   cli:
     command: bin/ssh-ca-client-cli
     plugs:
-      - desktop
       - network
       - network-bind
-
+      - password-manager-service
 parts:
   version:
     plugin: dump
