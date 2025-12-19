@@ -36,6 +36,15 @@ jobs:
           name: dist-artifact
           path: client/dist/**/*.exe
           retention-days: 1
+  snapcraft-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: snapcore/action-build@v1
   msi-build:
     name: Package as an MSI
     runs-on: windows-latest
