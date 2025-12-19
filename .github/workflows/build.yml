@@ -36,6 +36,23 @@ jobs:
           name: dist-artifact
           path: client/dist/**/*.exe
           retention-days: 1
+  snapcraft-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: snapcore/action-build@v1
+        id: snapcraft
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: edge
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
   msi-build:
     name: Package as an MSI
     runs-on: windows-latest
