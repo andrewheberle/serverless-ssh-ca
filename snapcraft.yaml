@@ -18,14 +18,8 @@ confinement: strict
 apps:
   ssh-ca-client:
     command: bin/ssh-ca-client
-    plugs:
-      - home
-      - dot-serverless-ssh-ca-config
   cli:
     command: bin/ssh-ca-client-cli
-    plugs:
-      - home
-      - dot-serverless-ssh-ca-config
 
 parts:
   version:
@@ -52,10 +46,4 @@ parts:
 
 platforms:
   amd64:
-
-plugs:
-  dot-serverless-ssh-ca-config:
-    interface: personal-files
-    write:
-      - $HOME/.config/serverless-ssh-ca
 
