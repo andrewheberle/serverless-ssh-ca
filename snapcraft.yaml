@@ -8,8 +8,11 @@ description: |
   
   Also included is the CLI version, however the snap version does not include
   host key management features.
+source-code: https://github.com/andrewheberle/serverless-ssh-ca
+issues: https://github.com/andrewheberle/serverless-ssh-ca/issues
+license: Apache-2.0
 
-grade: devel
+grade: stable
 confinement: strict
 
 apps:
@@ -54,5 +57,5 @@ plugs:
   dot-serverless-ssh-ca-config:
     interface: personal-files
     write:
-      $HOME/.config/serverless-ssh-ca
+      - $HOME/.config/serverless-ssh-ca
 
