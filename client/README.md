@@ -8,6 +8,10 @@ Certificate Authority in this repository.
 There are two versions of the client, one CLI based and the other GUI based both of which
 are tested on Windows and Linux.
 
+[![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/ssh-ca-client)
+
+On Linux the cluent is available from the Snapcraft store. 
+
 On Windows there is an MSI built that includes both the GUI and CLI versions and is the
 recommended option for Windows users.
 
