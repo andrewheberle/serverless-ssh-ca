@@ -50,7 +50,7 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
-          snap: ${{ steps.build.outputs.snap }}
+          snap: ${{ steps.snapcraft.outputs.snap }}
           release: edge
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
   msi-build:
