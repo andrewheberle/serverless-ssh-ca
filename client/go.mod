@@ -3,7 +3,7 @@ module github.com/andrewheberle/serverless-ssh-ca/client
 go 1.24.2
 
 require (
-	fyne.io/systray v1.11.0
+	fyne.io/systray v1.12.0
 	github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37
 	github.com/andrewheberle/simplecommand v0.5.0
 	github.com/andrewheberle/sshagent v1.0.0
