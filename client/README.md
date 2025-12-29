@@ -10,7 +10,15 @@ are tested on Windows and Linux.
 
 [![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/ssh-ca-client)
 
-On Linux the cluent is available from the Snapcraft store. 
+On Linux the client is available from the Snapcraft store, however at this time the snap
+version is unable to add keys and issued certificates to the SSH agent due to strict
+confinement so the userfulness of this version is currently limited.
+
+In addition you must manually connect the `password-manager-service` interface for this snap as follows:
+
+```sh
+sudo snap connect ssh-ca-client:password-manager-service
+```
 
 On Windows there is an MSI built that includes both the GUI and CLI versions and is the
 recommended option for Windows users.
