@@ -52,13 +52,13 @@ func TestConfigDirs(t *testing.T) {
 	// tests for snap
 	{
 		// set variables so we can test result
-		if os.Getenv("SNAP_USER_COMMON") == "" {
-			if err := os.Setenv("SNAP_USER_COMMON", "/home/testuser/snap/ssh-ca-client"); err != nil {
+		if os.Getenv("SNAP_USER_DATA") == "" {
+			if err := os.Setenv("SNAP_USER_DATA", "/home/testuser/snap/ssh-ca-client"); err != nil {
 				panic(err)
 			}
 		}
-		if os.Getenv("SNAP_COMMON") == "" {
-			if err := os.Setenv("SNAP_COMMON", "/var/snap/ssh-ca-client/ssh-ca-client"); err != nil {
+		if os.Getenv("SNAP_DATA") == "" {
+			if err := os.Setenv("SNAP_DATA", "/var/snap/ssh-ca-client/ssh-ca-client"); err != nil {
 				panic(err)
 			}
 		}
@@ -73,7 +73,7 @@ func TestConfigDirs(t *testing.T) {
 			want2   string
 			wantErr bool
 		}{
-			{"test results", os.Getenv("SNAP_USER_COMMON"), os.Getenv("SNAP_COMMON"), false},
+			{"test results", os.Getenv("SNAP_USER_DATA"), os.Getenv("SNAP_DATA"), false},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {

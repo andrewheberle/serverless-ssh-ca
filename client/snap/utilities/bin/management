@@ -1,0 +1,72 @@
+#!/bin/sh
+
+
+get_value() {
+    if [ $# -ne 1 ]; then
+        return 1
+    fi
+
+    v="$(snapctl get "$1")"
+
+    if [ -z "$v" ]; then
+        return 1
+    fi
+
+    echo "$v"
+}
+
+issuer() {
+    get_value "issuer"
+}
+
+set_issuer() {
+    snapctl set issuer="$1"
+}
+
+client_id() {
+    get_value "client_id"
+}
+
+set_client_id() {
+    snapctl set client_id="$1"
+}
+
+scopes() {
+    if ! s="$(get_value "scopes")"; then
+        return $?
+    fi
+
+    if [ -z "$s" ]; then
+        printf '[ "openid", "email", "profile" ]'
+    fi
+
+    echo "$s" | awk -F',' '{printf "[ "; for(i=1; i<=NF; i++) {printf "\"%s\"", $i; if(i<NF) printf ", "} printf " ]\n"}'
+}
+
+set_scopes() {
+    snapctl set scopes="$1"
+}
+
+redirect_url() {
+    get_value "redirect_url"
+}
+
+set_redirect_url() {
+    snapctl set redirect_url="$1"
+}
+
+ca_url() {
+    get_value "ca_url"
+}
+
+set_ca_url() {
+    snapctl set ca_url="$1"
+}
+
+trusted_ca() {
+    get_value "trusted_ca"
+}
+
+set_trusted_ca() {
+    snapctl set trusted_ca="$1"
+}
