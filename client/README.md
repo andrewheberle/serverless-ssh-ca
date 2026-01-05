@@ -45,6 +45,8 @@ client_id: OIDC Client ID
 scopes: ["openid", "email", "profile"]
 redirect_url: http://localhost:3000/auth/callback
 ca_url: https://ca.example.com/
+# optional (but recommended) SSH public key of CA
+trusted_ca: ecdsa-sha2-nistp256 AAAAE2VjZ...
 ```
 
 The default location for this config file is
@@ -68,14 +70,32 @@ can be overidden using the `--user` command line flag.
 This allows the use of a shared/system configuration file that defines the
 OIDC and SSH CA configuration with user specific data kept seperate.
 
-### Security
+### As A Snap
+
+The snap build must be configured as follows:
+
+```sh
+sudo snap set ssh-ca-client issuer="OIDC Issuer"
+sudo snap set ssh-ca-client client-id="OIDC Client ID"
+# This is the default value
+sudo snap set ssh-ca-client scopes=openid,email,profile
+# This is the default value
+sudo snap set ssh-ca-client redirect-url=http://localhost:3000/auth/callback
+sudo snap set ssh-ca-client ca-url=https://ca.example.com/
+sudo snap set ssh-ca-client trusted-ca="ecdsa-sha2-nistp256 AAAAE2VjZ..."
+```
+
+The above commands would generate the same configuration as the YAML example
+above.
+
+### Configuration Privacy/Security
 
 On Windows, sensitive data such as the users SSH private key and the OIDC refresh
 token are encrypted using the Windows Data Protection API (DPAPI), while on Linux
 a random key is generated and saved in the users `login` keyring which is then
 used to encrypt this data using AES-GCM.
 
-If this random key is lost or deleted this data cannot be recoved so the user must
+If this random key is lost or deleted this data cannot be recovered so the user must
 regenerate their private key and request a new certificate.
 
 ## Requirements

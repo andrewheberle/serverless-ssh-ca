@@ -335,9 +335,10 @@ func (app *Application) eventloop() {
 				// skip interactive flow if error was related to ssh agent
 				if errors.Is(err, client.ErrAddingToAgent) || errors.Is(err, client.ErrConnectingToAgent) {
 					app.logger.Warn("certificate refreshed but could not add to agent", "error", err)
-					app.notify("Warning", "Certificate renewed byt could not add to SSH Agent", warningIcon)
+					app.notify("Warning", "A new certificate was issued but could not added to the local SSH Authentication Agent", warningIcon)
+					break
 				}
-				// then do interactive renewal
+				// then try interactive renewal
 				app.logger.Warn("could not perform a refresh, running renew", "error", err)
 				if err := app.renew(); err != nil {
 					app.logger.Error("could not renew certificate", "error", err)
@@ -346,7 +347,7 @@ func (app *Application) eventloop() {
 				}
 			}
 
-			app.notify("Certificate Issued", "A new certificate was issued and added to the local ssh-agent", okIcon)
+			app.notify("Certificate Issued", "A new certificate was issued and added to the local SSH Authentication Agent", okIcon)
 			app.state = stateCertificateOK
 		case <-app.mGenerate.ClickedCh:
 			// start by disabling menu item so we aren't overlapping

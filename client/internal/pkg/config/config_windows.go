@@ -20,6 +20,12 @@ const (
 	tokenSecretName = "token"
 )
 
+func LogDir() (string, error) {
+	user, _, err := ConfigDirs()
+
+	return user, err
+}
+
 func ConfigDirs() (user, system string, err error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {

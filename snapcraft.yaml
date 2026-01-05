@@ -55,6 +55,10 @@ parts:
     stage:
       - -*
 
+  scripts:
+    plugin: dump
+    source: client/scripts/utilities
+
   go-build:
     plugin: go
     source: ./client

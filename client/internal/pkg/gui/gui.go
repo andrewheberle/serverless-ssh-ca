@@ -31,6 +31,12 @@ func Execute(ctx context.Context, args []string) error {
 		return err
 	}
 
+	// get log dir
+	logBase, err := config.LogDir()
+	if err != nil {
+		return err
+	}
+
 	var lifetime, renewAt time.Duration
 	var listenAddr, logDir, systemConfigFile, userConfigFile string
 	var install, uninstall, disableProxy, addOnStart bool
@@ -40,7 +46,7 @@ func Execute(ctx context.Context, args []string) error {
 	flags.DurationVar(&lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	flags.DurationVar(&renewAt, "renew", time.Hour, "Renew once remaining time gets below this value")
 	flags.StringVar(&listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
-	flags.StringVar(&logDir, "log", filepath.Join(user, "log"), "Log directory")
+	flags.StringVar(&logDir, "log", filepath.Join(logBase, "log"), "Log directory")
 	flags.StringVar(&systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
 	flags.StringVar(&userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
 	// only proxy pageant on Windows
@@ -75,8 +81,8 @@ func Execute(ctx context.Context, args []string) error {
 		return fmt.Errorf("--renew cannot be larger than --life")
 	}
 
-	// make sure user config dir exists
-	if err := os.MkdirAll(user, 0755); err != nil {
+	// make sure user config location exists
+	if err := os.MkdirAll(filepath.Dir(userConfigFile), 0755); err != nil {
 		return err
 	}
 
@@ -144,6 +150,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 	defer func() {
 		_ = lockFile.Close()
+		_ = os.Remove(lockFile.Name())
 	}()
 
 	// start pageant proxy if requested
