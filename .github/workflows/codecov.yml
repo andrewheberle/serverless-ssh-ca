@@ -81,6 +81,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: node-coverage
+          path: coverage
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
