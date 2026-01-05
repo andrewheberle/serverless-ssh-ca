@@ -150,6 +150,7 @@ func Execute(ctx context.Context, args []string) error {
 	}
 	defer func() {
 		_ = lockFile.Close()
+		_ = os.Remove(lockFile.Name())
 	}()
 
 	// start pageant proxy if requested
