@@ -9,10 +9,10 @@ handle_config() {
         return $?
     fi
 
-    config="$(printf 'issuer: %s\nclient_id: %s\nscopes: [%s]\nredirect_url: %s\nca_url: %s\n' \
-        "$(issuer)" "$(clien-id)" "$(scopes)" "$(redirect-url)" "$(ca-url)")"
+    config="$(printf 'issuer: %s\nclient_id: %s\nscopes: %s\nredirect_url: %s\nca_url: %s\n' \
+        "$(issuer)" "$(client_id)" "$(scopes)" "$(redirect_url)" "$(ca_url)")"
 
-    if ca="$(trusted-ca)"; then
+    if ca="$(trusted_ca)"; then
         config="$(printf '%s\ntrusted_ca: %s\n' "$config" "$ca")"
     fi
 
