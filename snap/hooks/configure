@@ -21,10 +21,12 @@ handle_config() {
     fi
 
     if ! echo "$config" > "$tempconfig"; then
+        rm -f "$tempconfig"
         return $?
     fi
 
     if ! chmod 0644 "$tempconfig"; then
+        rm -f "$tempconfig"
         return $?
     fi
 

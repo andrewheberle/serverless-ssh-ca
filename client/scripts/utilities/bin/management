@@ -29,16 +29,8 @@ issuer() {
     get_value "issuer"
 }
 
-set_issuer() {
-    snapctl set issuer="$1"
-}
-
 client_id() {
     get_value "client-id"
-}
-
-set_client_id() {
-    snapctl set client-id="$1"
 }
 
 scopes() {
@@ -53,30 +45,22 @@ scopes() {
     echo "$s" | awk -F',' '{printf "[ "; for(i=1; i<=NF; i++) {printf "\"%s\"", $i; if(i<NF) printf ", "} printf " ]\n"}'
 }
 
-set_scopes() {
-    snapctl set scopes="$1"
-}
-
 redirect_url() {
-    get_value "redirect-url"
-}
+    if ! r="$(get_value "redirect-url")"; then
+        return $?
+    fi
 
-set_redirect_url() {
-    snapctl set redirect-url="$1"
+    if [ -z "$r" ]; then
+        printf 'http://localhost:3000/auth/callback'
+    fi
+
+    echo "$r"
 }
 
 ca_url() {
     get_value "ca-url"
 }
 
-set_ca_url() {
-    snapctl set ca-url="$1"
-}
-
 trusted_ca() {
     get_value "trusted-ca"
-}
-
-set_trusted_ca() {
-    snapctl set trusted-ca="$1"
 }
