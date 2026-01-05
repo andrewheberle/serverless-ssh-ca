@@ -31,7 +31,14 @@ jobs:
         run: |
           cd client
           go test -coverprofile=../coverage.txt ./...
-    
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: go-coverage
+          path: coverage.txt
+          retention-days: 1
+
   node-test:
     name: Run Worker tests and collect coverage
     runs-on: ubuntu-latest
@@ -50,6 +57,13 @@ jobs:
 
       - name: Run Typescript tests with coverage
         run: npm run coverage
+      
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: node-coverage
+          path: coverage/**
+          retention-days: 1
 
   upload:
     name: Upload results
@@ -58,6 +72,17 @@ jobs:
       - go-test
       - node-test
     steps:
+      - name: Download go-coverage
+        uses: actions/download-artifact@v7
+        with:
+          name: go-coverage
+
+      - name: Download node-coverage
+        uses: actions/download-artifact@v7
+        with:
+          name: node-coverage
+          path: coverage
+
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
         with:
