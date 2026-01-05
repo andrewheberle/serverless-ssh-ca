@@ -32,12 +32,38 @@ func TestConfigDirs(t *testing.T) {
 			if tt.wantErr {
 				t.Fatal("ConfigDirs() succeeded unexpectedly")
 			}
-			// TODO: update the condition below to compare got with tt.want.
-			if true {
+			if got != tt.want {
 				t.Errorf("ConfigDirs() = %v, want %v", got, tt.want)
 			}
-			if true {
+			if got2 != tt.want2 {
 				t.Errorf("ConfigDirs() = %v, want %v", got2, tt.want2)
+			}
+		})
+	}
+}
+
+func TestLogDir(t *testing.T) {
+	tests := []struct {
+		name    string
+		want    string
+		wantErr bool
+	}{
+		{"test results", filepath.Join("C:\\Users\\testuser\\AppData", AppName), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := LogDir()
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("LogDir() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("LogDir() succeeded unexpectedly")
+			}
+			if got != tt.want {
+				t.Errorf("LogDir() = %v, want %v", got, tt.want)
 			}
 		})
 	}
