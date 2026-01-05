@@ -10,18 +10,29 @@ are tested on Windows and Linux.
 
 [![Get it from the Snap Store](https://snapcraft.io/en/dark/install.svg)](https://snapcraft.io/ssh-ca-client)
 
-On Linux the client is available from the Snapcraft store, however at this time the snap
-version is unable to add keys and issued certificates to the SSH agent due to strict
-confinement so the userfulness of this version is currently limited.
+On Linux the client is available from the Snapcraft store, however at this time
+there are additional steps required to allow the snap version access to the SSH
+authentication agent socket due to it's strict confinement.
 
-In addition you must manually connect the `password-manager-service` interface for this snap as follows:
+An example wrapper script is located under `scripts/wrapper.sh` that uses
+`socat` to listen on a socket in your home directory and proxies any access to
+the "real" SSH authentication agent socket.
+
+In addition you must manually connect the following interfaces for this snap:
 
 ```sh
+# allow access to the Gnome Keyring
 sudo snap connect ssh-ca-client:password-manager-service
+# connect the personal-files plug to allow access to $HOME/.agent
+sudo snap connect ssh-ca-client:dot-agent
+# start via wrapper script
+path/to/wrapper.sh
 ```
 
-On Windows there is an MSI built that includes both the GUI and CLI versions and is the
-recommended option for Windows users.
+Alternatively binary releases for Linux are available from the GitHub Releases page.
+
+On Windows there is an MSI build that includes both the GUI and CLI versions
+and is the recommended option for Windows users.
 
 ### CLI
 
