@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# shellcheck source=client/snap/utilities/bin/management
-. "$SNAP/utilities/bin/management"
+# shellcheck source=../../client/scripts/utilities/bin/management
+. "$SNAP/bin/management"
 
 printf 'issuer: %s\nclient_id: %s\nscopes: [%s]\nredirect_url: %s\nca_url: %s\n' \
     "$(issuer)" "$(client_id)" "$(scopes)" "$(redirect_url)" "$(ca_url)"
@@ -14,6 +14,15 @@ handle_config() {
         config="$(printf '%s\ntrusted_ca: %s\n' "$config" "$ca")"
     fi
 
-    echo "$config" > "$SNAP_DATA/config.yml"
+    if ! tempconfig="$(mktemp "$SNAP_DATA/config.yml.XXXXXXXX")"; then
+        return $?
+    fi
+
+    if ! echo "$config" > "$tempconfig"; then
+        return $?
+    fi
+
+    mv -f "$tempconfig" "$SNAP_DATA/config.yml"
 }
+
 handle_config

@@ -54,7 +54,10 @@ parts:
       craftctl set version="${TAG#v}"
     stage:
       - -*
-  
+
+  scripts:
+    plugin: dump
+    source: client/scripts/utilities
 
   go-build:
     plugin: go

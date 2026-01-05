@@ -1,5 +1,7 @@
 #!/bin/sh
-
+#
+# This utility script is used as part of the Snap build of the client
+#
 
 get_value() {
     if [ $# -ne 1 ]; then
