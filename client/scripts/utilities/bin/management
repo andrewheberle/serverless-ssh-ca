@@ -18,7 +18,7 @@ get_value() {
 }
 
 has_config_set() {
-    for v in "issuer" "client_id" "scopes" "redirect_url" "ca_url"; do
+    for v in "issuer" "client-id" "scopes" "redirect-url" "ca-url"; do
         if ! get_value "$v"; then
             return $?
         fi
@@ -34,11 +34,11 @@ set_issuer() {
 }
 
 client_id() {
-    get_value "client_id"
+    get_value "client-id"
 }
 
 set_client_id() {
-    snapctl set client_id="$1"
+    snapctl set client-id="$1"
 }
 
 scopes() {
@@ -58,25 +58,25 @@ set_scopes() {
 }
 
 redirect_url() {
-    get_value "redirect_url"
+    get_value "redirect-url"
 }
 
 set_redirect_url() {
-    snapctl set redirect_url="$1"
+    snapctl set redirect-url="$1"
 }
 
 ca_url() {
-    get_value "ca_url"
+    get_value "ca-url"
 }
 
 set_ca_url() {
-    snapctl set ca_url="$1"
+    snapctl set ca-url="$1"
 }
 
 trusted_ca() {
-    get_value "trusted_ca"
+    get_value "trusted-ca"
 }
 
 set_trusted_ca() {
-    snapctl set trusted_ca="$1"
+    snapctl set trusted-ca="$1"
 }

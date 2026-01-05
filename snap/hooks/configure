@@ -3,9 +3,6 @@
 # shellcheck source=../../client/scripts/utilities/bin/management
 . "$SNAP/bin/management"
 
-printf 'issuer: %s\nclient_id: %s\nscopes: [%s]\nredirect_url: %s\nca_url: %s\n' \
-    "$(issuer)" "$(client_id)" "$(scopes)" "$(redirect_url)" "$(ca_url)"
-
 handle_config() {
     # Check required config is set
     if ! has_config_set; then
@@ -13,9 +10,9 @@ handle_config() {
     fi
 
     config="$(printf 'issuer: %s\nclient_id: %s\nscopes: [%s]\nredirect_url: %s\nca_url: %s\n' \
-        "$(issuer)" "$(client_id)" "$(scopes)" "$(redirect_url)" "$(ca_url)")"
+        "$(issuer)" "$(clien-id)" "$(scopes)" "$(redirect-url)" "$(ca-url)")"
 
-    if ca="$(get_trusted_ca)"; then
+    if ca="$(trusted-ca)"; then
         config="$(printf '%s\ntrusted_ca: %s\n' "$config" "$ca")"
     fi
 
