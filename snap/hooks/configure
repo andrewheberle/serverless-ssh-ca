@@ -7,6 +7,11 @@ printf 'issuer: %s\nclient_id: %s\nscopes: [%s]\nredirect_url: %s\nca_url: %s\n'
     "$(issuer)" "$(client_id)" "$(scopes)" "$(redirect_url)" "$(ca_url)"
 
 handle_config() {
+    # Check required config is set
+    if ! has_config_set; then
+        return $?
+    fi
+
     config="$(printf 'issuer: %s\nclient_id: %s\nscopes: [%s]\nredirect_url: %s\nca_url: %s\n' \
         "$(issuer)" "$(client_id)" "$(scopes)" "$(redirect_url)" "$(ca_url)")"
 
@@ -19,6 +24,10 @@ handle_config() {
     fi
 
     if ! echo "$config" > "$tempconfig"; then
+        return $?
+    fi
+
+    if ! chmod 0644 "$tempconfig"; then
         return $?
     fi
 

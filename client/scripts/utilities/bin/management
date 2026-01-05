@@ -17,6 +17,14 @@ get_value() {
     echo "$v"
 }
 
+has_config_set() {
+    for v in "issuer" "client_id" "scopes" "redirect_url" "ca_url"; do
+        if ! get_value "$v"; then
+            return $?
+        fi
+    done
+}
+
 issuer() {
     get_value "issuer"
 }
