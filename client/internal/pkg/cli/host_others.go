@@ -19,6 +19,7 @@ import (
 type hostCommand struct {
 	keypath    []string
 	renew      bool
+	delay      time.Duration
 	lifetime   time.Duration
 	listenAddr string
 	debug      bool
@@ -46,6 +47,7 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().DurationVar(&c.lifetime, "life", host.DefaultLifetime, "Lifetime of SSH certificate")
+	cmd.Flags().DurationVar(&c.delay, "delay", host.DefaultDelay, "Delay between requests/renewals")
 	cmd.Flags().StringSliceVar(&c.keypath, "key", []string{"/etc/ssh/ssh_host_ed25519_key", "/etc/ssh/ssh_host_ecdsa_key", "/etc/ssh/ssh_host_rsa_key"}, "Path to private key(s)")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	cmd.Flags().StringSliceVar(&c.principals, "principals", principals, "Principals to add to the host certificate request")
@@ -80,6 +82,7 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		host.WithLifetime(c.lifetime),
 		host.WithPrincipals(c.principals),
 		host.WithLogger(c.logger),
+		host.WithDelay(c.delay),
 	}
 
 	if c.renew {
@@ -105,9 +108,6 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 
 func (c *hostCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	// start interactive login
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
 	return c.client.ExecuteLoginWithContext(ctx, c.listenAddr)
 }
 

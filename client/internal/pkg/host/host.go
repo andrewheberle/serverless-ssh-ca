@@ -31,8 +31,8 @@ import (
 
 const (
 	DefaultLifetime = (time.Hour * 24) * 30
-	DefaultDelay    = time.Second * 10
-	DefaultRenewAt  = 0.2
+	DefaultDelay    = time.Millisecond * 250
+	DefaultRenewAt  = 0.34
 )
 
 var (
@@ -347,7 +347,9 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 	}
 
 	for n, k := range lh.keys {
-		logger := lh.logger.With("key", k.keypath)
+		logger := lh.logger.With("key", k.keypath, "n", n, "keys", len(lh.keys))
+
+		logger.Info("starting signing request process")
 
 		// check if renewal is needed
 		if lh.renewal {
@@ -360,7 +362,6 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			}
 		}
 
-		logger.Info("starting signing request process")
 		csr, err := lh.doSigningRequest(client, k.key, k.certBytes)
 		if err != nil {
 			logger.Warn("error completing signing request", "error", err)
@@ -415,6 +416,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 		if n != len(lh.keys)-1 {
 			logger.Info("sleeping until next request", "delay", lh.delay)
 			time.Sleep(lh.delay)
+			logger.Debug("woke from sleep to handle next key", "next", lh.keys[n+1].keypath)
 		}
 	}
 
@@ -615,6 +617,7 @@ func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
 	if lh.renewal {
 		return lh.doLogin(nil)
 	}
+
 	// start web server now
 	lh.logger.Info("starting web server", "address", addr)
 	if err := lh.Start(addr); err != nil {
