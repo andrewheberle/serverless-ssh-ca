@@ -357,7 +357,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			timeleft := time.Until(expiry)
 
 			if !(lh.lifetime*time.Duration(lh.renewat) > timeleft) {
-				logger.Info("skipping renewal as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
+				logger.Info("skipping as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
 				continue
 			}
 		}
