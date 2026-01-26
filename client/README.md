@@ -23,7 +23,7 @@ In addition you must manually connect the following interfaces for this snap:
 ```sh
 # allow access to the Gnome Keyring
 sudo snap connect ssh-ca-client:password-manager-service
-# connect the personal-files plug to allow access to ssh-agent socket in $HOME
+# connect the home interface to allow access to ssh-agent socket in $HOME
 sudo snap connect ssh-ca-client:home
 # start via wrapper script
 path/to/wrapper.sh
