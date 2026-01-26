@@ -347,7 +347,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 	}
 
 	for n, k := range lh.keys {
-		logger := lh.logger.With("keypath", k.keypath, "format", k.key.PublicKey().Type(), "n", n, "keys", len(lh.keys)-1)
+		logger := lh.logger.With("keypath", k.keypath, "format", k.key.PublicKey().Type(), "key", n+1, "keys", len(lh.keys))
 
 		logger.Info("starting signing request process")
 
