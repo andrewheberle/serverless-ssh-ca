@@ -31,7 +31,7 @@ apps:
     plugs:
       - desktop
       - desktop-legacy
-      - dot-agent
+      - home
       - network
       - network-bind
       - password-manager-service
@@ -39,7 +39,7 @@ apps:
     command: bin/ssh-ca-client-cli
     plugs:
       - desktop
-      - dot-agent
+      - home
       - network
       - network-bind
       - password-manager-service
@@ -73,9 +73,3 @@ parts:
 
 platforms:
   amd64:
-
-plugs:
-  dot-agent:
-    interface: personal-files
-    write:
-    - $HOME/.agent
