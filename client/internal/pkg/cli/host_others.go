@@ -19,11 +19,13 @@ import (
 type hostCommand struct {
 	keypath    []string
 	renew      bool
+	delay      time.Duration
 	lifetime   time.Duration
 	listenAddr string
 	debug      bool
 	force      bool
 	principals []string
+	renewat    float64
 
 	client *host.LoginHandler
 
@@ -46,6 +48,7 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().DurationVar(&c.lifetime, "life", host.DefaultLifetime, "Lifetime of SSH certificate")
+	cmd.Flags().DurationVar(&c.delay, "delay", host.DefaultDelay, "Delay between requests/renewals")
 	cmd.Flags().StringSliceVar(&c.keypath, "key", []string{"/etc/ssh/ssh_host_ed25519_key", "/etc/ssh/ssh_host_ecdsa_key", "/etc/ssh/ssh_host_rsa_key"}, "Path to private key(s)")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	cmd.Flags().StringSliceVar(&c.principals, "principals", principals, "Principals to add to the host certificate request")
@@ -53,6 +56,8 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.MarkFlagsMutuallyExclusive("renew", "principals")
 	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 	cmd.Flags().BoolVar(&c.force, "force", false, fmt.Sprintf("Force renewal even if current certificate has more than %0.1f%% validity left", host.DefaultRenewAt*100.0))
+	cmd.Flags().Float64Var(&c.renewat, "renewat", host.DefaultRenewAt, "Renew at fraction of lifetime")
+	cmd.MarkFlagsMutuallyExclusive("force", "renewat")
 
 	return nil
 }
@@ -60,6 +65,10 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if err := c.Command.PreRun(this, runner); err != nil {
 		return err
+	}
+
+	if c.renewat < 0 || c.renewat > 1 {
+		return fmt.Errorf("renewat must be between 0 and 1")
 	}
 
 	logLevel := new(slog.LevelVar)
@@ -80,6 +89,7 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		host.WithLifetime(c.lifetime),
 		host.WithPrincipals(c.principals),
 		host.WithLogger(c.logger),
+		host.WithDelay(c.delay),
 	}
 
 	if c.renew {
@@ -105,9 +115,6 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 
 func (c *hostCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	// start interactive login
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
-	defer cancel()
-
 	return c.client.ExecuteLoginWithContext(ctx, c.listenAddr)
 }
 

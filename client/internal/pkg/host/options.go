@@ -36,9 +36,17 @@ func WithRenewal() LoginHandlerOption {
 	}
 }
 
-// WithRenewAt sets the threshold from 0.0-1.0 for renewals
-func WithRenewAt(renewat float32) LoginHandlerOption {
+// WithRenewAt sets the threshold from 0-100 for renewals
+func WithRenewAt(renewat float64) LoginHandlerOption {
 	return func(lh *LoginHandler) {
+		if renewat < 0 {
+			renewat = 0
+		}
+
+		if renewat > 1 {
+			renewat = 1
+		}
+
 		lh.renewat = renewat
 	}
 }

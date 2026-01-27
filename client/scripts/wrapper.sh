@@ -19,11 +19,13 @@ if ! [ -S "${SSH_AUTH_SOCK}" ]; then
     exit 1
 fi
 
+AGENT_DIR="$HOME/agent"
+
 # ensure .agent dir exists
-mkdir -p "$HOME/.agent"
+mkdir -p "$AGENT_DIR"
 
 # start socat to proxy agent to real socket
-SOCK="$HOME/.agent/ssh.$$"
+SOCK="$AGENT_DIR/ssh.$$"
 printf 'Proxying from "%s" to "%s"...\n' "${SSH_AUTH_SOCK}" "${SOCK}"
 socat UNIX-LISTEN:"${SOCK}",fork UNIX-CONNECT:"${SSH_AUTH_SOCK}" &
 SOCAT_PID=$!

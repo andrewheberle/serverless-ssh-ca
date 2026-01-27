@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	DefaultLifetime = (time.Hour * 24) * 30
-	DefaultDelay    = time.Second * 10
-	DefaultRenewAt  = 0.2
+	DefaultLifetime         = (time.Hour * 24) * 30
+	DefaultDelay            = time.Millisecond * 250
+	DefaultRenewAt  float64 = 0.50
 )
 
 var (
@@ -72,7 +72,7 @@ type LoginHandler struct {
 	store        *sessions.CookieStore
 	config       *config.SystemConfig
 	lifetime     time.Duration
-	renewat      float32
+	renewat      float64
 	redirectURL  *url.URL
 	done         chan error
 	logger       *slog.Logger
@@ -347,20 +347,21 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 	}
 
 	for n, k := range lh.keys {
-		logger := lh.logger.With("key", k.keypath)
+		logger := lh.logger.With("keypath", k.keypath, "format", k.key.PublicKey().Type(), "key", n+1, "keys", len(lh.keys))
+
+		logger.Info("starting signing request process")
 
 		// check if renewal is needed
 		if lh.renewal {
 			expiry := time.Unix(int64(k.cert.ValidBefore), 0)
 			timeleft := time.Until(expiry)
 
-			if !(lh.lifetime*time.Duration(lh.renewat) > timeleft) {
-				logger.Info("skipping renewal as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
+			if !(time.Duration(float64(lh.lifetime)*lh.renewat) > timeleft) {
+				logger.Info("skipping as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
 				continue
 			}
 		}
 
-		logger.Info("starting signing request process")
 		csr, err := lh.doSigningRequest(client, k.key, k.certBytes)
 		if err != nil {
 			logger.Warn("error completing signing request", "error", err)
@@ -415,6 +416,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 		if n != len(lh.keys)-1 {
 			logger.Info("sleeping until next request", "delay", lh.delay)
 			time.Sleep(lh.delay)
+			logger.Debug("woke from sleep to handle next key", "next", lh.keys[n+1].keypath)
 		}
 	}
 
@@ -615,6 +617,7 @@ func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
 	if lh.renewal {
 		return lh.doLogin(nil)
 	}
+
 	// start web server now
 	lh.logger.Info("starting web server", "address", addr)
 	if err := lh.Start(addr); err != nil {
