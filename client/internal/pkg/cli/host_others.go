@@ -25,6 +25,7 @@ type hostCommand struct {
 	debug      bool
 	force      bool
 	principals []string
+	renewat    float64
 
 	client *host.LoginHandler
 
@@ -55,6 +56,8 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.MarkFlagsMutuallyExclusive("renew", "principals")
 	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 	cmd.Flags().BoolVar(&c.force, "force", false, fmt.Sprintf("Force renewal even if current certificate has more than %0.1f%% validity left", host.DefaultRenewAt*100.0))
+	cmd.Flags().Float64Var(&c.renewat, "renewat", host.DefaultRenewAt, "Renew at fraction of lifetime")
+	cmd.MarkFlagsMutuallyExclusive("force", "renewat")
 
 	return nil
 }
@@ -62,6 +65,10 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if err := c.Command.PreRun(this, runner); err != nil {
 		return err
+	}
+
+	if c.renewat < 0 || c.renewat > 1 {
+		return fmt.Errorf("renewat must be between 0 and 1")
 	}
 
 	logLevel := new(slog.LevelVar)

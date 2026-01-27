@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	DefaultLifetime = (time.Hour * 24) * 30
-	DefaultDelay    = time.Millisecond * 250
-	DefaultRenewAt  = 0.5
+	DefaultLifetime         = (time.Hour * 24) * 30
+	DefaultDelay            = time.Millisecond * 250
+	DefaultRenewAt  float64 = 0.50
 )
 
 var (
@@ -72,7 +72,7 @@ type LoginHandler struct {
 	store        *sessions.CookieStore
 	config       *config.SystemConfig
 	lifetime     time.Duration
-	renewat      float32
+	renewat      float64
 	redirectURL  *url.URL
 	done         chan error
 	logger       *slog.Logger
@@ -356,7 +356,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			expiry := time.Unix(int64(k.cert.ValidBefore), 0)
 			timeleft := time.Until(expiry)
 
-			if !(lh.lifetime*time.Duration(lh.renewat) > timeleft) {
+			if !(time.Duration(float64(lh.lifetime)*lh.renewat) > timeleft) {
 				logger.Info("skipping as certificate is not due for renewal", "lifetime", lh.lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
 				continue
 			}
