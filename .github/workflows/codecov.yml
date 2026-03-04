@@ -33,7 +33,7 @@ jobs:
           go test -coverprofile=../coverage.txt ./...
 
       - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: go-coverage
           path: coverage.txt
@@ -59,7 +59,7 @@ jobs:
         run: npm run coverage
       
       - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: node-coverage
           path: coverage/**
@@ -73,12 +73,12 @@ jobs:
       - node-test
     steps:
       - name: Download go-coverage
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: go-coverage
 
       - name: Download node-coverage
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: node-coverage
           path: coverage
