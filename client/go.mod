@@ -1,6 +1,6 @@
 module github.com/andrewheberle/serverless-ssh-ca/client
 
-go 1.24.2
+go 1.25.0
 
 require (
 	fyne.io/systray v1.12.0
