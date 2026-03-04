@@ -115,7 +115,7 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 
 func (c *hostCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	// start interactive login
-	return c.client.ExecuteLoginWithContext(ctx, c.listenAddr)
+	return c.client.ExecuteLogin(c.listenAddr)
 }
 
 // loadsystemconfig will only attempt to load the system config file
