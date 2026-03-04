@@ -10,10 +10,14 @@ github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37 h1:2
 github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37/go.mod h1:6AXRstqK+32jeFmw89QGL2748+dj34Av4xc/I9oo9BY=
 github.com/andrewheberle/simplecommand v0.5.0 h1:xFHc96leV1SdochxzDwz8puAEsk6dfm/XFWMdmKGky0=
 github.com/andrewheberle/simplecommand v0.5.0/go.mod h1:CjhYjrAAQaelwcX0/c3ecK2Um6PpWMAOfX5xr7ke0Uk=
+github.com/andrewheberle/simplecommand v0.5.1 h1:zgTPMj2hf5baFE09fW/qb4VNhZL8v7TuZo6YsK/nbvo=
+github.com/andrewheberle/simplecommand v0.5.1/go.mod h1:XQOLdO2a9/ZQMl5+MuBTeBzct2vsR3nIrJD3fRJlNmI=
 github.com/andrewheberle/sshagent v1.0.0 h1:fqyiiEJGHc2nxDAhtQnYYeh+nxlKGLjSphAVU/YDH7Y=
 github.com/andrewheberle/sshagent v1.0.0/go.mod h1:n/xAqd896rpytmQnumHk7qVPN2yixUbfgq6fsEP/nBU=
 github.com/bep/simplecobra v0.6.1 h1:ORBAC5CSar99/NPZ5fCthCx/uvlm7ry58wwDsZ23a20=
 github.com/bep/simplecobra v0.6.1/go.mod h1:hmtjyHv6xwD637ScIRP++0NKkR5szrHuMw5BxMUH66s=
+github.com/bep/simplecobra v0.7.0 h1:kG8ZPwEc1o96hlIVGXcrrvwC8RornBqvMD3+pS0Z7y0=
+github.com/bep/simplecobra v0.7.0/go.mod h1:PDXvBWH1ZMX05DRQ25ub/C6kKUuq+jROPgjbVz8wO1g=
 github.com/coreos/go-oidc/v3 v3.17.0 h1:hWBGaQfbi0iVviX4ibC7bk8OKT5qNr4klBaCHVNvehc=
 github.com/coreos/go-oidc/v3 v3.17.0/go.mod h1:wqPbKFrVnE90vty060SB40FCJ8fTHTxSwyXJqZH+sI8=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
@@ -72,7 +76,10 @@ github.com/sergeymakinen/go-ico v1.0.0-beta.0 h1:m5qKH7uPKLdrygMWxbamVn+tl2HfiA3
 github.com/sergeymakinen/go-ico v1.0.0-beta.0/go.mod h1:wQ47mTczswBO5F0NoDt7O0IXgnV4Xy3ojrroMQzyhUk=
 github.com/spf13/cobra v1.9.1 h1:CXSaggrXdbHK9CF+8ywj8Amf7PBRmPCOJugH954Nnlo=
 github.com/spf13/cobra v1.9.1/go.mod h1:nDyEzZ8ogv936Cinf6g1RU9MRY64Ir93oCnqb9wxYW0=
+github.com/spf13/cobra v1.10.2 h1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=
+github.com/spf13/cobra v1.10.2/go.mod h1:7C1pvHqHw5A4vrJfjNwvOdzYu0Gml16OCs2GRiTUUS4=
 github.com/spf13/pflag v1.0.6/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
+github.com/spf13/pflag v1.0.9/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=
 github.com/spf13/pflag v1.0.10/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
