@@ -94,7 +94,7 @@ describe("generateCertificate", () => {
     })
 
 	it("user key with extra extensions", () => {
-        expext(generateCertificate(email, ed25519CAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["no-touch-required"]))
+        expect(generateCertificate(email, ed25519CAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["no-touch-required"]))
 		    .toThrow("no-touch-required is not allowed")
     })
 })
