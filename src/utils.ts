@@ -99,11 +99,13 @@ export const transformPublicKey = (val: string, ctx: z.RefinementCtx): Key | nev
                         message: "unhandled error parsing base64 public_key"
                     })
                 }
+				break
             case (err instanceof KeyParseError):
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     message: err.message
                 })
+				break
             default:
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
@@ -182,11 +184,13 @@ export const transformCertificate = (val: string, ctx: z.RefinementCtx): Certifi
                         message: "unhandled error parsing base64 certificate"
                     })
                 }
+				break
             case (err instanceof CertificateParseError):
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     message: err.message
                 })
+				break
             default:
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
@@ -206,7 +210,7 @@ type ParsedCertificateRequest = {
     extensions: string[]
 }
 
-export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.RefinementCtx): never => {
+export const refineCertificateRequest = async (val: ParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
     try {
         // check nonce fingerprint matches public key
         if (!val.nonce.matches(val.public_key)) {
@@ -214,7 +218,8 @@ export const refineCertificateRequest = (val: ParsedCertificateRequest, ctx: z.R
         }
 
         // verify nonce signature
-        if (!val.nonce.verify()) {
+		const verified = await val.nonce.verify()
+        if (!verified) {
             return fatalIssue(ctx, "nonce signature validation failed")
         }
 
@@ -246,7 +251,7 @@ type ParsedHostCertificateRequest = {
     nonce: Nonce
 } & HostCertificateRequest
 
-export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): never => {
+export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
     try {
         // check nonce fingerprint matches public key
         if (!val.nonce.matches(val.public_key)) {
@@ -254,7 +259,8 @@ export const refineHostCertificateRequest = (val: ParsedHostCertificateRequest, 
         }
 
         // verify nonce signature
-        if (!val.nonce.verify()) {
+		const verified = await val.nonce.verify()
+        if (!verified) {
             return fatalIssue(ctx, "nonce signature validation failed")
         }
 
@@ -269,7 +275,7 @@ type ParsedHostCertificateRenewal = {
     nonce: HostNonce
 } & HostCertificateRequest
 
-export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): never => {
+export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
     try {
         // check certificate is not expired
         if (val.certificate.isExpired()) {
@@ -282,7 +288,8 @@ export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, 
         }
 
         // verify nonce signature
-        if (!val.nonce.verify()) {
+		const verified = await val.nonce.verify()
+        if (!verified) {
             return fatalIssue(ctx, "nonce signature validation failed")
         }
 
