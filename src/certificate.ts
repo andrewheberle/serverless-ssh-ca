@@ -16,13 +16,13 @@ const DefaultCreateCertificateOptions: CreateCertificateOptions = {
     extensions: split(env.SSH_CERTIFICATE_EXTENSIONS)
 }
 
-export class CertificateExtraExtensionsError extends Error {
+export class CertificateError extends Error {
     constructor(message: string) {
     super(message)
-    this.name = "CertificateExtraExtensionsError"
+    this.name = "CertificateError"
 
     // This is necessary for proper stack trace in TypeScript
-    Object.setPrototypeOf(this, CertificateExtraExtensionsError.prototype)
+    Object.setPrototypeOf(this, CertificateError.prototype)
   }
 }
 
@@ -58,13 +58,18 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
     // create certificate
     const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
 
+	// ensure openssh info is included in certificate (should not occur)
+	if (certificate.signatures.openssh === undefined) {
+		throw new CertificateError("missing openssh information in certificate")
+	}
+
     // add usage extensions
     const sshextensions: SSHExtension[] = []
     if (extensions !== undefined) {
         // if extensions are provided in request, ensure they do not include extra extensions beyond the defaults
         for (const ext of extensions) {
             if (!split(env.SSH_CERTIFICATE_EXTENSIONS).includes(ext)) {
-                throw new CertificateExtraExtensionsError(`${ext} is not allowed`)
+                throw new CertificateError(`${ext} is not allowed`)
             }
 
             // add to list of allowed extensions
@@ -87,14 +92,12 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
     }
 
     // add info to certificate
-    if (certificate.signatures.openssh !== undefined) {
-        certificate.signatures = {
-            openssh: {
-                nonce: certificate.signatures.openssh.nonce,
-                keyId: email,
-                signature: certificate.signatures.openssh.signature,
-                exts: sshextensions,
-            }
+    certificate.signatures = {
+        openssh: {
+            nonce: certificate.signatures.openssh.nonce,
+            keyId: email,
+            signature: certificate.signatures.openssh.signature,
+            exts: sshextensions
         }
     }
 
@@ -118,7 +121,7 @@ export type CreateHostCertificateOptions = {
     certificate?: Certificate
 }
 
-const DefaultCreateCHostertificateOptions: CreateHostCertificateOptions = {
+const DefaultCreateHostertificateOptions: CreateHostCertificateOptions = {
     lifetime: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME),
     principals: [],
 }
@@ -132,7 +135,7 @@ export class BadIssuerError extends Error {
   }
 } 
 
-export async function createSignedHostCertificate(public_key: Key, options: CreateHostCertificateOptions = DefaultCreateCHostertificateOptions): Promise<Certificate> {
+export async function createSignedHostCertificate(public_key: Key, options: CreateHostCertificateOptions = DefaultCreateHostertificateOptions): Promise<Certificate> {
     // generate list of identities for host key
     const identity: Identity[] = []
     if (options.principals !== undefined) {
@@ -153,7 +156,7 @@ export async function createSignedHostCertificate(public_key: Key, options: Crea
     if (options.certificate !== undefined) {
         const issuer = key.toPublic()
         if (!options.certificate.isSignedByKey(issuer)) {
-            throw new BadIssuerError("the provided certificate was not signbed by this CA")
+            throw new BadIssuerError("the provided certificate was not signed by this CA")
         }
     }
 
