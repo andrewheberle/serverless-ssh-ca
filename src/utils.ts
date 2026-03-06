@@ -210,7 +210,7 @@ type ParsedCertificateRequest = {
     extensions: string[]
 }
 
-export const refineCertificateRequest = async (val: ParsedCertificateRequest, ctx: z.RefinementCtx): never => {
+export const refineCertificateRequest = async (val: ParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
     try {
         // check nonce fingerprint matches public key
         if (!val.nonce.matches(val.public_key)) {
@@ -251,7 +251,7 @@ type ParsedHostCertificateRequest = {
     nonce: Nonce
 } & HostCertificateRequest
 
-export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): never => {
+export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
     try {
         // check nonce fingerprint matches public key
         if (!val.nonce.matches(val.public_key)) {
@@ -275,7 +275,7 @@ type ParsedHostCertificateRenewal = {
     nonce: HostNonce
 } & HostCertificateRequest
 
-export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): never => {
+export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
     try {
         // check certificate is not expired
         if (val.certificate.isExpired()) {
@@ -288,7 +288,8 @@ export const refineHostCertificateRenewal = (val: ParsedHostCertificateRenewal, 
         }
 
         // verify nonce signature
-        if (!val.nonce.verify()) {
+		const verified = await val.nonce.verify()
+        if (!verified) {
             return fatalIssue(ctx, "nonce signature validation failed")
         }
 
