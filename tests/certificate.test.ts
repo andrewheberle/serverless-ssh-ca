@@ -85,4 +85,16 @@ describe("generateCertificate", () => {
         expect(certificate.isSignedByKey(ed25519CAKey.toPublic())).toBe(true)
         expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
     })
+
+	it("user key with less extensions", () => {
+        const certificate = generateCertificate(email, ed25519CAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["permit-user-rc"])
+
+        expect(certificate.isSignedByKey(ed25519CAKey.toPublic())).toBe(true)
+        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
+    })
+
+	it("user key with extra extensions", () => {
+        expext(generateCertificate(email, ed25519CAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["no-touch-required"]))
+		    .toThrow("no-touch-required is not allowed")
+    })
 })
