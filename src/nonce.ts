@@ -135,8 +135,6 @@ export class Nonce {
             return this.fingerprint.matches(keys[0])
         }
 
-        this.signature.publickey.toString
-
         for (const key of keys) {
             // confirm nonce fingerprint matches keys
             if (!this.fingerprint.matches(key))
