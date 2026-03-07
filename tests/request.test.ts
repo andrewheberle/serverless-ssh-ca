@@ -14,3 +14,10 @@ describe("get /docs", () => {
         expect(response.status).toBe(200)
     })
 })
+
+describe("get /api/v2/ca", () => {
+    it ("responds with a 200", async () => {
+        const response = await SELF.fetch("http://example.com/api/v2/ca")
+        expect(response.status).toBe(200)
+    })
+})
