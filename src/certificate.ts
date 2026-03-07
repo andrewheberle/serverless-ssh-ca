@@ -108,8 +108,13 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
 }
 
 export async function createSignedCertificate(email: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
-    // grab private key from secret store
-    const key = parsePrivateKey(await env.PRIVATE_KEY.get())
+    // grab private key from secret store (or env in tests)
+	const secret = typeof env.PRIVATE_KEY === "string"
+		? env.PRIVATE_KEY
+		: await env.PRIVATE_KEY.get()
+
+	// parse key
+    const key = parsePrivateKey(secret)
 
     return generateCertificate(email, key, public_key, options.lifetime, options.principals, options.extensions)
 }
@@ -149,8 +154,13 @@ export async function createSignedHostCertificate(public_key: Key, options: Crea
         identity.push(...options.subjects)
     }
 
-    // grab private key from secret store
-    const key = parsePrivateKey(await env.PRIVATE_KEY.get())
+    // grab private key from secret store (or env in tests)
+	const secret = typeof env.PRIVATE_KEY === "string"
+		? env.PRIVATE_KEY
+		: await env.PRIVATE_KEY.get()
+
+	// parse private key
+    const key = parsePrivateKey(secret)
 
     // check certificate was issued by us if provided (for renewals)
     if (options.certificate !== undefined) {
