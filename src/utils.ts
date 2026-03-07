@@ -306,7 +306,3 @@ export const split = (v: string): string[] => {
     
     return v.split(",")
 }
-
-export const getPrivateKey = typeof env.PRIVATE_KEY === "string"
-	? env.PRIVATE_KEY
-	: await env.PRIVATE_KEY.get()
