@@ -4,7 +4,6 @@ import { Hono } from "hono"
 import { HTTPException } from "hono/http-exception"
 import z from "zod"
 import { AppContext } from "../router"
-import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 import { CertificateSignerResponse } from "../types"
 import { BadIssuerError, CreateCertificateOptions, CreateHostCertificateOptions, createSignedCertificate, createSignedHostCertificate } from "../certificate"
@@ -46,9 +45,9 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
     async handle(c: AppContext) {
         try {
 			// grab private key from secret store (or env in tests)
-			const secret = typeof env.PRIVATE_KEY === "string"
-				? env.PRIVATE_KEY
-				: await env.PRIVATE_KEY.get()
+			const secret = typeof c.env.PRIVATE_KEY === "string"
+				? c.env.PRIVATE_KEY
+				: await c.env.PRIVATE_KEY.get()
 
 			// parse key
             const key = parsePrivateKey(secret)
