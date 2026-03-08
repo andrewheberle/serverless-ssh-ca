@@ -14,7 +14,7 @@ export default defineWorkersConfig({
 			workers: {
 				singleWorker: true,
 				wrangler: {
-					configPath: "../wrangler.jsonc",
+					configPath: "wrangler.jsonc",
 				},
 				miniflare: {
 					compatibilityFlags: ["experimental", "nodejs_compat"],
