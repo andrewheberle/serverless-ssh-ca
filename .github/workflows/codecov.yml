@@ -31,8 +31,13 @@ jobs:
         run: |
           cd client
           go test -coverprofile=coverage.txt ./...
-          pwd
-          ls -l
+
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: andrewheberle/serverless-ssh-ca
+          files: client/coverage.txt
 
   node-test:
     name: Run Worker tests and collect coverage
@@ -53,16 +58,8 @@ jobs:
       - name: Run Typescript tests with coverage
         run: npm run coverage
 
-  upload:
-    name: Upload coverage reports
-    runs-on: ubuntu-latest
-    needs:
-      - go-test
-      - node-test
-    steps:
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: andrewheberle/serverless-ssh-ca
-          files: client/coverage.txt
