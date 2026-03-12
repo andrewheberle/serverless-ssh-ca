@@ -8,10 +8,6 @@ type KeyringProtector struct {
     key []byte
 }
 
-func NewKeyringProtector() (*KeyringProtector, error) {
-    return &KeyringProtector{}, nil
-}
-
 // Decrypt will decrypt provided data using the secret reference in "name"
 // using the Secret Service API via D-Bus
 func (p *KeyringProtector) Decrypt(data []byte, name string) ([]byte, error) {
