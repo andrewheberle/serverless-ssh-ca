@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew SSH Host Certificates
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-ca-client-cli host --renew
