@@ -31,6 +31,8 @@ jobs:
         run: |
           cd client
           go test -coverprofile=coverage.txt ./...
+          pwd
+          ls -l
 
   node-test:
     name: Run Worker tests and collect coverage
