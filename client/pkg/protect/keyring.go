@@ -9,12 +9,7 @@ type KeyringProtector struct {
 }
 
 func NewKeyringProtector() (*KeyringProtector, error) {
-    key, err := getOrCreateKey(name, true)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate key: %w", err)
-    }
-
-    return &KeyringProtector{key}, nil
+    return &KeyringProtector{}, nil
 }
 
 // Decrypt will decrypt provided data using the secret reference in "name"
@@ -27,8 +22,8 @@ func (p *KeyringProtector) Decrypt(data []byte, name string) ([]byte, error) {
         }
         p.key = key
 	}
-    
-    return decrypt(p.key, data)
+	
+	return decrypt(p.key, data)
 }
 
 // Encrypt will encrypt provided data using the secret reference in "name"
