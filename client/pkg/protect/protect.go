@@ -19,13 +19,6 @@ type Protector interface {
 	Encrypt(data []byte, name string) ([]byte, error)
 }
 
-type DefaultProtector struct {
-}
-
-func NewDefaultProtector() *DefaultProtector {
-	return &DefaultProtector{}
-}
-
 func getOrCreateKey(name string, create bool) ([]byte, error) {
 	// get user details
 	u, err := user.Current()
