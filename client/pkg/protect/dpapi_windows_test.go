@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestEncrypt(t *testing.T) {
+func TestDpapiProtector_Encrypt(t *testing.T) {
 	tests := []struct {
 		name     string
 		data     []byte
