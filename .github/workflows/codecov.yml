@@ -38,6 +38,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: andrewheberle/serverless-ssh-ca
           files: client/coverage.txt
+          flags: client
 
   node-test:
     name: Run Worker tests and collect coverage
@@ -63,3 +64,4 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: andrewheberle/serverless-ssh-ca
+          flags: worker
