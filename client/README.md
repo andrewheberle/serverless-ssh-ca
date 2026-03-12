@@ -1,5 +1,8 @@
 # ssh-ca-client
 
+[![codecov](https://codecov.io/gh/andrewheberle/serverless-ssh-ca/graph/badge.svg?flag=client&token=AZLFIBTTFK)](https://codecov.io/gh/andrewheberle/serverless-ssh-ca)
+[![Go Report Card](https://goreportcard.com/badge/github.com/andrewheberle/serverless-ssh-ca/client)](https://goreportcard.com/report/github.com/andrewheberle/serverless-ssh-ca/client)
+
 This provides the client-side service to interact with the Serverless
 Certificate Authority in this repository.
 
