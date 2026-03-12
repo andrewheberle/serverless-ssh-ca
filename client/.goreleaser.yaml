@@ -87,3 +87,6 @@ nfpms:
     maintainer: Andrew Heberle <andrew.heberle@gmail.com>
     formats:
       - deb
+    contents:
+      - src: systemd/
+        dst: /usr/lib/systemd/system
