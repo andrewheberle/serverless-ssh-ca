@@ -7,7 +7,7 @@ on: [push]
 
 jobs:
   go-test:
-    name: Run Go tests and collect coverage
+    name: Run Go tests and with coverage
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,14 +30,14 @@ jobs:
       - name: Run Go tests with coverage
         run: |
           cd client
-          go test -coverprofile=../coverage.txt ./...
+          go test -coverprofile=coverage.txt ./...
 
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v7
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          name: go-coverage
-          path: coverage.txt
-          retention-days: 1
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: andrewheberle/serverless-ssh-ca
+          files: client/coverage.txt
 
   node-test:
     name: Run Worker tests and collect coverage
@@ -57,31 +57,6 @@ jobs:
 
       - name: Run Typescript tests with coverage
         run: npm run coverage
-      
-      - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: node-coverage
-          path: coverage/**
-          retention-days: 1
-
-  upload:
-    name: Upload results
-    runs-on: ubuntu-latest
-    needs:
-      - go-test
-      - node-test
-    steps:
-      - name: Download go-coverage
-        uses: actions/download-artifact@v8
-        with:
-          name: go-coverage
-
-      - name: Download node-coverage
-        uses: actions/download-artifact@v8
-        with:
-          name: node-coverage
-          path: coverage
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
