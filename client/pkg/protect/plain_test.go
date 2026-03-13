@@ -7,7 +7,7 @@ import (
 
 func TestPlainProtector_Encrypt(t *testing.T) {
     p := &PlainProtector{}
-    data := []byte{"somedata"}
+    data := []byte("somedata")
 
     got, err := p.Encrypt(data, "secret")
     if err != nil {
@@ -21,7 +21,7 @@ func TestPlainProtector_Encrypt(t *testing.T) {
 
 func TestPlainProtector_Decrypt(t *testing.T) {
     p := &PlainProtector{}
-    data := []byte{"somedata"}
+    data := []byte("somedata")
 
     got, err := p.Decrypt(data, "secret")
     if err != nil {
