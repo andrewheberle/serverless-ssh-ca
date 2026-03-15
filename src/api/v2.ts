@@ -56,12 +56,12 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
 
     async handle(c: AppContext) {
         try {
-			// grab private key from secret store (or env in tests)
-			const secret = typeof c.env.PRIVATE_KEY === "string"
-				? c.env.PRIVATE_KEY
-				: await c.env.PRIVATE_KEY.get()
+            // grab private key from secret store (or env in tests)
+            const secret = typeof c.env.PRIVATE_KEY === "string"
+                ? c.env.PRIVATE_KEY
+                : await c.env.PRIVATE_KEY.get()
 
-			// parse key
+            // parse key
             const key = parsePrivateKey(secret)
             const pub = key.toPublic()
             pub.comment = c.env.ISSUER_DN
@@ -69,7 +69,7 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
             return c.text(`${pub.toString("ssh")}\n`)
         } catch (err) {
             if (err instanceof KeyParseError) {
-                throw new HTTPException(500, { message: "error parsing private key", cause: err})
+                throw new HTTPException(500, { message: "error parsing private key", cause: err })
             }
 
             throw err
@@ -149,40 +149,27 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
     }
 
     async handle(c: AppContext) {
-        try {
-            const data = await this.getValidatedData<typeof this.schema>()
+        const data = await this.getValidatedData<typeof this.schema>()
 
-            logger.info("handling renewal request", "for", data.headers.Authorization.email)
+        logger.info("handling renewal request", "for", data.headers.Authorization.email)
 
-            const identity = await parseIdentity(data.body.identity)
-            if (identity.sub !== data.headers["Authorization"].sub) {
-                throw new HTTPException(403, { message: "possible token substitution as subjects for authentication and identity tokens did not match" })
-            }
-
-            const opts: CreateCertificateOptions = {
-                lifetime: data.body.lifetime,
-                principals: identity.principals,
-                extensions: data.body.extensions,
-            }
-
-            const certificate = await createSignedCertificate(data.headers.Authorization.email, data.body.public_key, opts)
-            const response: CertificateSignerResponse = {
-                certificate: btoa(certificate.toString("openssh"))
-            }
-
-            return c.json(response)
-        } catch (err) {
-            // handle btoa error
-            switch (true) {
-                case (err instanceof DOMException):
-                    if (err.name === "InvalidCharacterError") {
-                        throw new HTTPException(422, { message: "the content was not valid base64 encoded data", cause: err })
-                    }
-            }
-
-            // otherwise just re-throw error
-            throw err
+        const identity = await parseIdentity(data.body.identity)
+        if (identity.sub !== data.headers["Authorization"].sub) {
+            throw new HTTPException(403, { message: "possible token substitution as subjects for authentication and identity tokens did not match" })
         }
+
+        const opts: CreateCertificateOptions = {
+            lifetime: data.body.lifetime,
+            principals: identity.principals,
+            extensions: data.body.extensions,
+        }
+
+        const certificate = await createSignedCertificate(data.headers.Authorization.email, data.body.public_key, opts)
+        const response: CertificateSignerResponse = {
+            certificate: btoa(certificate.toString("openssh"))
+        }
+
+        return c.json(response)
     }
 }
 api.post("/certificate", CertificateRequestEndpoint)
