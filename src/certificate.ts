@@ -4,6 +4,8 @@ import { SSHExtension } from "./types"
 import { env } from "cloudflare:workers"
 import { split } from "./utils"
 
+const sshCertificateExtensions = split(env.SSH_CERTIFICATE_EXTENSIONS)
+
 export type CreateCertificateOptions = {
     lifetime?: number
     principals?: string[]
@@ -13,7 +15,7 @@ export type CreateCertificateOptions = {
 const DefaultCreateCertificateOptions: CreateCertificateOptions = {
     lifetime: seconds(env.SSH_CERTIFICATE_LIFETIME),
     principals: [],
-    extensions: split(env.SSH_CERTIFICATE_EXTENSIONS)
+    extensions: sshCertificateExtensions
 }
 
 export class CertificateError extends Error {
@@ -68,7 +70,7 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
     if (extensions !== undefined) {
         // if extensions are provided in request, ensure they do not include extra extensions beyond the defaults
         for (const ext of extensions) {
-            if (!split(env.SSH_CERTIFICATE_EXTENSIONS).includes(ext)) {
+            if (!sshCertificateExtensions.includes(ext)) {
                 throw new CertificateError(`${ext} is not allowed`)
             }
 
@@ -81,7 +83,7 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
         }
     } else {
         // use defaults if not provided
-        split(env.SSH_CERTIFICATE_EXTENSIONS).forEach((ext: string) => {
+        sshCertificateExtensions.forEach((ext: string) => {
             sshextensions.push({
                 critical: false,
                 name: ext,
