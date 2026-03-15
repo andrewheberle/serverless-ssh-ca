@@ -248,7 +248,7 @@ func (lh *LoginHandler) RedirectPath() string {
 }
 
 // The Login method is intended for use as the handler function for
-// the intial login URL of the OIDC auth flow process as part of the Serverless
+// the initial login URL of the OIDC auth flow process as part of the Serverless
 // SSH CA.
 //
 // This will start the OIDC auth flow process and redirect the user to

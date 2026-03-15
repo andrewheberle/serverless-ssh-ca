@@ -2,7 +2,7 @@
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "serverless-ssh-ca",
     "main": "src/index.ts",
-    "compatibility_date": "2025-07-26",
+    "compatibility_date": "2026-03-13",
     "compatibility_flags": ["nodejs_compat"],
     "observability": {
         "enabled": true
