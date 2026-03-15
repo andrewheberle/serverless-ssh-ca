@@ -15,7 +15,7 @@ const userRsaKey = userRsaPrivateKey()
 const userEcdsaKey = userEcdsaPrivateKey()
 const userEd25519Key = userEd25519PrivateKey()
 
-describe("generateCertificate", () => {
+describe("generateCertificate (RSA CA)", () => {
     const email = "test@example.com"
     const useridenties: string[] = [
         "testuser",
@@ -23,63 +23,97 @@ describe("generateCertificate", () => {
         "group2",
     ]
 
-    /* it("handle RSA user key with RSA CA key", () => {
-        const certificate = generateCertificate(email, rsaCAKey, userRsaKey.toPublic(), seconds("24 hours"), useridenties)
+    it("handle RSA user key", () => {
+        expect(() => generateCertificate(email, rsaCAKey, userRsaKey.toPublic(), seconds("24 hours"), useridenties))
+            .toThrow("Failed to parse private key")
+    })
 
-        expect(certificate.isSignedByKey(rsaCAKey.toPublic())).toBe(true)
-        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
-    }) */
+    it("handle ECDSA user key", () => {
+        expect(() => generateCertificate(email, rsaCAKey, userEcdsaKey.toPublic(), seconds("24 hours"), useridenties))
+            .toThrow("Failed to parse private key")
+    })
 
-    it("handle RSA user key with ECDSA CA key", () => {
+    it("handle ED25519 user key", () => {
+        expect(() => generateCertificate(email, rsaCAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties))
+            .toThrow("Failed to parse private key")
+    })
+
+	it("user key with less extensions", () => {
+        expect(() => generateCertificate(email, rsaCAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["permit-user-rc"]))
+            .toThrow("Failed to parse private key")
+    })
+
+	it("user key with extra extensions", () => {
+        expect(() => generateCertificate(email, rsaCAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["no-touch-required"]))
+		    .toThrow("Failed to parse private key")
+    })
+})
+
+describe("generateCertificate (ECDSA CA)", () => {
+    const email = "test@example.com"
+    const useridenties: string[] = [
+        "testuser",
+        "group1",
+        "group2",
+    ]
+
+    it("handle RSA user key", () => {
         const certificate = generateCertificate(email, ecdsaCAKey, userRsaKey.toPublic(), seconds("24 hours"), useridenties)
 
         expect(certificate.isSignedByKey(ecdsaCAKey.toPublic())).toBe(true)
         expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
     })
 
-    it("handle RSA user key with ED25519 CA key", () => {
-        const certificate = generateCertificate(email, ed25519CAKey, userRsaKey.toPublic(), seconds("24 hours"), useridenties)
-
-        expect(certificate.isSignedByKey(ed25519CAKey.toPublic())).toBe(true)
-        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
-    })
-
-    /* it("handle ECDSA user key with RSA CA key", () => {
-        const certificate = generateCertificate(email, rsaCAKey, userEcdsaKey.toPublic(), seconds("24 hours"), useridenties)
-
-        expect(certificate.isSignedByKey(rsaCAKey.toPublic())).toBe(true)
-        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
-    }) */
-
-    it("handle ECDSA user key with ECDSA CA key", () => {
+    it("handle ECDSA user key", () => {
         const certificate = generateCertificate(email, ecdsaCAKey, userEcdsaKey.toPublic(), seconds("24 hours"), useridenties)
 
         expect(certificate.isSignedByKey(ecdsaCAKey.toPublic())).toBe(true)
         expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
     })
 
-    it("handle ECDSA user key with ED25519 CA key", () => {
-        const certificate = generateCertificate(email, ed25519CAKey, userEcdsaKey.toPublic(), seconds("24 hours"), useridenties)
-
-        expect(certificate.isSignedByKey(ed25519CAKey.toPublic())).toBe(true)
-        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
-    })
-
-    /* it("handle ED25519 user key with RSA CA key", () => {
-        const certificate = generateCertificate(email, rsaCAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties)
-
-        expect(certificate.isSignedByKey(rsaCAKey.toPublic())).toBe(true)
-        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
-    }) */
-
-    it("handle ED25519 user key with ECDSA CA key", () => {
+    it("handle ED25519 user key", () => {
         const certificate = generateCertificate(email, ecdsaCAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties)
 
         expect(certificate.isSignedByKey(ecdsaCAKey.toPublic())).toBe(true)
         expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
     })
 
-    it("handle ED25519 user key with ED25519 CA key", () => {
+	it("user key with less extensions", () => {
+        const certificate = generateCertificate(email, ecdsaCAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["permit-user-rc"])
+
+        expect(certificate.isSignedByKey(ecdsaCAKey.toPublic())).toBe(true)
+        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
+    })
+
+	it("user key with extra extensions", () => {
+        expect(() => generateCertificate(email, ecdsaCAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties, ["no-touch-required"]))
+		    .toThrow("no-touch-required is not allowed")
+    })
+})
+
+describe("generateCertificate (ED25519 CA)", () => {
+    const email = "test@example.com"
+    const useridenties: string[] = [
+        "testuser",
+        "group1",
+        "group2",
+    ]
+
+    it("handle RSA user key", () => {
+        const certificate = generateCertificate(email, ed25519CAKey, userRsaKey.toPublic(), seconds("24 hours"), useridenties)
+
+        expect(certificate.isSignedByKey(ed25519CAKey.toPublic())).toBe(true)
+        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
+    })
+
+    it("handle ECDSA user key", () => {
+        const certificate = generateCertificate(email, ed25519CAKey, userEcdsaKey.toPublic(), seconds("24 hours"), useridenties)
+
+        expect(certificate.isSignedByKey(ed25519CAKey.toPublic())).toBe(true)
+        expect(certificate.subjects.length).toBe(useridenties.length + split(env.SSH_CERTIFICATE_PRINCIPALS).length)
+    })
+
+    it("handle ED25519 user key", () => {
         const certificate = generateCertificate(email, ed25519CAKey, userEd25519Key.toPublic(), seconds("24 hours"), useridenties)
 
         expect(certificate.isSignedByKey(ed25519CAKey.toPublic())).toBe(true)

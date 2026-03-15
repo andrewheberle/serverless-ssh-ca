@@ -20,12 +20,15 @@ app.onError((err, c) => {
         } else {
             logger.error(err.message)
         }
+
         return err.getResponse()
-    } else {
-        // an unhandled error should cause a crash
-        logger.error("unhandled error", "error", err)
-        throw err
-    }
+    } 
+
+    // an unhandled error
+    logger.error("unhandled error", "error", err)
+
+    // Handle other errors
+    return c.json({ error: 'Internal Server Error' }, 500)
 })
 
 const openapi = fromHono(app)

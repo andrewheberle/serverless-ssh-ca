@@ -161,6 +161,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
 
             return c.json(response)
         } catch (err) {
+            // handle btoa error
             switch (true) {
                 case (err instanceof DOMException):
                     if (err.name === "InvalidCharacterError") {
@@ -169,7 +170,6 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             }
 
             // otherwise just re-throw error
-            logger.error("unhandled error", "error", err)
             throw err
         }
     }
@@ -274,7 +274,6 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
             }
 
             // otherwise just re-throw error
-            logger.error("unhandled error", "error", err)
             throw err
         }
     }
@@ -377,7 +376,6 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
             }
 
             // otherwise just re-throw error
-            logger.error("unhandled error", "error", err)
             throw err
         }
     }

@@ -19,7 +19,7 @@ describe("get /docs", () => {
 })
 
 describe("get /api/v2/ca", () => {
-    it ("responds with a 200", async () => {
+    it ("responds with a 200 and correct content", async () => {
 		const request = new IncomingRequest("http://example.com/api/v2/ca")
 		
 		// Create an empty context to pass to `worker.fetch()`
@@ -28,7 +28,30 @@ describe("get /api/v2/ca", () => {
 		
 		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
 		await waitOnExecutionContext(ctx)
+
+        const content = (await response.text()).trim()
 		
         expect(response.status).toBe(200)
+        expect(content).toBe(`ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOuHkGuyTakRj+XUdS/2IHrfeqy4/N8bFVtlSLstcqK0m5ri/iZkSm5B8IZdrZlgm0ggNeb6bdh0uRsBgESVZxI= ${env.ISSUER_DN}`)
+    })
+})
+
+describe("post /api/v2/certificate", () => {
+    it ("incomplete request", async () => {
+        const headers = new Headers()
+        headers.set("Authorization", "Bearer foo")
+        headers.set("Content-Type", "application/json")
+
+		const request = new IncomingRequest("http://example.com/api/v2/certificate", { method: "POST", headers: headers, body: "{}" })
+		
+		// Create an empty context to pass to `worker.fetch()`
+		const ctx = createExecutionContext()
+		const response = await worker.fetch(request, env, ctx)
+		
+		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
+		await waitOnExecutionContext(ctx)
+		
+        console.log(response.status)
+        expect(response.status).toBe(400)
     })
 })
