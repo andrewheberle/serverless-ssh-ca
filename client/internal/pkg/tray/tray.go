@@ -360,7 +360,7 @@ func (app *Application) eventloop() {
 				break
 			}
 
-			app.notify("Key Generated", "A private key was sucessfully generated", okIcon)
+			app.notify("Key Generated", "A private key was successfully generated", okIcon)
 			app.state = stateKeyOK
 		case <-app.mQuit.ClickedCh:
 			app.logger.Info("application shutting down")
