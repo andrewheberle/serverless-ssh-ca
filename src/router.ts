@@ -15,14 +15,28 @@ export const app = new Hono()
 // add error handling
 app.onError((err, c) => {
     if (err instanceof HTTPException) {
+        const message = err.message === "" ? "HTTPException" : err.message
         if (err.cause !== undefined) {
-            logger.error(err.message, "error", err.cause)
+            logger.error(message, "status", err.status, "error", err.cause)
         } else {
-            logger.error(err.message, "error", "undefined")
+            logger.error(message, "status", err.status, "error", "undefined")
         }
 
         return err.getResponse()
-    } 
+    }
+
+    // workaround as chanfana bundles its own HTTPException - instanceof fails
+    if (typeof (err as HTTPException).getResponse === "function") {
+        const e = err as HTTPException
+        const message = e.message === "" ? "HTTPException" : e.message
+
+        if (e.cause !== undefined) {
+            logger.error(message, "status", e.status,"error", e.cause)
+        } else {
+            logger.error(message,  "status", e.status, "error", "undefined")
+        }
+        return e.getResponse()
+    }
 
     // Handle other errors
     logger.error("unexpected error", "error", err)
