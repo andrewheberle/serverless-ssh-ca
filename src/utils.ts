@@ -9,25 +9,42 @@ import { HostNonce, Nonce, NonceParseError } from "./nonce"
 
 const logger = new Logger()
 
-export const fatalIssue = (ctx: z.RefinementCtx, message: string) => {
-    ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) => {
+    ctx.issues.push({
+        code: "custom",
         message: message,
-        fatal: true,
+        input: val
     })
 
     return z.NEVER
 }
 
-export const transformNonce = (val: string, ctx: z.RefinementCtx): Nonce | never => {
+export const transformNonce = (val: string, ctx: z.core.$RefinementCtx<string>): Nonce | never => {
+    logger.info("starting transformNonce")
     try {
-        return new Nonce(val)
+        const nonce = new Nonce(val)
+        logger.info("parsed nonce", "nonce", nonce)
+
+        return nonce
     } catch (err) {
-        if (err instanceof NonceParseError) {
-            return fatalIssue(ctx, err.message)
+        logger.error("nonce parsing error", "error", err)
+        switch (true) {
+            case (err instanceof NonceParseError):
+                ctx.issues.push({
+                    code: "custom",
+                    message: err.message,
+                    input: val
+                })
+                break
+            default:
+                ctx.issues.push({
+                    code: "custom",
+                    message: "nonce transform unhandled error",
+                    input: val
+                })
         }
 
-        return fatalIssue(ctx, "nonce transform unhandled error")
+        return z.NEVER
     }
 }
 
@@ -48,7 +65,7 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
     const jwt = val.replace("Bearer ", "")
 
     if (jwt === "") {
-        return fatalIssue(ctx, "request did not contain a JWT")
+        return fatalIssue(ctx, "request did not contain a JWT", val)
     }
 
     try {
@@ -56,7 +73,7 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
         const { payload } = await verifyJWT(jwt)
 
         if (payload.email === undefined) {
-            return fatalIssue(ctx, "JWT was verified but was missing required email claim")
+            return fatalIssue(ctx, "JWT was verified but was missing required email claim", val)
         }
 
         return {
@@ -66,15 +83,15 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
     } catch (err) {
         switch (true) {
             case (err instanceof JWSInvalid):
-                return fatalIssue(ctx, "the access token was invalid")
+                return fatalIssue(ctx, "the access token was invalid", val)
             case (err instanceof JWTInvalid):
-                return fatalIssue(ctx, "the access token failed verification")
+                return fatalIssue(ctx, "the access token failed verification", val)
             case (err instanceof JWKInvalid):
-                return fatalIssue(ctx, "the access token JWK was invalid")
+                return fatalIssue(ctx, "the access token JWK was invalid", val)
             case (err instanceof JWKSInvalid):
-                return fatalIssue(ctx, "the access token JWK was invalid")
+                return fatalIssue(ctx, "the access token JWK was invalid", val)
             default:
-                return fatalIssue(ctx, "unhandled access token validation error")
+                return fatalIssue(ctx, "unhandled access token validation error", val)
         }
     }
 }
@@ -89,27 +106,31 @@ export const transformPublicKey = (val: string, ctx: z.RefinementCtx): Key | nev
         switch (true) {
             case (err instanceof DOMException):
                 if (err.name === "InvalidCharacterError") {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "the content was not valid base64 encoded data"
+                    ctx.issues.push({
+                        code: "custom",
+                        message: "not valid base64 encoded data",
+                        input: val
                     })
                 } else {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "unhandled error parsing base64 public_key"
+                    ctx.issues.push({
+                        code: "custom",
+                        message: "unhandled error parsing base64 public_key",
+                        input: val
                     })
                 }
-				break
+                break
             case (err instanceof KeyParseError):
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: err.message
+                ctx.issues.push({
+                    code: "custom",
+                    message: err.message,
+                    input: val
                 })
-				break
+                break
             default:
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: "unhandled error parsing public_key"
+                ctx.issues.push({
+                    code: "custom",
+                    message: "unhandled error parsing public_key",
+                    input: val
                 })
         }
 
@@ -174,27 +195,31 @@ export const transformCertificate = (val: string, ctx: z.RefinementCtx): Certifi
         switch (true) {
             case (err instanceof DOMException):
                 if (err.name === "InvalidCharacterError") {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "the content was not valid base64 encoded data"
+                    ctx.issues.push({
+                        code: "custom",
+                        message: "the content was not valid base64 encoded data",
+                        input: val
                     })
                 } else {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "unhandled error parsing base64 certificate"
+                    ctx.issues.push({
+                        code: "custom",
+                        message: "unhandled error parsing base64 certificate",
+                        input: val
                     })
                 }
-				break
+                break
             case (err instanceof CertificateParseError):
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: err.message
+                ctx.issues.push({
+                    code: "custom",
+                    message: err.message,
+                    input: val
                 })
-				break
+                break
             default:
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: "unhandled error parsing certificate"
+                ctx.issues.push({
+                    code: "custom",
+                    message: "unhandled error parsing certificate",
+                    input: val
                 })
         }
 
@@ -211,21 +236,22 @@ type ParsedCertificateRequest = {
 }
 
 export const refineCertificateRequest = async (val: ParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
+    logger.info("refineCertificateRequest")
     try {
         // check nonce fingerprint matches public key
         if (!val.nonce.matches(val.public_key)) {
-            return fatalIssue(ctx, "nonce fingerprint did not match public_key")
+            return fatalIssue(ctx, "nonce fingerprint did not match public_key", val)
         }
 
         // verify nonce signature
-		const verified = await val.nonce.verify()
+        const verified = await val.nonce.verify()
         if (!verified) {
-            return fatalIssue(ctx, "nonce signature validation failed")
+            return fatalIssue(ctx, "nonce signature validation failed", val)
         }
 
         return z.NEVER
     } catch (err) {
-        return fatalIssue(ctx, "nonce verification unhandled error")
+        return fatalIssue(ctx, "nonce verification unhandled error", val)
     }
 }
 
@@ -234,10 +260,10 @@ export const transformHostNonce = (val: string, ctx: z.RefinementCtx): HostNonce
         return new HostNonce(val)
     } catch (err) {
         if (err instanceof NonceParseError) {
-            return fatalIssue(ctx, err.message)
+            return fatalIssue(ctx, err.message, val)
         }
 
-        return fatalIssue(ctx, "nonce transform unhandled error")
+        return fatalIssue(ctx, "nonce transform unhandled error", val)
     }
 }
 
@@ -255,18 +281,18 @@ export const refineHostCertificateRequest = async (val: ParsedHostCertificateReq
     try {
         // check nonce fingerprint matches public key
         if (!val.nonce.matches(val.public_key)) {
-            return fatalIssue(ctx, "nonce fingerprint did not match public_key")
+            return fatalIssue(ctx, "nonce fingerprint did not match public_key", val)
         }
 
         // verify nonce signature
-		const verified = await val.nonce.verify()
+        const verified = await val.nonce.verify()
         if (!verified) {
-            return fatalIssue(ctx, "nonce signature validation failed")
+            return fatalIssue(ctx, "nonce signature validation failed", val)
         }
 
         return z.NEVER
     } catch (err) {
-        return fatalIssue(ctx, "nonce verification unhandled error")
+        return fatalIssue(ctx, "nonce verification unhandled error", val)
     }
 }
 
@@ -279,23 +305,23 @@ export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRen
     try {
         // check certificate is not expired
         if (val.certificate.isExpired()) {
-            return fatalIssue(ctx, "certificate is expired")
+            return fatalIssue(ctx, "certificate is expired", val)
         }
 
         // check nonce fingerprint matches public key and certificate subject key
         if (!val.nonce.matches(val.public_key, val.certificate.subjectKey)) {
-            return fatalIssue(ctx, "nonce fingerprints did not match public_key and/or certificate")
+            return fatalIssue(ctx, "nonce fingerprints did not match public_key and/or certificate", val)
         }
 
         // verify nonce signature
-		const verified = await val.nonce.verify()
+        const verified = await val.nonce.verify()
         if (!verified) {
-            return fatalIssue(ctx, "nonce signature validation failed")
+            return fatalIssue(ctx, "nonce signature validation failed", val)
         }
 
         return z.NEVER
     } catch (err) {
-        return fatalIssue(ctx, "nonce verification unhandled error")
+        return fatalIssue(ctx, "nonce verification unhandled error", val)
     }
 }
 
@@ -303,6 +329,6 @@ export const split = (v: string): string[] => {
     if (v === "") {
         return []
     }
-    
+
     return v.split(",")
 }

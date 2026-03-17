@@ -79,6 +79,9 @@ type LoginHandler struct {
 	mu           sync.RWMutex
 	renewal      bool
 	delay        time.Duration
+
+	// for testing
+	now time.Time
 }
 
 type sshKey struct {
@@ -213,7 +216,7 @@ func (lh *LoginHandler) RedirectPath() string {
 }
 
 // The Login method is intended for use as the handler function for
-// the intial login URL of the OIDC auth flow process as part of the Serverless
+// the initial login URL of the OIDC auth flow process as part of the Serverless
 // SSH CA.
 //
 // This will start the OIDC auth flow process and redirect the user to
@@ -353,13 +356,8 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 
 		// check if renewal is needed
 		if lh.renewal {
-			expiry := time.Unix(int64(k.cert.ValidBefore), 0)
-			timeleft := time.Until(expiry)
-			// calculate life of certificate based on current validity
-			lifetime := k.cert.ValidAfter - k.cert.ValidBefore
-
-			if !(time.Duration(float64(lifetime)*lh.renewat) > timeleft) {
-				logger.Info("skipping as certificate is not due for renewal", "lifetime", lifetime, "left", timeleft, "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
+			if !lh.renewalRequired(k) {
+				logger.Info("skipping as certificate is not due for renewal", "lifetime", k.lifetime(), "timeleft", k.expiry().Sub(lh.Now()), "renewat", fmt.Sprintf("%0.1f%%", lh.renewat*100.0))
 				continue
 			}
 		}
@@ -508,7 +506,7 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 		// add certificate if doing a renewal
 		payload.Certificate = cert
 	} else {
-		// add principals if doing intial request
+		// add principals if doing initial request
 		payload.Principals = lh.principals
 	}
 
@@ -711,4 +709,56 @@ func (lh *LoginHandler) Shutdown() error {
 
 	// also return result
 	return err
+}
+
+// Now is used in tests to mock the current time
+func (lh *LoginHandler) Now() time.Time {
+	if lh.now.IsZero() {
+		return time.Now()
+	}
+
+	return lh.now
+}
+
+func (k sshKey) expiry() time.Time {
+	if k.cert == nil {
+		return time.Time{}
+	}
+
+	return time.Unix(int64(k.cert.ValidBefore), 0)
+}
+
+func (k sshKey) lifetime() time.Duration {
+	if k.cert == nil {
+		return 0
+	}
+
+	return time.Duration((k.cert.ValidBefore - k.cert.ValidAfter) * uint64(time.Second))
+}
+
+func (k sshKey) validafter() time.Time {
+	if k.cert == nil {
+		return time.Time{}
+	}
+
+	return time.Unix(int64(k.cert.ValidAfter), 0)
+}
+
+func (k sshKey) validbefore() time.Time {
+	if k.cert == nil {
+		return time.Time{}
+	}
+
+	return time.Unix(int64(k.cert.ValidBefore), 0)
+}
+
+func (lh *LoginHandler) renewalRequired(k sshKey) bool {
+	expiry := k.expiry()
+	timeleft := expiry.Sub(lh.Now())
+	lifetime := k.lifetime()
+	renewat := time.Duration(float64(lifetime) * lh.renewat)
+
+	lh.logger.Debug("renewalRequired()", "expiry", expiry, "timeleft", timeleft, "lifetime", lifetime, "renewat", renewat, "after", k.validafter(), "before", k.validbefore())
+
+	return renewat >= timeleft || timeleft < 0
 }

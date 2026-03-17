@@ -18,14 +18,15 @@ app.onError((err, c) => {
         if (err.cause !== undefined) {
             logger.error(err.message, "error", err.cause)
         } else {
-            logger.error(err.message)
+            logger.error(err.message, "error", "undefined")
         }
+
         return err.getResponse()
-    } else {
-        // an unhandled error should cause a crash
-        logger.error("unhandled error", "error", err)
-        throw err
-    }
+    } 
+
+    // Handle other errors
+    logger.error("unexpected error", "error", err)
+    return c.json({ error: "Internal Server Error" }, 500)
 })
 
 const openapi = fromHono(app)
