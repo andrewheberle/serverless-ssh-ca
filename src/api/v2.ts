@@ -219,19 +219,19 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
     }
 
     async handle(c: AppContext) {
-            const data = await this.getValidatedData<typeof this.schema>()
+        const data = await this.getValidatedData<typeof this.schema>()
 
-            logger.info("handling host certificate request", "for", data.headers.Authorization.email)
+        logger.info("handling host certificate request", "for", data.headers.Authorization.email)
 
-            // check user can issue host certificates
-            if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email)) {
-                throw new ForbiddenException("User not allowed to issue host certificates")
-            }
+        // check user can issue host certificates
+        if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email)) {
+            throw new ForbiddenException("User not allowed to issue host certificates")
+        }
 
-            const opts: CreateHostCertificateOptions = {
-                lifetime: data.body.lifetime,
-                principals: data.body.principals,
-            }
+        const opts: CreateHostCertificateOptions = {
+            lifetime: data.body.lifetime,
+            principals: data.body.principals,
+        }
 
         try {
             const certificate = await createSignedHostCertificate(data.body.public_key, opts)
@@ -300,22 +300,22 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
     }
 
     async handle(c: AppContext) {
+        const data = await this.getValidatedData<typeof this.schema>()
+
+        logger.info("handling host certificate renewal")
+
+        // use smaller of the current certificate lifetime and the requested lifetime 
+        const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
+        const lifetime = originalLifetime > data.body.lifetime
+            ? data.body.lifetime
+            : originalLifetime
+
+        const opts: CreateHostCertificateOptions = {
+            lifetime: lifetime,
+            subjects: data.body.certificate.subjects
+        }
+
         try {
-            const data = await this.getValidatedData<typeof this.schema>()
-
-            logger.info("handling host certificate renewal")
-
-            // use smaller of the current certificate lifetime and the requested lifetime 
-            const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
-            const lifetime = originalLifetime > data.body.lifetime
-                ? data.body.lifetime
-                : originalLifetime
-
-            const opts: CreateHostCertificateOptions = {
-                lifetime: lifetime,
-                subjects: data.body.certificate.subjects
-            }
-
             const certificate = await createSignedHostCertificate(data.body.public_key, opts)
             const response: CertificateSignerResponse = {
                 certificate: btoa(certificate.toString("openssh"))
