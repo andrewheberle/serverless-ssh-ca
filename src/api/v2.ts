@@ -1,5 +1,13 @@
 import { Logger } from "@andrewheberle/ts-slog"
-import { contentJson, fromHono, InputValidationException, OpenAPIRoute } from "chanfana"
+import {
+    contentJson,
+    ForbiddenException,
+    fromHono,
+    InputValidationException,
+    InternalServerErrorException,
+    OpenAPIRoute,
+    UnprocessableEntityException
+} from "chanfana"
 import { Hono } from "hono"
 import { HTTPException } from "hono/http-exception"
 import z from "zod"
@@ -7,7 +15,13 @@ import { AppContext } from "../router"
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 import { CertificateSignerResponse } from "../types"
-import { BadIssuerError, CreateCertificateOptions, CreateHostCertificateOptions, createSignedCertificate, createSignedHostCertificate } from "../certificate"
+import {
+    BadIssuerError,
+    CreateCertificateOptions,
+    CreateHostCertificateOptions,
+    createSignedCertificate,
+    createSignedHostCertificate
+} from "../certificate"
 import {
     parseIdentity,
     refineCertificateRequest,
@@ -44,13 +58,7 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
                 },
                 description: "Returns SSH Certificate Authority Public Key",
             },
-            "500": {
-                description: "There was an internal error",
-                ...contentJson(z.object({
-                    status: z.literal(500),
-                    error: z.literal("Internal Server Error")
-                }))
-            }
+            ...InternalServerErrorException.schema(),
         }
     }
 
@@ -69,10 +77,11 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
             return c.text(`${pub.toString("ssh")}\n`)
         } catch (err) {
             if (err instanceof KeyParseError) {
-                throw new HTTPException(500, { message: "error parsing private key", cause: err })
+                throw new InternalServerErrorException("Error parsing private key")
             }
 
-            throw err
+            // otherwise throw as InternalServerErrorException
+            throw new InternalServerErrorException(`${err}`)
         }
     }
 }
@@ -119,32 +128,13 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             "401": {
                 description: "Access to the endpoint is Unauthorized",
                 ...contentJson(z.object({
-                    status: z.literal(401),
                     error: z.literal("Unauthorized")
                 }))
             },
-            "403": {
-                description: "Access to the endpoint is Forbidden",
-                ...contentJson(z.object({
-                    status: z.literal(403),
-                    error: z.literal("Forbidden")
-                }))
-            },
+            ...ForbiddenException.schema(),
             ...InputValidationException.schema(),
-            "422": {
-                description: "The request to could not be processed",
-                ...contentJson(z.object({
-                    status: z.literal(422),
-                    error: z.literal("Unprocessable Entity")
-                }))
-            },
-            "500": {
-                description: "There was an internal error",
-                ...contentJson(z.object({
-                    status: z.literal(500),
-                    error: z.literal("Internal Server Error")
-                }))
-            }
+            ...UnprocessableEntityException.schema(),
+            ...InternalServerErrorException.schema(),
         }
     }
 
@@ -155,7 +145,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
 
         const identity = await parseIdentity(data.body.identity)
         if (identity.sub !== data.headers["Authorization"].sub) {
-            throw new HTTPException(403, { message: "possible token substitution as subjects for authentication and identity tokens did not match" })
+            throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
         }
 
         const opts: CreateCertificateOptions = {
@@ -164,12 +154,17 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             extensions: data.body.extensions,
         }
 
-        const certificate = await createSignedCertificate(data.headers.Authorization.email, data.body.public_key, opts)
-        const response: CertificateSignerResponse = {
-            certificate: btoa(certificate.toString("openssh"))
-        }
+        try {
+            const certificate = await createSignedCertificate(data.headers.Authorization.email, data.body.public_key, opts)
+            const response: CertificateSignerResponse = {
+                certificate: btoa(certificate.toString("openssh"))
+            }
 
-        return c.json(response)
+            return c.json(response)
+        } catch (err) {
+            // otherwise throw as InternalServerErrorException
+            throw new InternalServerErrorException(`${err}`)
+        }
     }
 }
 api.post("/certificate", CertificateRequestEndpoint)
@@ -216,40 +211,21 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                     error: z.literal("Unauthorized")
                 }))
             },
-            "403": {
-                description: "Access to the endpoint is Forbidden",
-                ...contentJson(z.object({
-                    status: z.literal(403),
-                    error: z.literal("Forbidden")
-                }))
-            },
+            ...ForbiddenException.schema(),
             ...InputValidationException.schema(),
-            "422": {
-                description: "The request to could not be processed",
-                ...contentJson(z.object({
-                    status: z.literal(422),
-                    error: z.literal("Unprocessable Entity")
-                }))
-            },
-            "500": {
-                description: "There was an internal error",
-                ...contentJson(z.object({
-                    status: z.literal(500),
-                    error: z.literal("Internal Server Error")
-                }))
-            }
+            ...UnprocessableEntityException.schema(),
+            ...InternalServerErrorException.schema(),
         }
     }
 
     async handle(c: AppContext) {
-        try {
             const data = await this.getValidatedData<typeof this.schema>()
 
             logger.info("handling host certificate request", "for", data.headers.Authorization.email)
 
             // check user can issue host certificates
             if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email)) {
-                throw new HTTPException(403, { message: "user not allowed to issue host certificates" })
+                throw new ForbiddenException("User not allowed to issue host certificates")
             }
 
             const opts: CreateHostCertificateOptions = {
@@ -257,6 +233,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                 principals: data.body.principals,
             }
 
+        try {
             const certificate = await createSignedHostCertificate(data.body.public_key, opts)
             const response: CertificateSignerResponse = {
                 certificate: btoa(certificate.toString("openssh"))
@@ -267,12 +244,12 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
             switch (true) {
                 case (err instanceof DOMException):
                     if (err.name === "InvalidCharacterError") {
-                        throw new HTTPException(422, { message: "the content was not valid base64 encoded data", cause: err })
+                        throw new UnprocessableEntityException("The content was not valid base64 encoded data")
                     }
             }
 
-            // otherwise just re-throw error
-            throw err
+            // otherwise throw as InternalServerErrorException
+            throw new InternalServerErrorException(`${err}`)
         }
     }
 }
@@ -315,28 +292,10 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
                     error: z.literal("Unauthorized")
                 }))
             },
-            "403": {
-                description: "Access to the endpoint is Forbidden",
-                ...contentJson(z.object({
-                    status: z.literal(403),
-                    error: z.literal("Forbidden")
-                }))
-            },
+            ...ForbiddenException.schema(),
             ...InputValidationException.schema(),
-            "422": {
-                description: "The request to could not be processed",
-                ...contentJson(z.object({
-                    status: z.literal(422),
-                    error: z.literal("Unprocessable Entity")
-                }))
-            },
-            "500": {
-                description: "There was an internal error",
-                ...contentJson(z.object({
-                    status: z.literal(500),
-                    error: z.literal("Internal Server Error")
-                }))
-            }
+            ...UnprocessableEntityException.schema(),
+            ...InternalServerErrorException.schema(),
         }
     }
 
@@ -367,14 +326,14 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
             switch (true) {
                 case (err instanceof DOMException):
                     if (err.name === "InvalidCharacterError") {
-                        throw new HTTPException(422, { message: "the content was not valid base64 encoded data", cause: err })
+                        throw new UnprocessableEntityException("The content was not valid base64 encoded data")
                     }
                 case (err instanceof BadIssuerError):
-                    throw new HTTPException(422, { message: err.message })
+                    throw new UnprocessableEntityException(err.message)
             }
 
-            // otherwise just re-throw error
-            throw err
+            // otherwise throw as InternalServerErrorException
+            throw new InternalServerErrorException(`${err}`)
         }
     }
 }

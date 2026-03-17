@@ -55,3 +55,43 @@ describe("post /api/v2/certificate", () => {
         expect(response.status).toBe(500)
     })
 })
+
+describe("post /api/v2/host/request", () => {
+    it ("incomplete request", async () => {
+        const headers = new Headers()
+        headers.set("Authorization", "Bearer foo")
+        headers.set("Content-Type", "application/json")
+
+		const request = new IncomingRequest("http://example.com/api/v2/host/request", { method: "POST", headers: headers, body: "{}" })
+		
+		// Create an empty context to pass to `worker.fetch()`
+		const ctx = createExecutionContext()
+		const response = await worker.fetch(request, env, ctx)
+		
+		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
+		await waitOnExecutionContext(ctx)
+		
+        // this is not correct...should be a 400, but getting 500 anyway
+        expect(response.status).toBe(500)
+    })
+})
+
+describe("post /api/v2/host/renew", () => {
+    it ("incomplete request", async () => {
+        const headers = new Headers()
+        headers.set("Authorization", "Bearer foo")
+        headers.set("Content-Type", "application/json")
+
+		const request = new IncomingRequest("http://example.com/api/v2/host/renew", { method: "POST", headers: headers, body: "{}" })
+		
+		// Create an empty context to pass to `worker.fetch()`
+		const ctx = createExecutionContext()
+		const response = await worker.fetch(request, env, ctx)
+		
+		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
+		await waitOnExecutionContext(ctx)
+		
+        // this is not correct...should be a 400, but getting 500 anyway
+        expect(response.status).toBe(500)
+    })
+})

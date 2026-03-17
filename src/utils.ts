@@ -19,15 +19,32 @@ export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) 
     return z.NEVER
 }
 
-export const transformNonce = (val: string, ctx: z.RefinementCtx): Nonce | never => {
+export const transformNonce = (val: string, ctx: z.core.$RefinementCtx<string>): Nonce | never => {
+    logger.info("starting transformNonce")
     try {
-        return new Nonce(val)
+        const nonce = new Nonce(val)
+        logger.info("parsed nonce", "nonce", nonce)
+
+        return nonce
     } catch (err) {
-        if (err instanceof NonceParseError) {
-            return fatalIssue(ctx, err.message, val)
+        logger.error("nonce parsing error", "error", err)
+        switch (true) {
+            case (err instanceof NonceParseError):
+                ctx.issues.push({
+                    code: "custom",
+                    message: err.message,
+                    input: val
+                })
+                break
+            default:
+                ctx.issues.push({
+                    code: "custom",
+                    message: "nonce transform unhandled error",
+                    input: val
+                })
         }
 
-        return fatalIssue(ctx, "nonce transform unhandled error", val)
+        return z.NEVER
     }
 }
 
