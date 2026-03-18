@@ -5,7 +5,7 @@ import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
 import { Logger } from "@andrewheberle/ts-slog"
-import { HostNonce, Nonce, NonceParseError } from "./nonce"
+import { HostNonce, Nonce, NonceMatchesError, NonceParseError } from "./nonce"
 
 const logger = new Logger()
 
@@ -274,7 +274,7 @@ type HostCertificateRequest = {
 
 type ParsedHostCertificateRequest = {
     principals: string[]
-    nonce: Nonce
+    nonce: HostNonce
 } & HostCertificateRequest
 
 export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
@@ -292,7 +292,13 @@ export const refineHostCertificateRequest = async (val: ParsedHostCertificateReq
 
         return z.NEVER
     } catch (err) {
-        return fatalIssue(ctx, "nonce verification unhandled error", val)
+        switch (true) {
+            case err instanceof NonceMatchesError:
+                return fatalIssue(ctx, err.message, val)
+            default:
+                return fatalIssue(ctx, "nonce verification unhandled error", val)
+        }
+
     }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { Nonce } from "../src/nonce"
+import { HostNonce, Nonce } from "../src/nonce"
 import { Key, parseKey } from "sshpk"
 
 type testSig = {
@@ -9,7 +9,7 @@ type testSig = {
     from: number
     want: boolean
     wantErr?: string
-    matches?: string[]
+    matches?: string | string[]
     wantMatches?: boolean
 }
 
@@ -101,15 +101,42 @@ describe("Nonce", async () => {
                 expect(await nonce.verify()).toBe(tt.want)
 
                 // check matches for keys
-                if (tt.matches !== undefined) {
+                if (tt.matches !== undefined && typeof tt.matches === "string") {
+                    const key = parseKey(tt.matches)
+
+                    expect(nonce.matches(key)).toBe(tt.wantMatches !== undefined ? tt.wantMatches : false)
+                }
+            }
+        })
+    }
+
+})
+
+describe("HostNonce", async () => {
+    const timestamp = 1765696780805
+
+    for (const tt of tests) {
+        it(tt.name, async () => {
+            if (tt.wantErr !== undefined) {
+                expect(() => new HostNonce(`${tt.data}.${tt.sig}`, tt.from))
+                    .toThrow(tt.wantErr)
+            } else {
+                const nonce = new HostNonce(`${tt.data}.${tt.sig}`, tt.from)
+
+                // verify timestamp and signature
+                expect(nonce.timestamp).toBe(timestamp)
+                expect(await nonce.verify()).toBe(tt.want)
+
+                // check matches for keys
+                if (tt.matches !== undefined && typeof tt.matches !== "string") {
                     const keys = tt.matches.map((k: string): Key => {
                         return parseKey(k)
                     })
+
 
                     expect(nonce.matches(...keys)).toBe(tt.wantMatches !== undefined ? tt.wantMatches : false)
                 }
             }
         })
     }
-
 })

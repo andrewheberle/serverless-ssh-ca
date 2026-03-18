@@ -5,36 +5,6 @@ import { verify } from "./sshsig"
 import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
 
-// try to parse as ecdsa, ed25519 then rsa
-const parsesignature = (s: string): Signature => {
-    try {
-        // try ecdsa
-        return parseSignature(s, "ecdsa", "ssh")
-    } catch (err) {
-        if (err instanceof SignatureParseError) {
-            try {
-                // try ed25519
-                return parseSignature(s, "ed25519", "ssh")
-            } catch (err) {
-                if (err instanceof SignatureParseError) {
-                    try {
-                        // try rsa
-                        return parseSignature(s, "rsa", "ssh")
-                    } catch (err) {
-                        // just throw here as we are out of options
-                        throw err
-                    }
-                } else {
-                    throw err
-                }
-            }
-        } else {
-            throw err
-        }
-    }
-}
-
-
 export class NonceParseError extends Error {
     constructor(message: string, cause?: unknown) {
         super(message)
@@ -43,6 +13,17 @@ export class NonceParseError extends Error {
 
         // This is necessary for proper stack trace in TypeScript
         Object.setPrototypeOf(this, NonceParseError.prototype)
+    }
+}
+
+export class NonceMatchesError extends Error {
+    constructor(message: string, cause?: unknown) {
+        super(message)
+        this.name = "NonceMatchesError"
+        this.cause = cause
+
+        // This is necessary for proper stack trace in TypeScript
+        Object.setPrototypeOf(this, NonceMatchesError.prototype)
     }
 }
 
@@ -124,36 +105,23 @@ export class Nonce {
 
     /**
      * 
-     * @param keys array of keys to verify finterprint against
-     * @returns 
+     * @param key key to verify fingerprint against
+     * @returns
      */
-    matches(key: Key): boolean
-    matches(...keys: Key[]): boolean
-
-    matches(...keys: Key[]): boolean {
-        if (keys.length === 1) {
-            return this.fingerprint.matches(keys[0])
-        }
-
-        for (const key of keys) {
-            // confirm nonce fingerprint matches keys
-            if (!this.fingerprint.matches(key))
-                return false
-        
-            // also config key used to sign nonce matches
-            if (!this.signaturePubkey.fingerprint().matches(key))
-                return false
-        }
-
-        return true
+    matches(key: Key): boolean {
+        return this.fingerprint.matches(key)
     }
 }
 
 export class HostNonce extends Nonce {
+    /**
+     * 
+     * @param keys keys to verify fingerprint against
+     * @returns
+     */
     matches(...keys: Key[]): boolean {
-        if (keys.length === 1) {
-            // must verify key and cert
-            return false
+        if (keys.length === 0) {
+            throw new NonceMatchesError("host nonce must match against one or more keys")
         }
 
         for (const key of keys) {
