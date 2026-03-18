@@ -32,18 +32,20 @@ sudo snap connect ssh-ca-client:home
 path/to/wrapper.sh
 ```
 
-Alternatively binary releases for Linux are available from the GitHub Releases page.
+Alternatively binary releases and a Debian/Ubuntu package for Linux are available from the GitHub Releases page.
 
 On Windows there is an MSI build that includes both the GUI and CLI versions
 and is the recommended option for Windows users.
 
-### CLI
+### Building From Source
+
+#### CLI
 
 ```sh
 go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client-cli@latest
 ```
 
-### GUI
+#### GUI
 
 ```sh
 go install github.com/andrewheberle/serverless-ssh-ca/client/cmd/ssh-ca-client@latest
@@ -59,7 +61,7 @@ client_id: OIDC Client ID
 scopes: ["openid", "email", "profile"]
 redirect_url: http://localhost:3000/auth/callback
 ca_url: https://ca.example.com/
-# optional (but recommended) SSH public key of CA
+# optional (but highly recommended) SSH public key of CA
 trusted_ca: ecdsa-sha2-nistp256 AAAAE2VjZ...
 ```
 
@@ -110,7 +112,8 @@ a random key is generated and saved in the users `login` keyring which is then
 used to encrypt this data using AES-GCM.
 
 If this random key is lost or deleted this data cannot be recovered so the user must
-regenerate their private key and request a new certificate.
+regenerate their private key by either deleting the user data
+manually or using the CLI and request a new certificate.
 
 ## Requirements
 
@@ -120,7 +123,7 @@ private keys, certificates and authentication to your SSH client of choice.
 On Windows this requires the `OpenSSH Agent` service to be set to `Manual` start
 and `ssh-agent.exe` must be started on login for your user.
 
-On Linux `ssh-agent` should be started as part of your normal login process and in
+On Linux `ssh-agent` is often started as part of your normal login process and in
 addition the secure storage of sensitive material requires the users `login` keyring
 to be unlocked, which is usually the default in most desktop environments.
 
@@ -166,7 +169,7 @@ interactive authentication flow.
 
 ### Host certificates
 
-The client can request certificates for pre-exisiting SSH host keys using the
+The CLI can be used to request certificates for pre-exisiting SSH host keys using the
 `host` sub-command as follows:
 
 ```sh
@@ -176,6 +179,11 @@ ssh-ca-client-cli host
 # renew existing certificates
 ssh-ca-client-cli host --renew
 ```
+
+#### Overview
+
+Requesting host certificates is restricted to users that have been explicitly
+allowed to do this in tge configuration of the CA.
 
 By default the CLI will attempt to request certificates for the following keys:
 
@@ -223,13 +231,46 @@ SSO process via OIDC.
 
 The renewed certificate will be issued with identical principals and extensions
 as the current certificate with renewals being skipped unless the certificate
-has less than 20% of validity left (based on the default of 30-days validity)
+has less than 50% of validity left (based on the default of 30-days validity).
 
 This allows the renewal process to be executed via cron as follows:
 
 ```crontab
 15 1 * * *   root   ssh-ca-client-cli host --renew
 ```
+
+#### Command Line Options
+
+The `host` sub-command supports the following command-line options:
+
+| Flag        | Type       | Default | Description |
+|---|---|---|---|
+| `--life` | `time.Duration` | 30d | Lifetime of certificate |
+| `--delay` | `time.Duration` | 250ms | Delay between multiple key renewals
+| `--key` | `[]string` | /etc/ssh/ssh_host_rsa_key,/etc/ssh/ssh_host_ecdsa_key,/etc/ssh/ssh_host_ed25519_key | Key(s) to request/renew certificates for (may be specified multiple times or as a comma seperated string) |
+| `--principals` | `[]string` | `hostname` | Principal(s) to request on certificate (may be specified multiple times or as a comma seperated string) |
+| `--addr` | `string` | localhost:3000 | Listen address for OIDC auth flow |
+| `--renew` | `bool` | false | Attempt to renew existing certificate(s) for the specified key(s) |
+| `--force` | `bool` | false | Force renewal of certificate(s) regardless of remaining validity |
+| `--renewat` | `float64` | 0.5 | Renew at this fraction of remaining validity for existing certificate(s) |
+
+#### Example
+
+The following example shows the initial request for SSH host certificates and a subsequent renewal.
+
+This example assumes you are working from your local device and requesting host certificates for a remote system without a web browser, so port 3000 will be forwarded to allow the initial OIDC authentication process to be handled locally:
+
+```sh
+# Initially connect to your host and forward port 3000 locally
+ssh -L 3000:localhost:3000 admin@remotehost
+# Request the initial certificate(s) with three principals (hostname, FQDN and IP address)
+ssh-ca-client-cli host --principals remotehost --principals remotehost.example.com,192.168.1.10
+# Visit the URL displayed on the console using your local browser (eg http://localhost:3000/auth/login) and authenticate against the IdP
+# Some time later perform a renewal
+ssh-ca-client-cli host --renew
+```
+
+
 
 ## As a GUI
 
