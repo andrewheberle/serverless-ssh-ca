@@ -4,7 +4,7 @@
 	"cloudflare": {
 		"bindings": {
 			"ISSUER_DN": {
-				"description": "This is the issuer name for your SSH certificates"
+				"description": "This is the issuer name for your SSH certificate authority"
 			},
 			"JWT_JWKS_URL": {
 				"description": "This is the URL for the JWKS so the CA can verify the JWT provided by the client"
@@ -32,6 +32,9 @@
 			},
 			"SSH_HOST_CERTIFICATE_LIFETIME": {
 				"description": "The lifetime of issued Host SSH certificates in human readable form (ie \"45 days\"), although the client may request a shorter duration"
+			},
+			"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": {
+				"description": "A comma seperated list of users who are permitted to request SSH host certificates based on the email claim from the OIDC IdP"
 			},
 			"PRIVATE_KEY": {
 				"description": "The ECDSA private key to use in OpenSSH format"

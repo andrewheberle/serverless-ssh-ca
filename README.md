@@ -1,11 +1,11 @@
-# Serverless SSH CA in Workers
+# Serverless SSH CA on Cloudflare Workers
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca)
 
 [![codecov](https://codecov.io/gh/andrewheberle/serverless-ssh-ca/graph/badge.svg?flag=worker&token=AZLFIBTTFK)](https://codecov.io/gh/andrewheberle/serverless-ssh-ca)
 
 This repository contains a serverless Certificate Authority that can be used
-to provide signed certificates for SSH access running on Cloudflare Workers.
+to provide signed certificates for SSH users and hosts running on Cloudflare Workers.
 
 ## Architecture
 
@@ -181,6 +181,10 @@ npm install
     "SSH_CERTIFICATE_INCLUDE_USER": "false",
     // The list of SSH extensions to add to the certificate as a comma seperated list
     "SSH_CERTIFICATE_EXTENSIONS": "permit-X11-forwarding,permit-agent-forwarding,permit-port-forwarding,permit-pty,permit-user-rc",
+    // A comma seperated list of users who are permitted to request SSH host certificates based on the email claim from the OIDC IdP
+    "SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": "",
+    // The lifetime of issued Host SSH certificates in human readable form (ie "45 days"), although the client may request a shorter duration
+    "SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
     // The maximum time skew allowed for certificate requests
     "CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
 },
