@@ -36,9 +36,29 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: dist-artifact
-          path: client/dist/**/*.exe
+          name: client-dist-artifact
+          path: client/dist
           retention-days: 7
+  worker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v6
+      - name: Install NPM dependencies
+        run: npm install --force
+      - name: Build Worker
+        run: npm run build
+      - name: Upload Worker build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: worker-dist-artifact
+          path: dist
+          retention-days: 1
   snapcraft-release:
     runs-on: ubuntu-latest
     steps:
@@ -92,3 +112,34 @@ jobs:
           files: |
             client/dist/ssh-ca-client.msi
             client/dist/ssh-ca-client.msi.sha256sum
+  sbom-scan:
+    permissions:
+      actions: read
+      contents: write # required to upload to the Dependency submission API
+    runs-on: ubuntu-latest
+    needs:
+      - goreleaser-release
+      - worker-build
+    steps:
+      - name: Download client artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: client-dist-artifact
+          path: client/dist
+      - name: Download worker artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: worker-dist-artifact
+          path: dist
+      - name: Scan the client and upload dependency results
+        uses: anchore/sbom-action@17ae1740179002c89186b61233e0f892c3118b11
+        with:
+          path: client/dist
+          artifact-name: client.spdx.json
+          dependency-snapshot: true
+      - name: Scan the Worker and upload dependency results
+        uses: anchore/sbom-action@17ae1740179002c89186b61233e0f892c3118b11
+        with:
+          path: dist
+          artifact-name: worker.spdx.json
+          dependency-snapshot: true
