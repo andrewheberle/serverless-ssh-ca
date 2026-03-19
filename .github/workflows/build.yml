@@ -129,13 +129,13 @@ jobs:
           name: worker-dist-artifact
           path: dist
       - name: Scan the client and upload dependency results
-        uses: anchore/sbom-action@17ae1740179002c89186b61233e0f892c3118b11
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
           path: client/dist
           artifact-name: client.spdx.json
           dependency-snapshot: true
       - name: Scan the Worker and upload dependency results
-        uses: anchore/sbom-action@17ae1740179002c89186b61233e0f892c3118b11
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
           path: dist
           artifact-name: worker.spdx.json
