@@ -25,19 +25,6 @@ app.onError((err, c) => {
         return err.getResponse()
     }
 
-    // workaround as chanfana bundles its own HTTPException - instanceof fails
-    if (typeof (err as HTTPException).getResponse === "function") {
-        const e = err as HTTPException
-        const message = e.message === "" ? "HTTPException" : e.message
-
-        if (e.cause !== undefined) {
-            logger.error(message, "status", e.status,"error", e.cause)
-        } else {
-            logger.error(message,  "status", e.status, "error", "undefined")
-        }
-        return e.getResponse()
-    }
-
     // Handle other errors
     logger.error("unexpected error", "error", err)
     return c.json({ error: "Internal Server Error" }, 500)

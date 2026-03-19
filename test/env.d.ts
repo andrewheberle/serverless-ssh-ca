@@ -1,3 +1,3 @@
-declare module "cloudflare:test" {
+declare module "cloudflare:workers" {
   interface ProvidedEnv extends Env {}
 }

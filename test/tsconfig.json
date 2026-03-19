@@ -4,5 +4,6 @@
 		"moduleResolution": "bundler",
 		"types": ["@cloudflare/vitest-pool-workers"]
 	},
-	"include": ["./**/*.ts", "../worker-configuration.d.ts"]
+	"include": ["./**/*.ts", "../worker-configuration.d.ts"],
+	"exclude": []
 }
