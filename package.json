@@ -46,8 +46,8 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"cf-typegen": "wrangler types",
-		"coverage": "vitest run --coverage --config test/vitest.config.ts",
-		"test": "wrangler deploy --dry-run && vitest run --config test/vitest.config.ts"
+		"coverage": "vitest run --coverage",
+		"test": "wrangler deploy --dry-run && vitest run"
 	},
 	"dependencies": {
 		"@andrewheberle/ts-slog": "^1.1.0",
