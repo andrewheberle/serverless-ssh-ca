@@ -1,4 +1,8 @@
-import { SELF, env, createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
+import { env, exports } from "cloudflare:workers"
+import {
+  createExecutionContext,
+  waitOnExecutionContext,
+} from "cloudflare:test"
 import { describe, it, expect } from "vitest"
 import worker from "../src"
 
@@ -6,14 +10,14 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>
 
 describe("get /404", () => {
     it ("responds with a 404", async () => {
-        const response = await SELF.fetch("http://example.com/404")
+        const response = await exports.default.fetch("http://example.com/404")
         expect(response.status).toBe(404)
     })
 })
 
 describe("get /docs", () => {
     it ("responds with a 200", async () => {
-        const response = await SELF.fetch("http://example.com/docs")
+        const response = await exports.default.fetch("http://example.com/docs")
         expect(response.status).toBe(200)
     })
 })

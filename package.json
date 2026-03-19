@@ -46,8 +46,8 @@
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"cf-typegen": "wrangler types",
-		"coverage": "vitest run --coverage --config tests/vitest.config.ts",
-		"test": "wrangler deploy --dry-run && vitest run --config tests/vitest.config.ts"
+		"coverage": "vitest run --coverage --config test/vitest.config.ts",
+		"test": "wrangler deploy --dry-run && vitest run --config test/vitest.config.ts"
 	},
 	"dependencies": {
 		"@andrewheberle/ts-slog": "^1.1.0",
@@ -59,11 +59,10 @@
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.12.0",
+		"@cloudflare/vitest-pool-workers": "^0.13.0",
 		"@types/sshpk": "^1.17.4",
-		"@vitest/coverage-istanbul": "^3.2.4",
 		"typescript": "^5.5.2",
-		"vitest": "3.2.4",
+		"vitest": "^4.1.0",
 		"wrangler": "^4.73.0"
 	}
 }
