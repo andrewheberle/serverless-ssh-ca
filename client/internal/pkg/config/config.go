@@ -312,6 +312,14 @@ func (c *Config) CertificateAuthority() ssh.PublicKey {
 	return c.system.CertificateAuthority()
 }
 
+// CertificateAuthority returns the CA PublicKey
+func (c *Config) System() *SystemConfig {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return &c.system
+}
+
 func (c *Config) signer() (ssh.Signer, error) {
 	// get key
 	pemBytes, err := c.getPrivateKeyBytes()
