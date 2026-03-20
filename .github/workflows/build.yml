@@ -37,6 +37,7 @@ jobs:
           path: client/dist
           retention-days: 1
   worker-build:
+    name: Build Worker with Wrangler
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -57,6 +58,7 @@ jobs:
           path: dist
           retention-days: 1
   snapcraft-build:
+    name: Build Snap version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -74,7 +76,7 @@ jobs:
           release: edge
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
   msi-build:
-    name: Package as an MSI
+    name: Package as an MSI for Windows
     runs-on: windows-latest
     needs: goreleaser-build
     steps:
@@ -113,6 +115,7 @@ jobs:
     permissions:
       actions: read
       contents: write # required to upload to the Dependency submission API
+    name: Generate SBOM for client and Worker builds
     runs-on: ubuntu-latest
     needs:
       - goreleaser-build
