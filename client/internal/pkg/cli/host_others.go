@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/host"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
@@ -116,26 +115,4 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 func (c *hostCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	// start interactive login
 	return c.client.ExecuteLogin(c.listenAddr)
-}
-
-// loadsystemconfig will only attempt to load the system config file
-func loadsystemconfig(this *simplecobra.Commandeer) (*config.SystemConfig, error) {
-	// get root command for config locations
-	root, ok := this.Root.Command.(*rootCommand)
-	if !ok {
-		return nil, fmt.Errorf("problem accessing root command")
-	}
-
-	c, err := config.LoadConfig(root.systemConfigFile, "")
-	if err != nil {
-		return nil, err
-	}
-
-	return &config.SystemConfig{
-		Issuer:                  c.Oidc().Issuer,
-		ClientID:                c.Oidc().ClientID,
-		Scopes:                  c.Oidc().Scopes,
-		RedirectURL:             c.Oidc().RedirectURL,
-		CertificateAuthorityURL: c.CertificateAuthorityURL(),
-	}, nil
 }

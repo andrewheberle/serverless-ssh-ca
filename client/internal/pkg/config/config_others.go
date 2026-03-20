@@ -37,7 +37,7 @@ func ConfigDirs() (user, system string, err error) {
 
 	dir, err := os.UserConfigDir()
 	if err != nil {
-		return "", "", err
+		return "/dev/null/nonexistent", filepath.Join("/etc", AppName), nil
 	}
 
 	return filepath.Join(dir, AppName), filepath.Join("/etc", AppName), nil
