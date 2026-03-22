@@ -20,7 +20,7 @@ func commands() []simplecobra.Commander {
 			Command: simplecommand.New("show", "Show existing private/public key"),
 		},
 		&versionCommand{
-			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client"),
+			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client-cli"),
 		},
 	}
 }

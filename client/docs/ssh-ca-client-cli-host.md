@@ -27,18 +27,7 @@ As this command writes certificates issued for host SSH keys it needs write acce
 
 ## Global Options
 
-`--config <path>`
-Path to configuration file the defines global/system config such as the CA URL,
-OIDC IdP configuration and CA trust.
-
-The default is `/etc/serverless-ssh-ca/config.yml`
-
-`--debug`
-Enable debug logging.
-
-`--user <path>`
-The path to store user specific configuration (this is ignored for the `host`)
-sub-command.
+See [Options](ssh-ca-client-cli.md#options)
 
 ## Options
 
@@ -155,3 +144,7 @@ ca_url: https://ca.example.com/
 # Providing the SSH public key of the CA is optional but recommended to allow the client to validate issued certificates are from the expected CA
 trusted_ca: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBMgJTsYW+tHl0lz/rnO8djbwq0B3uZ5sGugXU6Ha5S2rTdzMDgit2DO+hoivdT4I07rMrRtmFI179wUY06gIf00=
 ```
+
+## ssh-ca-client-cli
+
+Part of the [ssh-ca-client-cli](ssh-ca-client-cli.md)
