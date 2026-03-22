@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
@@ -17,6 +18,7 @@ type showCommand struct {
 	status      bool
 
 	config *config.Config
+	logger *slog.Logger
 
 	*simplecommand.Command
 }
@@ -43,6 +45,15 @@ func (c *showCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if err := c.Command.PreRun(this, runner); err != nil {
 		return err
 	}
+
+	// set up logger
+	logger, err := logger(this)
+	if err != nil {
+		return fmt.Errorf("could not set up logger: %w", err)
+	}
+	c.logger = logger
+
+	c.logger.Debug("attempting load config", "command", this.CobraCommand.Name())
 
 	// load config
 	config, err := loaduserconfig(this)

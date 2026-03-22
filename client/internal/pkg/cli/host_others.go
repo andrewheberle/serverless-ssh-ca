@@ -21,7 +21,6 @@ type hostCommand struct {
 	delay      time.Duration
 	lifetime   time.Duration
 	listenAddr string
-	debug      bool
 	force      bool
 	principals []string
 	renewat    float64
@@ -53,7 +52,6 @@ func (c *hostCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.Flags().StringSliceVar(&c.principals, "principals", principals, "Principals to add to the host certificate request")
 	cmd.Flags().BoolVar(&c.renew, "renew", false, "Renew existing certificate")
 	cmd.MarkFlagsMutuallyExclusive("renew", "principals")
-	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 	cmd.Flags().BoolVar(&c.force, "force", false, fmt.Sprintf("Force renewal even if current certificate has more than %0.1f%% validity left", host.DefaultRenewAt*100.0))
 	cmd.Flags().Float64Var(&c.renewat, "renewat", host.DefaultRenewAt, "Renew at fraction of lifetime")
 	cmd.MarkFlagsMutuallyExclusive("force", "renewat")
@@ -66,17 +64,22 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		return err
 	}
 
+	// set up logger
+	logger, err := logger(this)
+	if err != nil {
+		return fmt.Errorf("could not set up logger: %w", err)
+	}
+	c.logger = logger
+
 	if c.renewat < 0 || c.renewat > 1 {
 		return fmt.Errorf("renewat must be between 0 and 1")
 	}
 
-	logLevel := new(slog.LevelVar)
-	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
-	c.logger = slog.New(h)
-
 	if os.Geteuid() != 0 {
 		c.logger.Warn("not running as root", "uid", os.Geteuid())
 	}
+
+	c.logger.Debug("attempting load config", "command", this.CobraCommand.Name())
 
 	config, err := loadsystemconfig(this)
 	if err != nil {
@@ -96,10 +99,6 @@ func (c *hostCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 		if c.force {
 			opts = append(opts, host.WithRenewAt(1.0))
 		}
-	}
-
-	if c.debug {
-		logLevel.Set(slog.LevelDebug)
 	}
 
 	lh, err := host.NewHostLoginHandler(c.keypath, config, opts...)

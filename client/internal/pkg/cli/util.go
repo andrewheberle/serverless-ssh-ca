@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -68,4 +69,21 @@ func loaduserconfig(this *simplecobra.Commandeer) (*config.Config, error) {
 	}
 
 	return config, nil
+}
+
+func logger(this *simplecobra.Commandeer) (*slog.Logger, error) {
+	debug, err := this.Root.CobraCommand.PersistentFlags().GetBool("debug")
+	if err != nil {
+		return nil, err
+	}
+
+	logLevel := new(slog.LevelVar)
+	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	logger := slog.New(h)
+
+	if debug {
+		logLevel.Set(slog.LevelDebug)
+	}
+
+	return logger, nil
 }

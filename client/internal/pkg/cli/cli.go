@@ -13,12 +13,13 @@ import (
 type rootCommand struct {
 	systemConfigFile string
 	userConfigFile   string
+	debug            bool
 
 	*simplecommand.Command
 }
 
 var (
-	ErrNoPrivateKey = errors.New("no private key found, please run \"ssh-ca-client generate\"")
+	ErrNoPrivateKey = errors.New("no private key found")
 )
 
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
@@ -34,6 +35,7 @@ func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd := cd.CobraCommand
 	cmd.PersistentFlags().StringVar(&c.systemConfigFile, "config", filepath.Join(system, "config.yml"), "Path to configuration file")
 	cmd.PersistentFlags().StringVar(&c.userConfigFile, "user", filepath.Join(user, "user.yml"), "Path to user configuration file")
+	cmd.PersistentFlags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 
 	return nil
 }
