@@ -14,7 +14,8 @@ ssh-ca-client-cli [options] [subcommand]
 Path to configuration file the defines global/system config such as the CA URL,
 OIDC IdP configuration and CA trust.
 
-The default is `/etc/serverless-ssh-ca/config.yml`
+The default is `/etc/serverless-ssh-ca/config.yml` (Linux/BSD/Darwin) or
+`%PROGRAMDATA%\Serverless SSH CA Client\config.yml` (Windows).
 
 `--debug`
 Enable debug logging.
@@ -22,6 +23,9 @@ Enable debug logging.
 `--user <path>`
 The path to store user specific configuration (this is ignored for the `host`)
 sub-command.
+
+The default is `$HOME/.config/serverless-ssh-ca/user.yaml` (Linux/BSD/Darwin)
+or `%APPDATA%\Serverless SSH CA Client\config.yml` (Windows).
 
 ## Sub-Commands
 

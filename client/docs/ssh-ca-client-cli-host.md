@@ -5,10 +5,13 @@ ssh-ca-client-cli-host - Request and renew host SSH certificates from the Server
 ## Synopsis
 
 ```sh
-ssh-ca-client-cli [global options] host [--addr <address>] [--debug]
-                                        [--delay <duration>] [--force]
-                                        [--key <key(s)>] [--life <duration>]
-                                        [--principals <principals>] [--renew]
+ssh-ca-client-cli [global options] host [--addr <address>]
+                                        [--delay <duration>]
+                                        [--force]
+                                        [--key <key(s)>]
+                                        [--life <duration>]
+                                        [--principals <principals>]
+                                        [--renew]
                                         [--renewat <percent>]
                        
 ```

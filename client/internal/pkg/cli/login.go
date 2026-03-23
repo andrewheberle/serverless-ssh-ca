@@ -15,7 +15,6 @@ import (
 type loginCommand struct {
 	skipAgent  bool
 	lifetime   time.Duration
-	showTokens bool
 	listenAddr string
 	add        bool
 	force      bool
@@ -34,7 +33,6 @@ func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.skipAgent, "skip-agent", false, "Skip adding SSH key and certificate to ssh-agent")
-	cmd.Flags().BoolVar(&c.showTokens, "show-tokens", false, "Display OIDC tokens after login process")
 	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	cmd.Flags().BoolVar(&c.add, "add", false, "Add existing certificate to SSH agent")
@@ -66,9 +64,6 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	// set options
 	opts := []client.LoginHandlerOption{
 		client.WithLifetime(c.lifetime),
-	}
-	if c.showTokens {
-		opts = append(opts, client.ShowTokens())
 	}
 	if c.skipAgent {
 		opts = append(opts, client.SkipAgent())

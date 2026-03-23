@@ -5,7 +5,8 @@ ssh-ca-client-cli-generate - Request and renew host SSH certificates from the Se
 ## Synopsis
 
 ```sh
-ssh-ca-client-cli [global options] generate [--force] [--dryrun] 
+ssh-ca-client-cli [global options] generate [--force]
+                                            [--dryrun] 
 ```
 
 ## Description

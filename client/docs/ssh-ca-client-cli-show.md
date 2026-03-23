@@ -5,7 +5,9 @@ ssh-ca-client-cli-show - Show any existing private key, public key, certificate 
 ## Synopsis
 
 ```sh
-ssh-ca-client-cli [global options] show [--certificate] [--private] [--public]
+ssh-ca-client-cli [global options] show [--certificate]
+                                        [--private]
+                                        [--public]
                                         [--status]
 ```
 
