@@ -24,7 +24,7 @@ export default defineConfig({
 		}
 	},
 	plugins: [
-		fixIstanbulBabelInterop,
+		fixIstanbulBabelInterop(),
 		cloudflareTest({
 			wrangler: {
 				configPath: "./wrangler.test.jsonc",
