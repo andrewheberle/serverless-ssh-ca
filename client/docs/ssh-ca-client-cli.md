@@ -32,24 +32,24 @@ or `%APPDATA%\Serverless SSH CA Client\config.yml` (Windows).
 `generate`
 Generate a SSH private key.
 
-See [ssh-ca-client-generate](ssh-ca-client-generate.md)
+See [ssh-ca-client-generate](ssh-ca-client-cli-generate.md)
 
 `host`
 Request and renew SSH host certificates.
 
-See [ssh-ca-client-host](ssh-ca-client-host.md)
+See [ssh-ca-client-host](ssh-ca-client-cli-host.md)
 
 `login`
 Request user SSH certificates.
 
-See [ssh-ca-client-login](ssh-ca-client-login.md)
+See [ssh-ca-client-login](ssh-ca-client-cli-login.md)
 
 `show`
 Show user SSH private key, public key and/or certificate.
 
-See [ssh-ca-client-show](ssh-ca-client-show.md)
+See [ssh-ca-client-show](ssh-ca-client-cli-show.md)
 
 `version`
 Show the current version of the ssh-ca-client-cli
 
-See [ssh-ca-client-show](ssh-ca-client-show.md)
+See [ssh-ca-client-show](ssh-ca-client-cli-show.md)
