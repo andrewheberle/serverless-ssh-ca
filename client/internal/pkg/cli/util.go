@@ -17,7 +17,7 @@ func loadconfig(this *simplecobra.Commandeer) (*config.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("problem accessing config flag: %w", err)
 	}
-	
+
 	// get user config location
 	userConfigFile, err := this.CobraCommand.Flags().GetString("user")
 	if err != nil {
@@ -51,7 +51,7 @@ func loaduserconfig(this *simplecobra.Commandeer) (*config.Config, error) {
 		return nil, err
 	}
 
-	config, err := config.LoadUserConfigOnly(root.userConfigFile)
+	config, err := config.LoadUserConfigOnly(userConfigFile)
 	if err != nil {
 		return nil, err
 	}
