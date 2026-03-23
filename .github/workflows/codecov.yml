@@ -54,7 +54,7 @@ jobs:
         uses: actions/setup-node@v6
         
       - name: Install NPM dependencies
-        run: npm install --force
+        run: npm install
 
       - name: Run Typescript tests with coverage
         run: npm run coverage

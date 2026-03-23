@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
@@ -17,6 +18,8 @@ type generateCommand struct {
 
 	config *config.Config
 
+	logger *slog.Logger
+
 	*simplecommand.Command
 }
 
@@ -26,7 +29,7 @@ func (c *generateCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.Flags().BoolVar(&c.force, "force", false, "Force replacing and existing key")
+	cmd.Flags().BoolVar(&c.force, "force", false, "Force replacing an existing private key")
 	cmd.Flags().BoolVarP(&c.dryrun, "dryrun", "n", false, "Show what would be done")
 
 	return nil
@@ -36,6 +39,15 @@ func (c *generateCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if err := c.Command.PreRun(this, runner); err != nil {
 		return err
 	}
+
+	// set up logger
+	logger, err := logger(this)
+	if err != nil {
+		return fmt.Errorf("could not set up logger: %w", err)
+	}
+	c.logger = logger
+
+	c.logger.Debug("attempting load config", "command", this.CobraCommand.Name())
 
 	// load config
 	config, err := loaduserconfig(this)

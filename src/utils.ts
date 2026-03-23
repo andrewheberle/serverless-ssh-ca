@@ -138,7 +138,7 @@ export const transformPublicKey = (val: string, ctx: z.RefinementCtx): Key | nev
     }
 }
 
-const identityPrincipals = (payload: CertificateRequestJWTPayload): string[] => {
+export const identityPrincipals = (payload: CertificateRequestJWTPayload): string[] => {
     if (env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM === undefined) {
         return []
     }
@@ -146,6 +146,11 @@ const identityPrincipals = (payload: CertificateRequestJWTPayload): string[] => 
     const p = payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM]
     if (p === undefined) {
         logger.warn("principals claim was missing despite being set in CA config", "claim", env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        return []
+    }
+
+    if (p === "") {
+        logger.warn("principals claim was present but was an empty string", "claim", env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         return []
     }
 

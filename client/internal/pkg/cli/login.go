@@ -3,8 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
@@ -15,10 +15,8 @@ import (
 type loginCommand struct {
 	skipAgent  bool
 	lifetime   time.Duration
-	showTokens bool
 	listenAddr string
 	add        bool
-	debug      bool
 	force      bool
 
 	client *client.LoginHandler
@@ -35,11 +33,9 @@ func (c *loginCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.skipAgent, "skip-agent", false, "Skip adding SSH key and certificate to ssh-agent")
-	cmd.Flags().BoolVar(&c.showTokens, "show-tokens", false, "Display OIDC tokens after login process")
 	cmd.Flags().DurationVar(&c.lifetime, "life", time.Hour*24, "Lifetime of SSH certificate")
 	cmd.Flags().StringVar(&c.listenAddr, "addr", "localhost:3000", "Listen address for OIDC auth flow")
 	cmd.Flags().BoolVar(&c.add, "add", false, "Add existing certificate to SSH agent")
-	cmd.Flags().BoolVar(&c.debug, "debug", false, "Enable debug logging")
 	cmd.Flags().BoolVar(&c.force, "force", false, "Force renewal even if current certificate has more than 50% validity left")
 
 	return nil
@@ -49,6 +45,15 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	if err := c.Command.PreRun(this, runner); err != nil {
 		return err
 	}
+
+	// set up logger
+	logger, err := logger(this)
+	if err != nil {
+		return fmt.Errorf("could not set up logger: %w", err)
+	}
+	c.logger = logger
+
+	c.logger.Debug("attempting load config", "command", this.CobraCommand.Name())
 
 	// load config
 	config, err := loadconfig(this)
@@ -60,22 +65,11 @@ func (c *loginCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 	opts := []client.LoginHandlerOption{
 		client.WithLifetime(c.lifetime),
 	}
-	if c.showTokens {
-		opts = append(opts, client.ShowTokens())
-	}
 	if c.skipAgent {
 		opts = append(opts, client.SkipAgent())
 	}
 
-	logLevel := new(slog.LevelVar)
-	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
-	c.logger = slog.New(h)
-
 	opts = append(opts, client.WithLogger(c.logger))
-
-	if c.debug {
-		logLevel.Set(slog.LevelDebug)
-	}
 
 	// set up login client
 	lh, err := client.NewLoginHandler(config, opts...)
