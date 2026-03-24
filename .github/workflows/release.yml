@@ -10,6 +10,8 @@ jobs:
   goreleaser-release:
     name: Release with GoReleaser
     runs-on: ubuntu-latest
+    concurrency:
+      group: client
     permissions:
       contents: write
       id-token: write
@@ -44,6 +46,8 @@ jobs:
   worker-build:
     runs-on: ubuntu-latest
     name: Build Worker with Wrangler
+    concurrency:
+      group: worker
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -58,6 +62,8 @@ jobs:
   snapcraft-release:
     runs-on: ubuntu-latest
     name: Build and release Snap
+    concurrency:
+      group: snap
     steps:
       - name: Checkout
         uses: actions/checkout@v6
