@@ -12,8 +12,6 @@ jobs:
   goreleaser-build:
     name: Build with GoReleaser
     runs-on: ubuntu-latest
-    concurrency:
-      group: client
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -43,8 +41,6 @@ jobs:
   worker-build:
     name: Build Worker with Wrangler
     runs-on: ubuntu-latest
-    concurrency:
-      group: worker
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -59,8 +55,6 @@ jobs:
   snapcraft-build:
     name: Build Snap version
     runs-on: ubuntu-latest
-    concurrency:
-      group: snap
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -84,6 +78,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@v6
