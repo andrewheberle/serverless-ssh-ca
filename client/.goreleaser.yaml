@@ -103,7 +103,8 @@ nfpms:
         dst: /usr/lib/systemd/system
 
 sboms:
-  - artifacts: package
-    ids:
-      - default
+  - id: package
+    artifacts: package
+    disable: false
+  - artifacts: archive
     disable: false
