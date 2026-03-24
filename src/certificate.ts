@@ -28,7 +28,21 @@ export class CertificateError extends Error {
   }
 }
 
-export const generateCertificate = (email: string, key: PrivateKey, public_key: Key, lifetime?: number, principals?: string[], extensions?: string[]): Certificate => {
+export type GenerateCertificateOptions = {
+    lifetime?: number
+    principals?: string[]
+    extensions?: string[]
+    /**
+     * @internal
+     * Override the current timestamp used for the certificate serial number.
+     * Should only be set in tests.
+     */
+    now?: number
+}
+
+export const generateCertificate = (email: string, key: PrivateKey, public_key: Key, options?: GenerateCertificateOptions): Certificate => {
+    let { lifetime, principals, extensions } = options ?? {}
+
     // add identities
     const identity = env.SSH_CERTIFICATE_INCLUDE_SELF as string === "true"
         ? [identityForUser(email.split("@")[0])]
@@ -50,9 +64,9 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
         : seconds(env.SSH_CERTIFICATE_LIFETIME)
 
     // generate value for serial of certificate
-    const unixTimestamp = Math.floor(Date.now() / 1000)
+    const now = options?.now ?? Date.now()
     const serial = Buffer.alloc(8)
-    serial.writeBigUInt64BE(BigInt(unixTimestamp))
+    serial.writeBigUInt64BE(BigInt(now))
 
     // set issuer of certificate based on ISSUER_DN
     const issuer = identityFromDN(env.ISSUER_DN)
@@ -118,7 +132,7 @@ export async function createSignedCertificate(email: string, public_key: Key, op
 	// parse key
     const key = parsePrivateKey(secret)
 
-    return generateCertificate(email, key, public_key, options.lifetime, options.principals, options.extensions)
+    return generateCertificate(email, key, public_key, options)
 }
 
 export type CreateHostCertificateOptions = {
