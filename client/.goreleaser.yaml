@@ -15,6 +15,9 @@ builds:
     goos:
       - linux
     main: ./cmd/ssh-ca-client-cli
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
   - id: windowscli
     binary: ssh-ca-client-cli
     env:
@@ -24,6 +27,9 @@ builds:
     goos:
       - windows
     main: ./cmd/ssh-ca-client-cli
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
   - id: windowsgui
     binary: ssh-ca-client
     env:
@@ -38,7 +44,8 @@ builds:
         - go generate ./cmd/ssh-ca-client/generate_windows.go
     main: ./cmd/ssh-ca-client
     ldflags:
-      - -H=windowsgui
+      - -H=windowsgui -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
   - id: gui
     binary: ssh-ca-client
     env:
@@ -48,6 +55,9 @@ builds:
     goos:
       - linux
     main: ./cmd/ssh-ca-client
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
 
 archives:
   - allow_different_binary_count: true
@@ -73,8 +83,9 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 release:
   draft: true
@@ -90,3 +101,10 @@ nfpms:
     contents:
       - src: systemd/
         dst: /usr/lib/systemd/system
+
+sboms:
+  - id: package
+    artifacts: package
+    disable: false
+  - artifacts: archive
+    disable: false
