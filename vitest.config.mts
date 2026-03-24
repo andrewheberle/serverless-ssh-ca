@@ -1,21 +1,6 @@
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers"
 import { defineConfig, Plugin } from "vitest/config"
 
-function fixIstanbulBabelInterop(): Plugin {
-  return {
-    name: "fix-istanbul-babel-interop",
-    transform(code, id) {
-      if (!id.includes("coverage-istanbul/dist/provider")) return;
-      // Replace the default import with a namespace import so Vite's SSR
-      // transform doesn't wrap it in .default (which loses CJS exports)
-      return code.replace(
-        "import require$$0$3 from '@babel/core';",
-        () => "import * as require$$0$3 from '@babel/core';",
-      );
-    },
-  };
-}
-
 export default defineConfig({
 	test: {
 		coverage: {
@@ -24,7 +9,6 @@ export default defineConfig({
 		}
 	},
 	plugins: [
-		fixIstanbulBabelInterop(),
 		cloudflareTest({
 			wrangler: {
 				configPath: "./wrangler.test.jsonc",
