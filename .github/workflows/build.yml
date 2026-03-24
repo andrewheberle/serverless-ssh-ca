@@ -23,6 +23,8 @@ jobs:
         with:
           go-version-file: client/go.mod
           cache: false
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
