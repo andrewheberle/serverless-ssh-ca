@@ -34,7 +34,7 @@ import {
     transformPublicKey
 } from "../utils"
 import { Format, Identity, KeyParseError, parsePrivateKey } from "sshpk"
-import { runStatement } from "../db"
+import { isRevoked, recordCertificate, runStatement } from "../db"
 
 const logger = new Logger()
 
@@ -161,28 +161,9 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             }
 
             try {
-                const serial = certificate.serial.readBigUInt64BE(0)
-                const subjects = certificate.subjects.map((v: Identity): string => {
-                    return v.toString()
-                }).join(",")
-                const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
-                    // @ts-ignore: the name property does exist
-                    return v.name as string
-                }).join(",")
-                const stmt = c.env.DB
-                    .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before) VALUES (?, ?, ?, ?, ?, ?)")
-                    .bind(`${serial}`, data.headers.Authorization.email, subjects, extensions, certificate.validFrom.toISOString(), certificate.validUntil.toISOString())
-                const res = await runStatement(stmt)
-
-                if (!res.success) {
-                    if (res.error !== undefined) {
-                        throw new Error(res.error)
-                    }
-
-                    throw new Error("error during query")
-                }
+                await recordCertificate(certificate, data.headers.Authorization.email)
             } catch (err) {
-                logger.error("there was a problem adding issued certificate to database", "error", err)
+                logger.error("there was a problem adding issued user certificate to database", "error", err)
             }
 
             return c.json(response)
@@ -246,7 +227,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                     nonce: z.string()
                         .transform(transformNonce)
                         .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
-                    principals: z.array(z.string())
+                    principals: z.array(z.string()).min(1)
                         .describe("List of principals to include on the issued certificate"),
                     lifetime: z.number()
                         .min(seconds("24 hours"))
@@ -297,6 +278,12 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
             const certificate = await createSignedHostCertificate(data.body.public_key, opts)
             const response: CertificateSignerResponse = {
                 certificate: btoa(certificate.toString("openssh"))
+            }
+
+            try {
+                await recordCertificate(certificate, `host_${certificate.subjects[0].hostname}`)
+            } catch (err) {
+                logger.error("there was a problem adding issued host certificate to database", "error", err)
             }
 
             return c.json(response)
@@ -364,6 +351,12 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 
         logger.info("handling host certificate renewal")
 
+        // ensure certificate presented for renewal process is not revoked
+        const serial = data.body.certificate.serial.readBigUInt64BE(0)
+        if (await isRevoked(serial)) {
+            throw new ForbiddenException("current certificate is revoked")
+        }
+
         // use smaller of the current certificate lifetime and the requested lifetime 
         const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
         const lifetime = originalLifetime > data.body.lifetime
@@ -379,6 +372,12 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
             const certificate = await createSignedHostCertificate(data.body.public_key, opts)
             const response: CertificateSignerResponse = {
                 certificate: btoa(certificate.toString("openssh"))
+            }
+
+            try {
+                await recordCertificate(certificate, `host_${certificate.subjects[0].hostname}`)
+            } catch (err) {
+                logger.error("there was a problem adding issued host certificate to database", "error", err)
             }
 
             return c.json(response)

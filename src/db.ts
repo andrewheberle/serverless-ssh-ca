@@ -1,11 +1,12 @@
 import { Logger } from "@andrewheberle/ts-slog";
 import { tryWhile } from "@cloudflare/actors"
 import { env } from "cloudflare:workers";
+import { Certificate, Format, Identity } from "sshpk";
 
 export const runStatement = async (stmt: D1PreparedStatement) => {
-  return await tryWhile(async () => {
-    return await stmt.run();
-  }, shouldRetry);
+    return await tryWhile(async () => {
+        return await stmt.run();
+    }, shouldRetry);
 }
 
 export const shouldRetry = (err: unknown, nextAttempt: number) => {
@@ -15,7 +16,7 @@ export const shouldRetry = (err: unknown, nextAttempt: number) => {
         errMsg.includes("storage caused object to be reset") ||
         errMsg.includes("reset because its code was updated") ||
         errMsg.includes("stream because client disconnected")
-    
+
     if (nextAttempt <= 5 && isRetryableError) {
         return true
     }
@@ -40,4 +41,36 @@ export const dbCleanup = async () => {
     } catch (err) {
         logger.error("error during database cleanup", "retention", env.DB_CERTIFICATE_RETENTION)
     }
+}
+
+export const recordCertificate = async (certificate: Certificate, keyid: string) => {
+    const serial = certificate.serial.readBigUInt64BE(0)
+    const subjects = certificate.subjects.map((v: Identity): string => {
+        return v.toString()
+    }).join(",")
+    const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
+        // @ts-ignore: the name property does exist
+        return v.name as string
+    }).join(",")
+    const stmt = env.DB
+        .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(`${serial}`, keyid, subjects, extensions, certificate.validFrom.toISOString(), certificate.validUntil.toISOString())
+    const res = await runStatement(stmt)
+
+    if (!res.success) {
+        if (res.error !== undefined) {
+            throw new Error(res.error)
+        }
+
+        throw new Error("error during query")
+    }
+}
+
+export const isRevoked = async (serial: bigint): Promise<boolean> => {
+    const stmt = env.DB
+        .prepare("SELECT COUNT(*) FROM certificates WHERE serial = ? AND revoked_at NOTNULL")
+        .bind(`${serial}`)
+    const res = await runStatement(stmt)
+
+    return res.results.length > 0
 }
