@@ -19,7 +19,7 @@ builds:
     main: ./cmd/ssh-ca-client-cli
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
+      - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.Version={{ .Version }} -X main.Date={{ .CommitDate }}
   - id: windowscli
     binary: ssh-ca-client-cli
     env:
@@ -33,7 +33,7 @@ builds:
     main: ./cmd/ssh-ca-client-cli
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
+      - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.Version={{ .Version }} -X main.Date={{ .CommitDate }}
   - id: windowsgui
     binary: ssh-ca-client
     env:
@@ -50,7 +50,7 @@ builds:
         - go generate ./cmd/ssh-ca-client/generate_windows.go
     main: ./cmd/ssh-ca-client
     ldflags:
-      - -H=windowsgui -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
+      - -H=windowsgui -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.Version={{ .Version }} -X main.Date={{ .CommitDate }}
     mod_timestamp: "{{ .CommitTimestamp }}"
   - id: gui
     binary: ssh-ca-client
@@ -65,7 +65,7 @@ builds:
     main: ./cmd/ssh-ca-client
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
+      - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.Version={{ .Version }} -X main.Date={{ .CommitDate }}
 
 archives:
   - allow_different_binary_count: true

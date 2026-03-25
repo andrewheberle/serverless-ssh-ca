@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime/debug"
 	"sync"
 	"time"
 
 	"fyne.io/systray"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version"
 	"github.com/gen2brain/beeep"
 )
 
@@ -54,8 +54,6 @@ type Application struct {
 	mu             sync.Mutex
 	refreshBackOff int
 	refreshFailure int
-
-	version string
 
 	logger *slog.Logger
 }
@@ -102,14 +100,6 @@ func New(title, addr string, fs embed.FS, client *client.LoginHandler, renewAt t
 
 		app.notificationIcons[name] = icon
 	}
-
-	// get version if available
-	version := "Unknown"
-	info, ok := debug.ReadBuildInfo()
-	if ok {
-		version = info.Main.Version
-	}
-	app.version = version
 
 	return app, nil
 }
@@ -464,6 +454,6 @@ func timeLeft(t time.Time) string {
 
 func (app *Application) setTooltip(message string) {
 	// set tooltip
-	tooltip := fmt.Sprintf("SSH CA Client (%s) - %s", app.version, message)
+	tooltip := fmt.Sprintf("SSH CA Client (%s) - %s", version.Version, message)
 	systray.SetTooltip(tooltip)
 }
