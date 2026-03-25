@@ -88,7 +88,10 @@ checksum:
   name_template: "checksums.txt"
 
 release:
-  draft: true
+  draft: false
+  make_latest: true
+  replace_existing_artifacts: true
+  prerelease: auto
   make_latest: true
 
 nfpms:
