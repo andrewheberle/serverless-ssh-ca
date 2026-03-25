@@ -1,10 +1,11 @@
-name: Build
+name: Release
 
 on:
   push:
     branches:
       - 'main'
-  pull_request:
+    tags:
+      - 'v*'
 
 permissions: {}
 
@@ -12,6 +13,11 @@ jobs:
   client:
     name: Build Client with GoReleaser
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -25,33 +31,25 @@ jobs:
           cache: true
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@v0
-      - name: Build snapshot with GoReleaser
+      - name: Release with GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: build --clean --snapshot
+          args: release --clean
           workdir: client
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sign artifacts
+        uses: actions/attest@v4
+        with:
+          subject-checksums: ./client/dist/checksums.txt
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
           name: client-dist-artifact
           path: client/dist
           retention-days: 1
-  worker:
-    name: Build Worker with Wrangler
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@v6
-      - name: Install NPM dependencies
-        run: npm install
-      - name: Build Worker
-        run: npm run build
   snapcraft:
     name: Build Client as Snap
     runs-on: ubuntu-latest
@@ -68,10 +66,12 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
           snap: ${{ steps.snapcraft.outputs.snap }}
-          release: edge
+          release: stable
   msi:
     name: Package as an MSI for Windows
     runs-on: windows-latest
+    permissions:
+      contents: write
     needs: client
     steps:
       - name: Checkout
@@ -104,3 +104,9 @@ jobs:
           name: msi-artifact
           path: client/dist/**/*.msi
           retention-days: 1
+      - name: Add MSI to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            client/dist/ssh-ca-client.msi
+            client/dist/ssh-ca-client.msi.sha256sum
