@@ -46,8 +46,7 @@ builds:
       - windows
     hooks:
       pre:
-        - go install github.com/tc-hib/go-winres@v0.3.3
-        - go generate ./cmd/ssh-ca-client/generate_windows.go
+        - go generate ./cmd/ssh-ca-client
     main: ./cmd/ssh-ca-client
     ldflags:
       - -H=windowsgui -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.Version={{ .Version }} -X main.Date={{ .CommitDate }}
