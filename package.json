@@ -41,6 +41,9 @@
 			},
 			"CERTIFICATE_REQUEST_TIME_SKEW_MAX": {
 				"description": "The maximum time offset/skew allowed for certificate requests from a client in human readable form (ie \"5 minutes\")"
+			},
+			"DB_CERTIFICATE_RETENTION": {
+				"description": "The period of time to retain issued certificates in the database (ie \"1 year\" or \"infinite\" to never purge the database)"
 			}
 		}
 	},

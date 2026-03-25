@@ -162,6 +162,8 @@ npm install
 
 ```jsonc
 "vars": {
+    // This is used during tests and should never be set to false for you Worker
+    "IS_PRODUCTION": "true",
     // This is the issuer of your SSH certificates
     "ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
     // This is the URL for the CA to verify the JWT provided by the client

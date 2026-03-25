@@ -6,7 +6,7 @@ import { generateCertificate } from "../src/certificate"
 import { seconds } from "itty-time"
 import { split } from "../src/utils"
 import { env } from "cloudflare:workers"
-import { Format, Identity, identityForUser, Key, PrivateKey } from "sshpk"
+import { Format, Identity, identityForUser, PrivateKey } from "sshpk"
 
 const rsaCAKey = rsaPrivateKey()
 const ecdsaCAKey = ecdsaPrivateKey()
