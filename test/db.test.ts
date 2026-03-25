@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { runStatement, shouldRetry } from "../src/db"
+import { isRevoked, runStatement, shouldRetry } from "../src/db"
 import { env } from "cloudflare:workers"
 
 describe("shouldRetry", () => {
@@ -31,3 +31,8 @@ describe("runStatement", async () => {
     })
 })
 
+describe("isRevoked", async () => {
+    it("not revoked", async () => {
+        expect(await isRevoked(BigInt(1))).toBe(false)
+    })
+})

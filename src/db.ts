@@ -68,7 +68,7 @@ export const recordCertificate = async (certificate: Certificate, keyid: string)
 
 export const isRevoked = async (serial: bigint): Promise<boolean> => {
     const stmt = env.DB
-        .prepare("SELECT COUNT(*) FROM certificates WHERE serial = ? AND revoked_at NOTNULL")
+        .prepare("SELECT serial FROM certificates WHERE serial = ? AND revoked_at NOTNULL")
         .bind(`${serial}`)
     const res = await runStatement(stmt)
 
