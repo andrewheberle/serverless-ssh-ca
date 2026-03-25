@@ -21,5 +21,12 @@
         "SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": "",
         "SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
         "CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes"
-    }
+    },
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "ssh-ca-database",
+			"database_id": "eb7c4615-2ab6-4475-937d-027d079c6494"
+		}
+	]
 }

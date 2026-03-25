@@ -9,6 +9,8 @@ builds:
     binary: ssh-ca-client-cli
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
       - arm64
@@ -17,11 +19,13 @@ builds:
     main: ./cmd/ssh-ca-client-cli
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
   - id: windowscli
     binary: ssh-ca-client-cli
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
     goos:
@@ -29,11 +33,13 @@ builds:
     main: ./cmd/ssh-ca-client-cli
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
   - id: windowsgui
     binary: ssh-ca-client
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
     goos:
@@ -44,12 +50,14 @@ builds:
         - go generate ./cmd/ssh-ca-client/generate_windows.go
     main: ./cmd/ssh-ca-client
     ldflags:
-      - -H=windowsgui -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -H=windowsgui -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
     mod_timestamp: "{{ .CommitTimestamp }}"
   - id: gui
     binary: ssh-ca-client
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
     goos:
@@ -57,7 +65,7 @@ builds:
     main: ./cmd/ssh-ca-client
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .CommitDate }}
 
 archives:
   - allow_different_binary_count: true
@@ -88,8 +96,10 @@ checksum:
   name_template: "checksums.txt"
 
 release:
-  draft: true
+  draft: false
   make_latest: true
+  replace_existing_artifacts: true
+  prerelease: auto
 
 nfpms:
   - ids:
