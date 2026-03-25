@@ -34,7 +34,7 @@ import {
     transformNonce,
     transformPublicKey
 } from "../utils"
-import { KeyParseError, parsePrivateKey } from "sshpk"
+import { Identity, KeyParseError, parsePrivateKey } from "sshpk"
 
 const logger = new Logger()
 
@@ -159,6 +159,14 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
             const response: CertificateSignerResponse = {
                 certificate: btoa(certificate.toString("openssh"))
             }
+
+            const serial = certificate.serial.readBigUInt64BE(0)
+            const subjects = certificate.subjects.map((v: Identity): string => {
+                return v.toString()
+            }).join(",")
+            const stmt = c.env.DB
+                .prepare("INSERT INTO certificates (serial, key_id, principals, valid_after, valid_before) VALUES (?, ?, ?, ?, ?)")
+                .bind(`${serial}`, data.headers.Authorization.email, subjects, certificate.validFrom.toUTCString(), certificate.validUntil.toUTCString())
 
             return c.json(response)
         } catch (err) {

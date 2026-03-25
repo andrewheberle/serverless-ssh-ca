@@ -29,16 +29,13 @@ export class CertificateError extends Error {
 }
 
 export type GenerateCertificateOptions = {
-    lifetime?: number
-    principals?: string[]
-    extensions?: string[]
     /**
      * @internal
      * Override the current timestamp used for the certificate serial number.
      * Should only be set in tests.
      */
     now?: number
-}
+} & CreateCertificateOptions
 
 export const generateCertificate = (email: string, key: PrivateKey, public_key: Key, options?: GenerateCertificateOptions): Certificate => {
     let { lifetime, principals, extensions } = options ?? {}
@@ -192,7 +189,7 @@ export async function createSignedHostCertificate(public_key: Key, options: Crea
         : seconds(env.SSH_HOST_CERTIFICATE_LIFETIME)
 
     // generate value for serial of certificate
-    const unixTimestamp = Math.floor(Date.now() / 1000)
+    const unixTimestamp = Date.now()
     const serial = Buffer.alloc(8)
     serial.writeBigUInt64BE(BigInt(unixTimestamp))
 

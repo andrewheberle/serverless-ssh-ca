@@ -1,16 +1,18 @@
 name: Build
 
 on:
-  pull_request:
   push:
     branches:
-      - main
+      - 'main'
+    tags:
+      - 'v*'
+  pull_request:
 
 permissions: {}
 
 jobs:
-  goreleaser-build:
-    name: Build with GoReleaser
+  client:
+    name: Build Client with GoReleaser
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,23 +24,37 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: client/go.mod
-          cache: false
+          cache: true
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@v0
-      - name: Run GoReleaser
+      - name: Build snapshot with GoReleaser
         uses: goreleaser/goreleaser-action@v7
+        if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
         with:
           distribution: goreleaser
           version: "~> v2"
           args: build --clean --snapshot
           workdir: client
+      - name: Release with GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+          workdir: client
+      - name: Sign artifacts
+        uses: actions/attest@v4
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          subject-checksums: ./client/dist/checksums.txt
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
           name: client-dist-artifact
           path: client/dist
           retention-days: 1
-  worker-build:
+  worker:
     name: Build Worker with Wrangler
     runs-on: ubuntu-latest
     steps:
@@ -52,8 +68,8 @@ jobs:
         run: npm install
       - name: Build Worker
         run: npm run build
-  snapcraft-build:
-    name: Build Snap version
+  snapcraft:
+    name: Build Client as Snap
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,16 +80,23 @@ jobs:
       - uses: snapcore/action-build@v1
         id: snapcraft
       - uses: snapcore/action-publish@v1
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
           snap: ${{ steps.snapcraft.outputs.snap }}
           release: edge
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-  msi-build:
+      - uses: snapcore/action-publish@v1
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.snapcraft.outputs.snap }}
+          release: stable
+  msi:
     name: Package as an MSI for Windows
     runs-on: windows-latest
-    needs: goreleaser-build
+    needs: client
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -105,3 +128,10 @@ jobs:
           name: msi-artifact
           path: client/dist/**/*.msi
           retention-days: 1
+      - name: Add MSI to Release
+        uses: softprops/action-gh-release@v2
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        with:
+          files: |
+            client/dist/ssh-ca-client.msi
+            client/dist/ssh-ca-client.msi.sha256sum
