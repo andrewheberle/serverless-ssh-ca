@@ -9,6 +9,8 @@ builds:
     binary: ssh-ca-client-cli
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
       - arm64
@@ -22,6 +24,8 @@ builds:
     binary: ssh-ca-client-cli
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
     goos:
@@ -34,6 +38,8 @@ builds:
     binary: ssh-ca-client
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
     goos:
@@ -50,6 +56,8 @@ builds:
     binary: ssh-ca-client
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goarch:
       - amd64
     goos:
