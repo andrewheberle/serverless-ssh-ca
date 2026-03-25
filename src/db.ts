@@ -1,4 +1,6 @@
+import { Logger } from "@andrewheberle/ts-slog";
 import { tryWhile } from "@cloudflare/actors"
+import { env } from "cloudflare:workers";
 
 export const runStatement = async (stmt: D1PreparedStatement) => {
   return await tryWhile(async () => {
@@ -19,4 +21,23 @@ export const shouldRetry = (err: unknown, nextAttempt: number) => {
     }
 
     return false
+}
+
+export const dbCleanup = async () => {
+    const logger = new Logger().with("retention", env.DB_CERTIFICATE_RETENTION)
+
+    // @ts-expect-error: This is flagged but only due to the Workers type generation
+    if (env.DB_CERTIFICATE_RETENTION === "infinite") {
+        logger.info("skipping database cleanup")
+    }
+
+    logger.info("starting database cleanup")
+    try {
+        const stmt = env.DB.prepare("DELETE FROM certificates WHERE unixepoch('subsec') > unixepoch(valid_before,'subsec',?)")
+            .bind(env.DB_CERTIFICATE_RETENTION)
+        const res = await stmt.run()
+        logger.info("completed database cleanup", "changes", res.meta.changes)
+    } catch (err) {
+        logger.error("error during database cleanup", "retention", env.DB_CERTIFICATE_RETENTION)
+    }
 }

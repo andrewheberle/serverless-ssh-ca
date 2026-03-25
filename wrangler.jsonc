@@ -18,6 +18,9 @@
 	"observability": {
 		"enabled": true
 	},
+	"triggers": {
+		"crons": [ "59 23 * * *" ],
+	},
 	"vars": {
 		"IS_PRODUCTION": "true",
 		"ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
@@ -32,6 +35,7 @@
 		"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": "",
 		"SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
 		"CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
+		"DB_CERTIFICATE_RETENTION": "1 year" 
 	},
 	"secrets_store_secrets": [
 		{

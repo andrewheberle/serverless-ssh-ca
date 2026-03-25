@@ -171,7 +171,7 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
                 }).join(",")
                 const stmt = c.env.DB
                     .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before) VALUES (?, ?, ?, ?, ?, ?)")
-                    .bind(`${serial}`, data.headers.Authorization.email, subjects, extensions, certificate.validFrom.toUTCString(), certificate.validUntil.toUTCString())
+                    .bind(`${serial}`, data.headers.Authorization.email, subjects, extensions, certificate.validFrom.toISOString(), certificate.validUntil.toISOString())
                 const res = await runStatement(stmt)
 
                 if (!res.success) {
@@ -193,6 +193,41 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
     }
 }
 api.post("/certificate", CertificateRequestEndpoint)
+
+class GetKRLEndpoint extends OpenAPIRoute {
+    schema = {
+        responses: {
+            "200": {
+                content: {
+                    "text/plain": {
+                        schema: z.string()
+                    }
+                },
+                description: "Returns SSH KRL specification",
+            },
+            ...InternalServerErrorException.schema(),
+        }
+    }
+
+    async handle(c: AppContext) {
+        try {
+            const stmt = c.env.DB
+                .prepare("SELECT serial FROM certificates WHERE revoked_at NOTNULL AND unixepoch('subsec') < unixepoch(revoked_at,'subsec','24 hours')")
+            const res = await stmt.run()
+
+            const result: string[] = []
+
+            for (const item of res.results) {
+                result.push(`serial: ${item.serial}`)
+            }
+            return c.text(result.join('\n') + '\n')
+        } catch (err) {
+            // otherwise throw as InternalServerErrorException
+            throw new InternalServerErrorException(`${err}`)
+        }
+    }
+}
+api.get("/krl", GetKRLEndpoint)
 
 class HostCertificateRequestEndpoint extends OpenAPIRoute {
     schema = {
