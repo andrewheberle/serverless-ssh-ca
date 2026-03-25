@@ -3,7 +3,7 @@ import { privateKey as ecdsaPrivateKey, userPrivateKey as userEcdsaPrivateKey } 
 import { privateKey as ed25519PrivateKey, userPrivateKey as userEd25519PrivateKey } from "./keys/ed25519"
 import { describe, expect, it } from "vitest"
 import { generateCertificate } from "../src/certificate"
-import { ms, seconds } from "itty-time"
+import { seconds } from "itty-time"
 import { split } from "../src/utils"
 import { env } from "cloudflare:workers"
 import { Format, Identity, identityForUser, Key, PrivateKey } from "sshpk"

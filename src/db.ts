@@ -6,7 +6,7 @@ export const runStatement = async (stmt: D1PreparedStatement) => {
   }, shouldRetry);
 }
 
-const shouldRetry = (err: unknown, nextAttempt: number) => {
+export const shouldRetry = (err: unknown, nextAttempt: number) => {
     const errMsg = String(err);
     const isRetryableError =
         errMsg.includes("Network connection lost") ||
