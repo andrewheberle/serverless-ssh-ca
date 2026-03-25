@@ -9,7 +9,6 @@ import {
     UnprocessableEntityException
 } from "chanfana"
 import { Hono } from "hono"
-import { HTTPException } from "hono/http-exception"
 import z from "zod"
 import { AppContext } from "../router"
 import { env } from "cloudflare:workers"
@@ -34,7 +33,8 @@ import {
     transformNonce,
     transformPublicKey
 } from "../utils"
-import { Identity, KeyParseError, parsePrivateKey } from "sshpk"
+import { Format, Identity, KeyParseError, parsePrivateKey } from "sshpk"
+import { runStatement } from "../db"
 
 const logger = new Logger()
 
@@ -160,13 +160,30 @@ class CertificateRequestEndpoint extends OpenAPIRoute {
                 certificate: btoa(certificate.toString("openssh"))
             }
 
-            const serial = certificate.serial.readBigUInt64BE(0)
-            const subjects = certificate.subjects.map((v: Identity): string => {
-                return v.toString()
-            }).join(",")
-            const stmt = c.env.DB
-                .prepare("INSERT INTO certificates (serial, key_id, principals, valid_after, valid_before) VALUES (?, ?, ?, ?, ?)")
-                .bind(`${serial}`, data.headers.Authorization.email, subjects, certificate.validFrom.toUTCString(), certificate.validUntil.toUTCString())
+            try {
+                const serial = certificate.serial.readBigUInt64BE(0)
+                const subjects = certificate.subjects.map((v: Identity): string => {
+                    return v.toString()
+                }).join(",")
+                const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
+                    // @ts-ignore: the name property does exist
+                    return v.name as string
+                }).join(",")
+                const stmt = c.env.DB
+                    .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before) VALUES (?, ?, ?, ?, ?, ?)")
+                    .bind(`${serial}`, data.headers.Authorization.email, subjects, extensions, certificate.validFrom.toUTCString(), certificate.validUntil.toUTCString())
+                const res = await runStatement(stmt)
+
+                if (!res.success) {
+                    if (res.error !== undefined) {
+                        throw new Error(res.error)
+                    }
+
+                    throw new Error("error during query")
+                }
+            } catch (err) {
+                logger.error("there was a problem adding issued certificate to database", "error", err)
+            }
 
             return c.json(response)
         } catch (err) {

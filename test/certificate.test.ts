@@ -6,7 +6,7 @@ import { generateCertificate } from "../src/certificate"
 import { ms, seconds } from "itty-time"
 import { split } from "../src/utils"
 import { env } from "cloudflare:workers"
-import { Identity, identityForUser, Key, PrivateKey } from "sshpk"
+import { Format, Identity, identityForUser, Key, PrivateKey } from "sshpk"
 
 const rsaCAKey = rsaPrivateKey()
 const ecdsaCAKey = ecdsaPrivateKey()
@@ -85,6 +85,13 @@ for (const tt of tests) {
                 }).join(",")
                 expect(certificateSubjects).toBe(subjects)
 
+                // check extensions
+                const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
+                    // @ts-ignore: the name property does exist
+                    return v.name
+                }).join(",")
+                expect(extensions).toBe(env.SSH_CERTIFICATE_EXTENSIONS)
+
                 // confirm serial is set as expected
                 const serialValue = certificate.serial.readBigUInt64BE(0)
                 expect(serialValue).toBe(BigInt(now))
@@ -110,6 +117,13 @@ for (const tt of tests) {
                     return identityForUser(v).toString()
                 }).join(",")
                 expect(certificateSubjects).toBe(subjects)
+
+                // check extensions
+                const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
+                    // @ts-ignore: the name property does exist
+                    return v.name
+                }).join(",")
+                expect(extensions).toBe(env.SSH_CERTIFICATE_EXTENSIONS)
 
                 // confirm serial is set as expected
                 const serialValue = certificate.serial.readBigUInt64BE(0)
@@ -137,6 +151,13 @@ for (const tt of tests) {
                 }).join(",")
                 expect(certificateSubjects).toBe(subjects)
 
+                // check extensions
+                const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
+                    // @ts-ignore: the name property does exist
+                    return v.name
+                }).join(",")
+                expect(extensions).toBe(env.SSH_CERTIFICATE_EXTENSIONS)
+
                 // confirm serial is set as expected
                 const serialValue = certificate.serial.readBigUInt64BE(0)
                 expect(serialValue).toBe(BigInt(now))
@@ -162,6 +183,13 @@ for (const tt of tests) {
                     return identityForUser(v).toString()
                 }).join(",")
                 expect(certificateSubjects).toBe(subjects)
+
+                // check extensions
+                const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
+                    // @ts-ignore: the name property does exist
+                    return v.name
+                }).join(",")
+                expect(extensions).toBe("permit-user-rc")
 
                 // confirm serial is set as expected
                 const serialValue = certificate.serial.readBigUInt64BE(0)
