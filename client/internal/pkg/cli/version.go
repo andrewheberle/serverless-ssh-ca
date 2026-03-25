@@ -3,8 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
-	"runtime/debug"
 
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
 )
@@ -14,11 +14,7 @@ type versionCommand struct {
 }
 
 func (c *versionCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		fmt.Printf("%s Unknown\n", cd.Root.Command.Name())
-	}
-	fmt.Printf("%s %s\n", cd.Root.Command.Name(), info.Main.Version)
+	fmt.Printf("%s %s\n", cd.Root.Command.Name(), version.Version)
 
 	return nil
 }
