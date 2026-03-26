@@ -73,7 +73,11 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			c.logger.Warn("there was a problem closing the response body", "error", err)
+		}
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status code for KRL: %d", res.StatusCode)
