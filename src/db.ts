@@ -82,7 +82,7 @@ export const isRevoked = async (serial: bigint): Promise<boolean> => {
 
 export const getRevocationList = async (certificateType: CertificateType): Promise<string[]> => {
     const stmt = env.DB
-        .prepare("SELECT serial FROM certificates WHERE revoked_at NOTNULL AND certificate_type = ? AND unixepoch('subsec') < unixepoch(revoked_at,'subsec','24 hours')")
+        .prepare("SELECT serial FROM certificates WHERE revoked_at NOTNULL AND certificate_type = ? AND unixepoch('subsec') < unixepoch(valid_before,'subsec','24 hours')")
         .bind(certificateType)
     const res = await runStatement<{serial: string}>(stmt)
 
