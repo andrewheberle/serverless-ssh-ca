@@ -74,7 +74,7 @@ describe("GET /api/v3/user/krl", () => {
 		
         // expect 200 ok
         expect(response.status).toBe(200)
-        expect(response.headers.get("content-type")).toContain("text/plain")
+        expect(response.headers.get("content-type")).toContain("application/json")
     })
 })
 
@@ -131,7 +131,7 @@ describe("GET /api/v3/host/krl", () => {
 		
         // expect 200 ok
         expect(response.status).toBe(200)
-        expect(response.headers.get("content-type")).toContain("text/plain")
+        expect(response.headers.get("content-type")).toContain("application/json")
     })
 })
 

@@ -1,22 +1,26 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 
+	"codeberg.org/sdassow/atomic"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
+	"github.com/forfuncsake/krl"
+	"github.com/hiddeco/sshsig"
 )
 
 type krlCommand struct {
-	host bool
-	out  string
+	host  bool
+	out   string
+	force bool
 
 	config *config.SystemConfig
 	krlUrl string
@@ -32,7 +36,8 @@ func (c *krlCommand) Init(cd *simplecobra.Commandeer) error {
 
 	cmd := cd.CobraCommand
 	cmd.Flags().BoolVar(&c.host, "host", false, "Retrieve host KRL instead of user KRL")
-	cmd.Flags().StringVarP(&c.out, "out", "f", "-", "Output file for KRL")
+	cmd.Flags().StringVarP(&c.out, "out", "f", "", "Output file for KRL")
+	cmd.Flags().BoolVar(&c.force, "force", false, "Force writing to output even if signature was not verified")
 
 	return nil
 }
@@ -83,15 +88,42 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 		return fmt.Errorf("bad status code for KRL: %d", res.StatusCode)
 	}
 
-	if c.out == "-" {
-		if _, err := io.Copy(os.Stdout, res.Body); err != nil {
-			return err
-		}
-
-		return nil
+	var payload krlResponsePayload
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		return err
 	}
 
-	c.logger.Warn("this only writes to stdout at this time")
+	// parse krl
+	c.logger.Debug("parsing krl to ensure its valid")
+	if _, err := krl.ParseKRL(payload.KeyRevocationList); err != nil {
+		return fmt.Errorf("problem parsing krl: %w", err)
+	}
+
+	if c.config.TrustedCertificateAuthority != "" {
+		sig, err := sshsig.Unarmor([]byte(payload.Signature))
+		if err != nil {
+			return fmt.Errorf("problem unarmoring signature: %w", err)
+		}
+
+		if err := sshsig.Verify(bytes.NewReader(payload.KeyRevocationList), sig, c.config.CertificateAuthority(), sig.HashAlgorithm, "file"); err != nil {
+			return fmt.Errorf("signature verification failed: %w", err)
+		}
+
+		c.logger.Info("signature verified ok")
+	} else {
+		c.logger.Warn("trusted_ca not set so signature will not be verified")
+
+		if !c.force && c.out != "" {
+			c.logger.Info("skipping writing krl to output location without force option set", "out", c.out)
+
+			return nil
+		}
+	}
+
+	if c.out != "" {
+		c.logger.Info("writing krl to output file", "out", c.out)
+		return atomic.WriteFile(c.out, bytes.NewReader(payload.KeyRevocationList), atomic.FileMode(0440))
+	}
 
 	return nil
 }
@@ -102,4 +134,9 @@ func (c *krlCommand) getKrlUrl() (string, error) {
 	}
 
 	return url.JoinPath(c.config.CertificateAuthorityURL, "/api/v3/user/krl")
+}
+
+type krlResponsePayload struct {
+	KeyRevocationList []byte `json:"krl"`
+	Signature         string `json:"signature"`
 }

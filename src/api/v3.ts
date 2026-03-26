@@ -6,7 +6,6 @@ import {
     InputValidationException,
     InternalServerErrorException,
     OpenAPIRoute,
-    RouteOptions,
     UnprocessableEntityException
 } from "chanfana"
 import { Hono } from "hono"
@@ -36,6 +35,7 @@ import {
 } from "../utils"
 import { KeyParseError, parsePrivateKey } from "sshpk"
 import { CertificateType, getRevocationList, isRevoked, recordCertificate } from "../db"
+import { KRLBuilder } from "../krl"
 
 const logger = new Logger()
 
@@ -177,15 +177,15 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
 api.post("/user/certificate", UserCertificateRequestEndpoint)
 
 class UserRevocationListEndpoint extends OpenAPIRoute {
+    certificateType: CertificateType = CertificateType.User
     schema = {
         responses: {
             "200": {
-                content: {
-                    "text/plain": {
-                        schema: z.string()
-                    }
-                },
-                description: "Returns SSH KRL specification",
+                description: "Returns an Open SSH Key Revocation List as BASE64 and an SSHSIG signature for verification",
+                ...contentJson(z.object({
+                    krl: z.base64(),
+                    signature: z.string()
+                }))
             },
             ...InternalServerErrorException.schema(),
         }
@@ -193,10 +193,39 @@ class UserRevocationListEndpoint extends OpenAPIRoute {
 
     async handle(c: AppContext) {
         try {
-            const result = await getRevocationList(CertificateType.User)
+            // get revoked serials
+            const serials = (await getRevocationList(this.certificateType)).map(v => BigInt(v))
 
-            return c.text(result.join('\n') + '\n')
+            // grab private key from secret store (or env in tests)
+            const secret = typeof c.env.PRIVATE_KEY === "string"
+                ? c.env.PRIVATE_KEY
+                : await c.env.PRIVATE_KEY.get()
+
+            // parse key
+            const key = parsePrivateKey(secret)
+
+            // generate KRL
+            const krl = new KRLBuilder(key)
+                .addSerials(serials)
+
+            const krlBytes = krl.generate()
+
+            // convert to base64
+            const bytes = new Uint8Array(krlBytes)
+            let binary = ""
+            for (const byte of bytes) {
+                binary += String.fromCharCode(byte)
+            }
+            const base64Krl = btoa(binary)
+
+            const signature = await krl.signature()
+
+            return c.json({
+                krl: base64Krl,
+                signature: signature,
+            })
         } catch (err) {
+            logger.error("krl error", "error", err)
             // otherwise throw as InternalServerErrorException
             throw new InternalServerErrorException(`${err}`)
         }
@@ -297,31 +326,8 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 }
 api.post("/host/certificate", HostCertificateRequestEndpoint)
 
-class HostRevocationListEndpoint extends OpenAPIRoute {
-    schema = {
-        responses: {
-            "200": {
-                content: {
-                    "text/plain": {
-                        schema: z.string()
-                    }
-                },
-                description: "Returns SSH KRL specification",
-            },
-            ...InternalServerErrorException.schema(),
-        }
-    }
-
-    async handle(c: AppContext) {
-        try {
-            const result = await getRevocationList(CertificateType.Host)
-
-            return c.text(result.join('\n') + '\n')
-        } catch (err) {
-            // otherwise throw as InternalServerErrorException
-            throw new InternalServerErrorException(`${err}`)
-        }
-    }
+class HostRevocationListEndpoint extends UserRevocationListEndpoint {
+    certificateType: CertificateType = CertificateType.Host
 }
 api.get("/host/krl", HostRevocationListEndpoint)
 
