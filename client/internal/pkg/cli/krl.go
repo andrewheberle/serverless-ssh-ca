@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 
+	"codeberg.org/sdassow/atomic"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
@@ -122,7 +122,7 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 
 	if c.out != "" {
 		c.logger.Info("writing krl to output file", "out", c.out)
-		return os.WriteFile(c.out, payload.KeyRevocationList, 0644)
+		return atomic.WriteFile(c.out, bytes.NewReader(payload.KeyRevocationList), atomic.FileMode(0440))
 	}
 
 	return nil
