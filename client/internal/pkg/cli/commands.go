@@ -22,6 +22,9 @@ func commands() []simplecobra.Commander {
 		&showCommand{
 			Command: simplecommand.New("show", "Show existing private/public key"),
 		},
+		&krlCommand{
+			Command: simplecommand.New("krl", "Download and parse a SSH KRL"),
+		},
 		&versionCommand{
 			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client-cli"),
 		},

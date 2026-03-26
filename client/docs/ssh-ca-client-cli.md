@@ -39,6 +39,11 @@ Request and renew SSH host certificates.
 
 See [ssh-ca-client-host](ssh-ca-client-cli-host.md)
 
+`krl`
+Download or display a SSH key revocation list (KRL).
+
+See [ssh-ca-client-show](ssh-ca-client-cli-krl.md)
+
 `login`
 Request user SSH certificates.
 
