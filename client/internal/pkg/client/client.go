@@ -556,7 +556,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	}
 
 	// build url
-	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL(), "/api/v2/certificate")
+	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL(), "/api/v3/user/certificate")
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import {
     InputValidationException,
     InternalServerErrorException,
     OpenAPIRoute,
+    RouteOptions,
     UnprocessableEntityException
 } from "chanfana"
 import { Hono } from "hono"
@@ -34,7 +35,7 @@ import {
     transformPublicKey
 } from "../utils"
 import { KeyParseError, parsePrivateKey } from "sshpk"
-import { CertificateType, isRevoked, recordCertificate } from "../db"
+import { CertificateType, getRevocationList, isRevoked, recordCertificate } from "../db"
 
 const logger = new Logger()
 
@@ -47,9 +48,8 @@ const HeaderSchema = z.object({
         .describe("Access Token JWT from OIDC IdP")
 })
 
-class CaPublicKeyEndpointV2 extends OpenAPIRoute {
+class CaPublicKeyEndpoint extends OpenAPIRoute {
     schema = {
-        deprecated: true,
         responses: {
             "200": {
                 content: {
@@ -86,11 +86,10 @@ class CaPublicKeyEndpointV2 extends OpenAPIRoute {
         }
     }
 }
-api.get("/ca", CaPublicKeyEndpointV2)
+api.get("/ca", CaPublicKeyEndpoint)
 
-class CertificateRequestEndpointV2 extends OpenAPIRoute {
+class UserCertificateRequestEndpoint extends OpenAPIRoute {
     schema = {
-        deprecated: true,
         security: [
             {
                 oidcAuth: []
@@ -175,11 +174,39 @@ class CertificateRequestEndpointV2 extends OpenAPIRoute {
         }
     }
 }
-api.post("/certificate", CertificateRequestEndpointV2)
+api.post("/user/certificate", UserCertificateRequestEndpoint)
 
-class HostCertificateRequestEndpointV2 extends OpenAPIRoute {
+class UserRevocationListEndpoint extends OpenAPIRoute {
     schema = {
-        deprecated: true,
+        responses: {
+            "200": {
+                content: {
+                    "text/plain": {
+                        schema: z.string()
+                    }
+                },
+                description: "Returns SSH KRL specification",
+            },
+            ...InternalServerErrorException.schema(),
+        }
+    }
+
+    async handle(c: AppContext) {
+        try {
+            const result = await getRevocationList(CertificateType.User)
+
+            return c.text(result.join('\n') + '\n')
+        } catch (err) {
+            // otherwise throw as InternalServerErrorException
+            throw new InternalServerErrorException(`${err}`)
+        }
+    }
+}
+
+api.get("/user/krl", UserRevocationListEndpoint)
+
+class HostCertificateRequestEndpoint extends OpenAPIRoute {
+    schema = {
         security: [
             {
                 oidcAuth: []
@@ -268,11 +295,38 @@ class HostCertificateRequestEndpointV2 extends OpenAPIRoute {
         }
     }
 }
-api.post("/host/request", HostCertificateRequestEndpointV2)
+api.post("/host/certificate", HostCertificateRequestEndpoint)
 
-class HostCertificateRenewEndpointV2 extends OpenAPIRoute {
+class HostRevocationListEndpoint extends OpenAPIRoute {
     schema = {
-        deprecated: true,
+        responses: {
+            "200": {
+                content: {
+                    "text/plain": {
+                        schema: z.string()
+                    }
+                },
+                description: "Returns SSH KRL specification",
+            },
+            ...InternalServerErrorException.schema(),
+        }
+    }
+
+    async handle(c: AppContext) {
+        try {
+            const result = await getRevocationList(CertificateType.Host)
+
+            return c.text(result.join('\n') + '\n')
+        } catch (err) {
+            // otherwise throw as InternalServerErrorException
+            throw new InternalServerErrorException(`${err}`)
+        }
+    }
+}
+api.get("/host/krl", HostRevocationListEndpoint)
+
+class HostCertificateRenewEndpoint extends OpenAPIRoute {
+    schema = {
         request: {
             body: contentJson(
                 z.object({
@@ -365,4 +419,4 @@ class HostCertificateRenewEndpointV2 extends OpenAPIRoute {
         }
     }
 }
-api.post("/host/renew", HostCertificateRenewEndpointV2)
+api.post("/host/renew", HostCertificateRenewEndpoint)

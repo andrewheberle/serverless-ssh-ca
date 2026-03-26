@@ -1,11 +1,16 @@
-import { Logger } from "@andrewheberle/ts-slog";
+import { Logger } from "@andrewheberle/ts-slog"
 import { tryWhile } from "@cloudflare/actors"
-import { env } from "cloudflare:workers";
-import { Certificate, Format, Identity } from "sshpk";
+import { env } from "cloudflare:workers"
+import { Certificate, Format, Identity } from "sshpk"
 
-export const runStatement = async (stmt: D1PreparedStatement) => {
+export enum CertificateType {
+    User,
+    Host
+}
+
+export const runStatement = async <T = Record<string, unknown>>(stmt: D1PreparedStatement) => {
     return await tryWhile(async () => {
-        return await stmt.run();
+        return await stmt.run<T>();
     }, shouldRetry);
 }
 
@@ -43,7 +48,7 @@ export const dbCleanup = async () => {
     }
 }
 
-export const recordCertificate = async (certificate: Certificate, keyid: string) => {
+export const recordCertificate = async (certificate: Certificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
     const serial = certificate.serial.readBigUInt64BE(0)
     const subjects = certificate.subjects.map((v: Identity): string => {
         return v.toString()
@@ -73,4 +78,19 @@ export const isRevoked = async (serial: bigint): Promise<boolean> => {
     const res = await runStatement(stmt)
 
     return res.results.length > 0
+}
+
+export const getRevocationList = async (certificateType: CertificateType): Promise<string[]> => {
+    const stmt = env.DB
+        .prepare("SELECT serial FROM certificates WHERE revoked_at NOTNULL AND certificate_type = ? AND unixepoch('subsec') < unixepoch(revoked_at,'subsec','24 hours')")
+        .bind(certificateType)
+    const res = await runStatement<{serial: string}>(stmt)
+
+    const result: string[] = []
+
+    for (const item of res.results) {
+        result.push(`serial: ${item.serial}`)
+    }
+
+    return result
 }

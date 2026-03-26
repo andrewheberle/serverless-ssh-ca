@@ -28,7 +28,7 @@ The flow to obtain a User SSH certificate using the CLI version is as follows:
    `http://localhost:3000/auth/callback`)
 5. The client uses the JWT from the IdP as `Authorization: Bearer <TOKEN>`
    in a `POST` request containing the users SSH public key to the CA's
-   `/api/v2/certificate` endpoint
+   `/api/v3/user/certificate` endpoint
 6. The CA verifies the incoming JWT and assuming it is valid and verified, will 
    respond with a signed certificate based on the provided public key
 7. The client saves the certificate and adds the SSH private key and
@@ -55,7 +55,7 @@ sequenceDiagram
     activate Client
     Client-->>User: Auth flow completed
     deactivate Client
-    Client->>CA: POST /api/v2/certificate
+    Client->>CA: POST /api/v3/user/certificate
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -75,7 +75,7 @@ sequenceDiagram
     IdP-->>Client: Token returned
     deactivate IdP
     activate Client
-    Client->>CA: POST /api/v2/certificate
+    Client->>CA: POST /api/v3/user/certificate
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -117,7 +117,7 @@ sequenceDiagram
     activate Client
     Client-->>User: Auth flow completed
     deactivate Client
-    Client->>CA: POST /api/v2/host/request
+    Client->>CA: POST /api/v3/host/certificate
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -141,7 +141,7 @@ below when `ssh-ca-client-cli host --renew` is run:
 
 ```mermaid
 sequenceDiagram
-    Client->>CA: POST /api/v2/host/renew
+    Client->>CA: POST /api/v3/host/renew
     activate CA
     CA-->>Client: Signed certificate
     deactivate CA
@@ -329,7 +329,7 @@ The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be
 retrieved as follows:
 
 ```sh
-curl https://ssh-ca.example.com/api/v2/ca | sudo tee /etc/ssh/ca.pub
+curl https://ssh-ca.example.com/api/v3/ca | sudo tee /etc/ssh/ca.pub
 ```
 
 The `/etc/ssh/principals.d` directory should contain a file corresponding to

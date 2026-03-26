@@ -574,10 +574,10 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 
 func (lh *LoginHandler) apiPath() string {
 	if lh.renewal {
-		return "/api/v2/host/renew"
+		return "/api/v3/host/renew"
 	}
 
-	return "/api/v2/host/request"
+	return "/api/v3/host/certificate"
 }
 
 func (lh *LoginHandler) getPublicKeyBytes(key ssh.Signer) ([]byte, error) {
