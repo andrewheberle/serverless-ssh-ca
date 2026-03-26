@@ -1,39 +1,9 @@
 import { env } from "cloudflare:workers"
 import { ms } from "itty-time"
-import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseKey, parseSignature, Signature, SignatureParseError } from "sshpk"
+import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseKey } from "sshpk"
 import { verify } from "./sshsig"
 import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
-
-// try to parse as ecdsa, ed25519 then rsa
-const parsesignature = (s: string): Signature => {
-    try {
-        // try ecdsa
-        return parseSignature(s, "ecdsa", "ssh")
-    } catch (err) {
-        if (err instanceof SignatureParseError) {
-            try {
-                // try ed25519
-                return parseSignature(s, "ed25519", "ssh")
-            } catch (err) {
-                if (err instanceof SignatureParseError) {
-                    try {
-                        // try rsa
-                        return parseSignature(s, "rsa", "ssh")
-                    } catch (err) {
-                        // just throw here as we are out of options
-                        throw err
-                    }
-                } else {
-                    throw err
-                }
-            }
-        } else {
-            throw err
-        }
-    }
-}
-
 
 export class NonceParseError extends Error {
     constructor(message: string, cause?: unknown) {

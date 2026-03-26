@@ -58,8 +58,8 @@ export const recordCertificate = async (certificate: Certificate, keyid: string,
         return v.name as string
     }).join(",")
     const stmt = env.DB
-        .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before) VALUES (?, ?, ?, ?, ?, ?)")
-        .bind(`${serial}`, keyid, subjects, extensions, certificate.validFrom.toISOString(), certificate.validUntil.toISOString())
+        .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before, certificate_type) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind(`${serial}`, keyid, subjects, extensions, certificate.validFrom.toISOString(), certificate.validUntil.toISOString(), certificateType)
     const res = await runStatement(stmt)
 
     if (!res.success) {
@@ -89,7 +89,7 @@ export const getRevocationList = async (certificateType: CertificateType): Promi
     const result: string[] = []
 
     for (const item of res.results) {
-        result.push(`serial: ${item.serial}`)
+        result.push(item.serial)
     }
 
     return result
