@@ -6,7 +6,6 @@ import {
     InputValidationException,
     InternalServerErrorException,
     OpenAPIRoute,
-    RouteOptions,
     UnprocessableEntityException
 } from "chanfana"
 import { Hono } from "hono"
@@ -37,7 +36,6 @@ import {
 import { KeyParseError, parsePrivateKey } from "sshpk"
 import { CertificateType, getRevocationList, isRevoked, recordCertificate } from "../db"
 import { KRLBuilder } from "../krl"
-import { signKRL } from "../krl-sign"
 
 const logger = new Logger()
 
@@ -207,9 +205,10 @@ class UserRevocationListEndpoint extends OpenAPIRoute {
             const key = parsePrivateKey(secret)
 
             // generate KRL
-            const krlBytes = new KRLBuilder(key)
+            const krl = new KRLBuilder(key)
                 .addSerials(serials)
-                .generate()
+
+            const krlBytes = krl.generate()
 
             // convert to base64
             const bytes = new Uint8Array(krlBytes)
@@ -219,7 +218,7 @@ class UserRevocationListEndpoint extends OpenAPIRoute {
             }
             const base64Krl = btoa(binary)
 
-            const signature = await signKRL(key, krlBytes)
+            const signature = await krl.signature()
 
             return c.json({
                 krl: base64Krl,
