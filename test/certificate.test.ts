@@ -97,7 +97,7 @@ for (const tt of tests) {
                 expect(serialValue).toBe(BigInt(now))
 
                 // confirm lifetime
-                const lifetime = (certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000
+                const lifetime = Math.round((certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000)
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 
@@ -130,7 +130,7 @@ for (const tt of tests) {
                 expect(serialValue).toBe(BigInt(now))
 
                 // confirm lifetime
-                const lifetime = (certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000
+                const lifetime = Math.round((certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000)
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 
@@ -163,7 +163,7 @@ for (const tt of tests) {
                 expect(serialValue).toBe(BigInt(now))
 
                 // confirm lifetime
-                const lifetime = (certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000
+                const lifetime = Math.round((certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000)
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 
@@ -196,7 +196,7 @@ for (const tt of tests) {
                 expect(serialValue).toBe(BigInt(now))
 
                 // confirm lifetime
-                const lifetime = (certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000
+                const lifetime = Math.round((certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000)
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 

@@ -1,6 +1,7 @@
 import { fromHono } from "chanfana"
 import { Hono, type Context } from "hono"
 import { api as apiv2 } from "./api/v2"
+import { api as apiv3 } from "./api/v3"
 import { Logger } from "@andrewheberle/ts-slog"
 import { HTTPException } from "hono/http-exception"
 
@@ -42,3 +43,4 @@ export const oidcAuth = openapi.registry.registerComponent(
 )
 
 openapi.route("/api/v2", apiv2)
+openapi.route("/api/v3", apiv3)
