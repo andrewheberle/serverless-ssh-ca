@@ -4,13 +4,13 @@
 
 [![codecov](https://codecov.io/gh/andrewheberle/serverless-ssh-ca/graph/badge.svg?flag=worker&token=AZLFIBTTFK)](https://codecov.io/gh/andrewheberle/serverless-ssh-ca)
 
-This repository contains a serverless Certificate Authority that can be used
+This repository contains a serverless Certificate Authority (CA) that can be used
 to provide signed certificates for SSH users and hosts running on Cloudflare Workers.
 
 ## Architecture
 
-The solutions comprises of the CA running as a Worker, a Go based client and 
-an external OIDC IdP (this not provided as part of this solution).
+The solution comprises of the CA running as a Worker, a Go based client and 
+a third party OIDC IdP.
 
 The IdP may be any OIDC compatible service that returns a JWT with at least
 an `email` claim in the OIDC access token, however at this time only
