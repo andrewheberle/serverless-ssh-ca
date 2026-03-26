@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"codeberg.org/sdassow/atomic"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
@@ -369,43 +370,10 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			continue
 		}
 
-		temp, err := func() (string, error) {
-			// save to a temp file first
-			t, err := os.CreateTemp(filepath.Dir(k.keypath), "cert*")
-			if err != nil {
-				// creation failed
-				return "", err
-			}
-			defer func() {
-				_ = t.Close()
-			}()
-
-			// write config
-			if _, err := t.Write(csr.Certificate); err != nil {
-				return t.Name(), err
-			}
-
-			// return name and no error
-			return t.Name(), nil
-		}()
-
-		// ensure temp file is removed it it was created
-		if temp != "" {
-			defer func() {
-				_ = os.Remove(temp)
-			}()
-		}
-
-		// check save to temp was ok
-		if err != nil {
-			logger.Warn("error saving certificate to temporaray file", "temp", temp, "error", err)
-			errs = append(errs, err)
-			continue
-		}
-
-		// move into place
-		if err := os.Rename(temp, certPath(k.keypath)); err != nil {
-			logger.Warn("error moving certificate into place", "temp", temp, "error", err)
+		// write file atomically
+		out := certPath(k.keypath)
+		if err := atomic.WriteFile(out, bytes.NewReader(csr.Certificate), atomic.FileMode(0644)); err != nil {
+			logger.Warn("error writing certificate", "out", out, "error", err)
 			errs = append(errs, err)
 			continue
 		}
