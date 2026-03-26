@@ -120,7 +120,7 @@ describe("post /api/v3/host/renew", () => {
 
 describe("GET /api/v3/host/krl", () => {
     it ("normal request", async () => {
-		const request = new IncomingRequest("http://example.com/api/v3/user/krl")
+		const request = new IncomingRequest("http://example.com/api/v3/host/krl")
 		
 		// Create an empty context to pass to `worker.fetch()`
 		const ctx = createExecutionContext()
