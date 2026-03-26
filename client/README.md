@@ -131,7 +131,7 @@ to be unlocked, which is usually the default in most desktop environments.
 
 The client can be run in the following ways:
 
-### User Cerificates
+### User Certificates
 
 #### Generating a private key
 
@@ -167,7 +167,7 @@ If a refresh token was provided by the OIDC IdP, this will be used initially to
 attempt a renewal of the authentication token so the process can avoid an
 interactive authentication flow.
 
-### Host certificates
+### Host Certificates
 
 The CLI can be used to request certificates for pre-exisiting SSH host keys using the
 `host` sub-command as follows:
