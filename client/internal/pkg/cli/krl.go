@@ -13,6 +13,7 @@ import (
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
+	"github.com/forfuncsake/krl"
 	"github.com/hiddeco/sshsig"
 )
 
@@ -90,6 +91,12 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 	var payload krlResponsePayload
 	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
 		return err
+	}
+
+	// parse krl
+	c.logger.Debug("parsing krl to ensure its valid")
+	if _, err := krl.ParseKRL(payload.KeyRevocationList); err != nil {
+		return fmt.Errorf("problem parsing krl: %w", err)
 	}
 
 	if c.config.TrustedCertificateAuthority != "" {
