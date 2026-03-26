@@ -6,7 +6,8 @@ or `sshd`.
 ## Synopsis
 
 ```sh
-ssh-ca-client-cli [global options] krl [--host]
+ssh-ca-client-cli [global options] krl [--force]
+                                       [--host]
                                        [--out]
 ```
 
@@ -16,15 +17,20 @@ This sub-command can be used to download a list of revoked certificates in
 order to allow `ssh` or `sshd` to reject revoked host or user certificates
 respectively.
 
-Currently this command simply downloads and displays a list of revoked user or
-host keys in a format that can be consumed by `ssh-keygen` which may then be
-referenced in the `ssh` or `sshd` configuration.
+The downloaded KRL is verified against a SSHSIG signature as long as the
+`trusted_ca` option is set in the global/system configuration file.
 
 ## Global Options
 
 See [Options](ssh-ca-client-cli.md#options)
 
 ## Options
+
+`--force`
+Force writing the KRL to the output location even if `trusted_ca` is not set.
+
+This could allow a third party to provide a malicious KRL payload in order to
+pevent legitimate connections.
 
 `--host`
 Download and parse the host KRL.
@@ -33,24 +39,20 @@ Without this option the default is to download and parse the user KRL
 
 `--out`
 `-f`
-The output file for the parse KRL, or `-` to write the text version to stdout. 
+The output file for the verified KRL. 
 
 ## Examples
 
-* Display the a list of revoked host certificates to stdout:
+* Retrieve host SSH key revocation list and verify the signature:
 
   ```sh
-  ssh-ca-client-cli krl --host --out "-"
+  ssh-ca-client-cli krl --host
   ```
 
 * Write a key revocation list to a file:
 
   ```sh
-  ssh-ca-client-cli krl | \
-    sudo ssh-keygen -k \
-      -f /etc/ssh/revocation_list \
-      -s /etc/ssh/ca.pub \
-      -
+  ssh-ca-client-cli krl --out /etc/ssh/revocation_list
   ```
 
   In the above example, having the following configuration in
@@ -64,10 +66,7 @@ The output file for the parse KRL, or `-` to write the text version to stdout.
 * Write a key revocation list to a file for host keys:
 
   ```sh
-  ssh-ca-client-cli krl --host | \
-    ssh-keygen -k \
-      -f /home/example/.ssh/revocation_list \
-      -s /etc/ssh/ca.pub \
+  ssh-ca-client-cli krl --host --out /home/example/.ssh/revocation_list
       -
   ```
 
