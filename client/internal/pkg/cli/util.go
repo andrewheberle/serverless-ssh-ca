@@ -59,6 +59,24 @@ func loaduserconfig(this *simplecobra.Commandeer) (*config.Config, error) {
 	return config, nil
 }
 
+// loadsystemconfig will only attempt to load the system config file
+func loadsystemconfig(this *simplecobra.Commandeer) (*config.SystemConfig, error) {
+	// get root command for config locations
+	root, ok := this.Root.Command.(*rootCommand)
+	if !ok {
+		return nil, fmt.Errorf("problem accessing root command")
+	}
+
+	// load config
+	c, err := config.LoadConfig(root.systemConfigFile, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// return system portion of config
+	return c.System(), nil
+}
+
 func logger(this *simplecobra.Commandeer) (*slog.Logger, error) {
 	debug, err := this.CobraCommand.Flags().GetBool("debug")
 	if err != nil {
