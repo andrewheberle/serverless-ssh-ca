@@ -32,7 +32,16 @@ sudo snap connect ssh-ca-client:home
 path/to/wrapper.sh
 ```
 
-Alternatively binary releases and a Debian/Ubuntu package for Linux are available from the GitHub Releases page.
+Alternatively binary releases and a Debian/Ubuntu package for Linux are
+available from the GitHub Releases page or you may add the APT repository to
+your system as follows:
+
+```sh
+curl -fsSL https://packages.hebs.net.au/pubkey.gpg | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/serverless-ssh-ca.gpg
+echo "deb [signed-by=/etc/apt/trusted.gpg.d/serverless-ssh-ca.gpg] https://packages.hebs.net.au stable main" | sudo tee /etc/apt/sources.list.d/serverless-ssh-ca.list
+sudo apt-get update
+sudo apt-get install serverless-ssh-ca
+```
 
 On Windows there is an MSI build that includes both the GUI and CLI versions
 and is the recommended option for Windows users.
