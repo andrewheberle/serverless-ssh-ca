@@ -22,8 +22,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
-          cache-dependency-path: client/go.mod
-          cache: true
+          cache: false
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
