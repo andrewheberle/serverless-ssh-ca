@@ -64,6 +64,7 @@ jobs:
       - uses: snapcore/action-build@v1
         id: snapcraft
       - uses: snapcore/action-publish@v1
+        if: github.event_name == 'push'
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
