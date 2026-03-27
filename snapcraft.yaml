@@ -7,9 +7,9 @@ description: |
   This snap includes the graphical client-side component of a Serverless SSH CA
   that handles requesting and renewing user certificates for SSH access on your
   device.
-  
+
   Also included is the CLI version, however the snap build does not include
-  host SSH certificate management features.
+  host SSH certificate support or KRL management features.
 
   **Important:** This requires the deployment of the CA component on
   Cloudflare Workers, it does not work standalone.
@@ -67,7 +67,7 @@ parts:
     source: ./client
     source-type: local
     build-snaps:
-      - go/1.25/stable
+      - go/latest/stable
     go-buildtags:
       - snap
 
