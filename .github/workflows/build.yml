@@ -88,6 +88,12 @@ jobs:
           path: client/dist
       - name: Add WiX Toolset to path
         run: Write-Output $env:WIX | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache-dependency-path: client/go.sum
+          cache: true
       - name: Build MSI
         run: |
           cd client
