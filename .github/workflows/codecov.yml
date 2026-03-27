@@ -19,11 +19,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.26'
+          go-version: stable
           cache: false
 
       - name: Install Go dependencies
@@ -53,10 +53,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      
+
       - name: Set up Node
         uses: actions/setup-node@v6
-        
+
       - name: Install NPM dependencies
         run: npm install
 

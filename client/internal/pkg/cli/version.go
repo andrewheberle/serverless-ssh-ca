@@ -14,7 +14,7 @@ type versionCommand struct {
 }
 
 func (c *versionCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
-	fmt.Printf("%s %s\n", cd.Root.Command.Name(), version.Version)
+	fmt.Printf("%s %s\n", cd.Root.Command.Name(), version.Version())
 
 	return nil
 }
