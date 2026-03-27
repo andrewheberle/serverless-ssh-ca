@@ -49,6 +49,7 @@ jobs:
           name: client-dist-artifact
           path: client/dist
           retention-days: 1
+
   snapcraft:
     name: Build Client as Snap
     runs-on: ubuntu-latest
@@ -66,6 +67,7 @@ jobs:
         with:
           snap: ${{ steps.snapcraft.outputs.snap }}
           release: stable
+
   msi:
     name: Package as an MSI for Windows
     runs-on: windows-latest
@@ -96,12 +98,12 @@ jobs:
       - name: Build MSI
         run: |
           cd client
-          go tool github.com/mh-cbon/go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client.msi" --version "$(git describe --tags)"
-          Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client.msi").Hash) ssh-ca-client.msi" | Out-File -FilePath ".\dist\ssh-ca-client.msi.sha256sum"
+          go tool github.com/mh-cbon/go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client_$($env:GITHUB_REF_NAME)_amd64.msi" --version "$($env:GITHUB_REF_NAME)"
+          Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client_$($env:GITHUB_REF_NAME)_amd64.msi").Hash) ssh-ca-client_$($env:GITHUB_REF_NAME)_amd64.msi" | Out-File -FilePath ".\dist\ssh-ca-client.sha256sum"
       - name: Attest MSI
         uses: actions/attest@v4
         with:
-          subject-checksums: ./client/dist/ssh-ca-client.msi.sha256sum
+          subject-checksums: ./client/dist/ssh-ca-client.sha256sum
       - name: Upload MSI as artifact
         uses: actions/upload-artifact@v7
         with:
@@ -112,8 +114,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            client/dist/ssh-ca-client.msi
-            client/dist/ssh-ca-client.msi.sha256sum
+            client/dist/*.msi
+            client/dist/*.sha256sum
+
   repo:
     name: Publish to APT repository
     runs-on: ubuntu-latest
