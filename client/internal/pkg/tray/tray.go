@@ -454,6 +454,6 @@ func timeLeft(t time.Time) string {
 
 func (app *Application) setTooltip(message string) {
 	// set tooltip
-	tooltip := fmt.Sprintf("SSH CA Client (%s) - %s", version.Version, message)
+	tooltip := fmt.Sprintf("SSH CA Client (%s) - %s", version.Version(), message)
 	systray.SetTooltip(tooltip)
 }

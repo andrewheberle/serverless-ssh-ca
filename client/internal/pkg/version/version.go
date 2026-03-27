@@ -1,4 +1,10 @@
+//go:build !snap
+
 package version
 
-// Verson is set via ldflags
-var Version = "devel"
+// verson is set via ldflags
+var version = "devel"
+
+func Version() string {
+	return version
+}
