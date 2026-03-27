@@ -98,7 +98,7 @@ jobs:
       - name: Build MSI
         run: |
           cd client
-          go tool github.com/mh-cbon/go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client_$($env:GITHUB_REF_NAME)_amd64.msi" --version "$($env:VersionString)"
+          go tool github.com/mh-cbon/go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client_$($env:GITHUB_REF_NAME)_amd64.msi" --version "$($env:GITHUB_REF_NAME)"
           Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client_$($env:GITHUB_REF_NAME)_amd64.msi").Hash) ssh-ca-client_$($env:GITHUB_REF_NAME)_amd64.msi" | Out-File -FilePath ".\dist\ssh-ca-client.sha256sum"
       - name: Attest MSI
         uses: actions/attest@v4
