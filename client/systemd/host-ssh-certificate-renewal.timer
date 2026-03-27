@@ -3,6 +3,8 @@ Description=Run SSH Host Key renewal
 
 [Timer]
 OnCalendar=daily
+RandomizedDelaySec=4h
+FixedRandomDelay=true
 Persistent=true
 
 [Install]
