@@ -22,6 +22,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: client/go.mod
+          cache-dependency-path: client/go.mod
           cache: true
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@v0
@@ -80,11 +81,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: client/go.mod
-          cache: false
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
