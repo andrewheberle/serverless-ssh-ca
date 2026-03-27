@@ -242,10 +242,12 @@ The renewed certificate will be issued with identical principals and extensions
 as the current certificate with renewals being skipped unless the certificate
 has less than 50% of validity left (based on the default of 30-days validity).
 
-This allows the renewal process to be executed via cron as follows:
+Example systemd unit files are located in the `systemd` directory and these are
+installed by the DEB package so renewals can be enabled as follows if you have
+installed via the package:
 
-```crontab
-15 1 * * *   root   ssh-ca-client-cli host --renew
+```sh
+sudo systemctl enable --now host-ssh-certificate-renewal.timer
 ```
 
 #### Command Line Options
