@@ -133,6 +133,8 @@ jobs:
             --component main \
             {}
         env:
+          # R2 does not support CRC32 checksums introduced in AWS SDK
+          # https://github.com/aws/aws-sdk-ruby/issues/3166
           AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
       - name: Upload public key to apt repo
         run: |
