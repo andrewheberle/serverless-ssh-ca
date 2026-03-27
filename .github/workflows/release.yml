@@ -43,36 +43,6 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-checksums: ./client/dist/checksums.txt
-      - name: Import GPG key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-      - name: Setup deb-s3
-        run: |
-          sudo wget -O /etc/apt/trusted.gpg.d/deb-s3-keyring.asc https://deb-s3.github.io/deb-s3/gpg.key
-          echo "deb https://deb-s3.github.io/deb-s3 deb-s3 main" | sudo tee /etc/apt/sources.list.d/deb-s3.list
-          sudo apt-get update
-          sudo apt-get install deb-s3
-      - name: Upload .deb packages to repo
-        run: |
-          find client/dist -name '*.deb' | xargs -I{} deb-s3 upload \
-            --visibility=nil \
-            --bucket packages \
-            --s3-region auto \
-            --endpoint https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com \
-            --access-key-id ${{ secrets.R2_ACCESS_KEY_ID }} \
-            --secret-access-key ${{ secrets.R2_SECRET_ACCESS_KEY }} \
-            --sign C725E94C4DAFEA05 \
-            --codename stable \
-            --component main \
-            {}
-      - name: Upload public key to apt repo
-        run: |
-          gpg --armor --export C725E94C4DAFEA05 > pubkey.gpg
-          aws s3 cp pubkey.gpg s3://packages/pubkey.gpg \
-            --endpoint-url https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com \
-            --region auto
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -132,3 +102,43 @@ jobs:
           files: |
             client/dist/ssh-ca-client.msi
             client/dist/ssh-ca-client.msi.sha256sum
+  repo:
+    name: Publish to APT repository
+    needs: client
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: client-dist-artifact
+          path: client/dist
+      - name: Import GPG key
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+      - name: Setup deb-s3
+        run: |
+          sudo wget -O /etc/apt/trusted.gpg.d/deb-s3-keyring.asc https://deb-s3.github.io/deb-s3/gpg.key
+          echo "deb https://deb-s3.github.io/deb-s3 deb-s3 main" | sudo tee /etc/apt/sources.list.d/deb-s3.list
+          sudo apt-get update
+          sudo apt-get install deb-s3
+      - name: Upload .deb packages to repo
+        run: |
+          find client/dist -name '*.deb' | xargs -I{} deb-s3 upload \
+            --bucket packages \
+            --s3-region auto \
+            --endpoint https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com \
+            --access-key-id ${{ secrets.R2_ACCESS_KEY_ID }} \
+            --secret-access-key ${{ secrets.R2_SECRET_ACCESS_KEY }} \
+            --sign C725E94C4DAFEA05 \
+            --codename stable \
+            --component main \
+            {}
+        env:
+          AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+      - name: Upload public key to apt repo
+        run: |
+          gpg --armor --export C725E94C4DAFEA05 > pubkey.gpg
+          aws s3 cp pubkey.gpg s3://packages/pubkey.gpg \
+            --endpoint-url https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com \
+            --region auto
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
