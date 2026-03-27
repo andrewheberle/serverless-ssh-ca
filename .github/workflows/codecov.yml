@@ -37,7 +37,7 @@ jobs:
           go test -coverprofile=coverage.txt ./...
 
       - name: Upload results to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: andrewheberle/serverless-ssh-ca
@@ -64,7 +64,7 @@ jobs:
         run: npm run coverage
 
       - name: Upload results to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: andrewheberle/serverless-ssh-ca
