@@ -122,7 +122,6 @@ jobs:
       - name: Upload .deb packages to repo
         run: |
           find client/dist -name '*.deb' | xargs -I{} deb-s3 upload \
-            --visibility=nil \
             --bucket packages \
             --s3-region auto \
             --endpoint https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com \
