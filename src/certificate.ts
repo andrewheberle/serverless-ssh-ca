@@ -121,10 +121,8 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
 }
 
 export async function createSignedCertificate(email: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
-    // grab private key from secret store (or env in tests)
-	const secret = typeof env.PRIVATE_KEY === "string"
-		? env.PRIVATE_KEY
-		: await env.PRIVATE_KEY.get()
+    // grab private key from secret store
+	const secret = await env.PRIVATE_KEY.get()
 
 	// parse key
     const key = parsePrivateKey(secret)
@@ -151,7 +149,7 @@ export class BadIssuerError extends Error {
 
     Object.setPrototypeOf(this, BadIssuerError.prototype)
   }
-} 
+}
 
 export async function createSignedHostCertificate(public_key: Key, options: CreateHostCertificateOptions = DefaultCreateHostertificateOptions): Promise<Certificate> {
     // generate list of identities for host key
@@ -167,10 +165,8 @@ export async function createSignedHostCertificate(public_key: Key, options: Crea
         identity.push(...options.subjects)
     }
 
-    // grab private key from secret store (or env in tests)
-	const secret = typeof env.PRIVATE_KEY === "string"
-		? env.PRIVATE_KEY
-		: await env.PRIVATE_KEY.get()
+    // grab private key from secret store
+	const secret = await env.PRIVATE_KEY.get()
 
 	// parse private key
     const key = parsePrivateKey(secret)
