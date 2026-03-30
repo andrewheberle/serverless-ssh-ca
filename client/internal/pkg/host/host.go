@@ -58,6 +58,7 @@ type CertificateSignerPayload struct {
 	PublicKey   []byte   `json:"public_key"`
 	Certificate []byte   `json:"certificate,omitempty"`
 	Nonce       string   `json:"nonce"`
+	Identity    string   `json:"identity,omitempty"`
 }
 
 type CertificateSignerResponse struct {
@@ -350,6 +351,12 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 		return err
 	}
 
+	// extract id_token from token (this is not verified here as it is up to the caller to verify)
+	rawIDToken, ok := token.Extra("id_token").(string)
+	if !ok {
+		return fmt.Errorf("no id_token found")
+	}
+
 	for n, k := range lh.keys {
 		logger := lh.logger.With("keypath", k.keypath, "format", k.key.PublicKey().Type(), "key", n+1, "keys", len(lh.keys))
 
@@ -363,7 +370,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			}
 		}
 
-		csr, err := lh.doSigningRequest(client, k.key, k.certBytes)
+		csr, err := lh.doSigningRequest(client, k.key, k.certBytes, rawIDToken)
 		if err != nil {
 			logger.Warn("error completing signing request", "error", err)
 			errs = append(errs, err)
@@ -451,7 +458,7 @@ func (lh *LoginHandler) httpClient(token *oauth2.Token) (*http.Client, error) {
 	}, nil
 }
 
-func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, cert []byte) (*CertificateSignerResponse, error) {
+func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, cert []byte, id string) (*CertificateSignerResponse, error) {
 	// get public key
 	publicKey, err := lh.getPublicKeyBytes(key)
 	if err != nil {
@@ -474,8 +481,9 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 		// add certificate if doing a renewal
 		payload.Certificate = cert
 	} else {
-		// add principals if doing initial request
+		// add principals and identity if doing initial request
 		payload.Principals = lh.principals
+		payload.Identity = id
 	}
 
 	// convert to JSON

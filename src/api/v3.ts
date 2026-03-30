@@ -135,9 +135,9 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
     async handle(c: AppContext) {
         const data = await this.getValidatedData<typeof this.schema>()
 
-        logger.info("handling renewal request", "for", data.headers.Authorization.email)
+        logger.info("handling user certificated request", "for", data.headers.Authorization.email)
 
-        const identity = await parseIdentity(data.body.identity)
+        const identity = await parseIdentity(data.body.identity, c.env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         if (identity.sub !== data.headers["Authorization"].sub) {
             throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
         }
@@ -242,6 +242,8 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                     nonce: z.string()
                         .transform(transformNonce)
                         .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
+					identity: z.string()
+                        .describe("Identity Token JWT from OIDC IdP"),
                     principals: z.array(z.string()).min(1)
                         .describe("List of principals to include on the issued certificate"),
                     lifetime: z.number()
@@ -279,8 +281,13 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 
         logger.info("handling host certificate request", "for", data.headers.Authorization.email)
 
+		const identity = await parseIdentity(data.body.identity, c.env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES_CLAIM)
+        if (identity.sub !== data.headers["Authorization"].sub) {
+            throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
+        }
+
         // check user can issue host certificates
-        if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email)) {
+        if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !identity.principals.some((p: string) => split(env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
             throw new ForbiddenException("User not allowed to issue host certificates")
         }
 
