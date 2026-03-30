@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers"
 import { JWKInvalid, JWKSInvalid, JWSInvalid, JWTInvalid } from "jose/errors"
-import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificate, parseKey } from "sshpk"
+import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificate, parseKey, parsePrivateKey, PrivateKey } from "sshpk"
 import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
@@ -69,7 +69,7 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
     }
 
     try {
-        // verify jwt 
+        // verify jwt
         const { payload } = await verifyJWT(jwt)
 
         if (payload.email === undefined) {
@@ -336,4 +336,21 @@ export const split = (v: string): string[] => {
     }
 
     return v.split(",")
+}
+
+export const getPublic = async (key?: PrivateKey) => {
+	if (key === undefined) {
+		// grab private key from secret store
+		const secret = await env.PRIVATE_KEY.get()
+
+		// parse it
+		key = parsePrivateKey(secret)
+	}
+
+	// convert to a public key and add comment
+	const pub = key.toPublic()
+	pub.comment = env.ISSUER_DN
+
+	// return in ssh format trimmed of any whitespace
+	return pub.toString("ssh").trim()
 }

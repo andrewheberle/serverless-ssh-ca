@@ -22,6 +22,7 @@ import {
     createSignedHostCertificate
 } from "../certificate"
 import {
+	getPublic,
     parseIdentity,
     refineCertificateRequest,
     refineHostCertificateRenewal,
@@ -65,17 +66,9 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
 
     async handle(c: AppContext) {
         try {
-            // grab private key from secret store (or env in tests)
-            const secret = typeof c.env.PRIVATE_KEY === "string"
-                ? c.env.PRIVATE_KEY
-                : await c.env.PRIVATE_KEY.get()
+            const pub = await getPublic()
 
-            // parse key
-            const key = parsePrivateKey(secret)
-            const pub = key.toPublic()
-            pub.comment = c.env.ISSUER_DN
-
-            return c.text(`${pub.toString("ssh")}\n`)
+            return c.text(`${pub}\n`)
         } catch (err) {
             if (err instanceof KeyParseError) {
                 throw new InternalServerErrorException("Error parsing private key")
@@ -196,10 +189,8 @@ class UserRevocationListEndpoint extends OpenAPIRoute {
             // get revoked serials
             const serials = (await getRevocationList(this.certificateType)).map(v => BigInt(v))
 
-            // grab private key from secret store (or env in tests)
-            const secret = typeof c.env.PRIVATE_KEY === "string"
-                ? c.env.PRIVATE_KEY
-                : await c.env.PRIVATE_KEY.get()
+            // grab private key from secret store
+            const secret = await c.env.PRIVATE_KEY.get()
 
             // parse key
             const key = parsePrivateKey(secret)
@@ -386,7 +377,7 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
             throw new ForbiddenException("current certificate is revoked")
         }
 
-        // use smaller of the current certificate lifetime and the requested lifetime 
+        // use smaller of the current certificate lifetime and the requested lifetime
         const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
         const lifetime = originalLifetime > data.body.lifetime
             ? data.body.lifetime
