@@ -136,19 +136,19 @@ export const transformPublicKey = (val: string, ctx: z.RefinementCtx): Key | nev
     }
 }
 
-export const identityPrincipals = (payload: CertificateRequestJWTPayload): string[] => {
-    if (env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM === undefined) {
-        return []
-    }
+export const identityPrincipals = (payload: CertificateRequestJWTPayload, claim?: string): string[] => {
+    if (claim === undefined) {
+		claim = env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM
+	}
 
-    const p = payload[env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM]
+    const p = payload[claim]
     if (p === undefined) {
-        logger.warn("principals claim was missing despite being set in CA config", "claim", env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        logger.warn("claim was missing despite being set in CA config", "claim", claim)
         return []
     }
 
     if (p === "") {
-        logger.warn("principals claim was present but was an empty string", "claim", env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        logger.warn("claim was present but was an empty string", "claim", claim)
         return []
     }
 
@@ -170,7 +170,7 @@ type ParsedIdentity = {
     principals: string[]
 }
 
-export const parseIdentity = async (jwt: string | undefined): Promise<ParsedIdentity> => {
+export const parseIdentity = async (jwt: string | undefined, claim?: string): Promise<ParsedIdentity> => {
     if (jwt === undefined) {
         return {
             sub: "",
@@ -180,7 +180,7 @@ export const parseIdentity = async (jwt: string | undefined): Promise<ParsedIden
 
     const { payload } = await verifyJWT(jwt)
 
-    const principals = identityPrincipals(payload)
+    const principals = identityPrincipals(payload, claim)
 
     return {
         sub: payload.sub,

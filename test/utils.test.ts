@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { identityPrincipals, split } from "../src/utils"
+import { env } from "cloudflare:workers"
 
 describe("split", () => {
     it ("with empty string", () => {
@@ -25,27 +26,27 @@ describe("identityPrincipals", () => {
     })
 
     it ("empty string principals claim", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ""})
+        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ""}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         expect(result).toStrictEqual([])
     })
 
     it ("empty array principals claim", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: []})
+        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: []}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         expect(result).toStrictEqual([])
     })
 
     it ("principals claim as string", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: "foo"})
+        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: "foo"}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         expect(result).toStrictEqual(["foo"])
     })
 
     it ("principals claim as array", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ["foo"]})
+        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ["foo"]}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         expect(result).toStrictEqual(["foo"])
     })
 
     it ("principals claim as array with two items", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ["foo", "bar"]})
+        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ["foo", "bar"]}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         expect(result).toStrictEqual(["foo", "bar"])
     })
 })
