@@ -30,8 +30,8 @@ import {
     split,
     transformAuthorizationHeader,
     transformCertificate,
-    transformHostNonce,
-    transformNonce,
+    transformHostProofOfPossession,
+    transformProofOfPossession,
     transformPublicKey
 } from "../utils"
 import { KeyParseError, parsePrivateKey } from "sshpk"
@@ -95,8 +95,8 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
                     public_key: z.string()
                         .transform(transformPublicKey)
                         .describe("SSH public key to sign"),
-                    nonce: z.string()
-                        .transform(transformNonce)
+                    proof: z.string()
+                        .transform(transformProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
                     identity: z.string()
                         .describe("Identity Token JWT from OIDC IdP"),
@@ -239,8 +239,8 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                     public_key: z.string()
                         .transform(transformPublicKey)
                         .describe("SSH public key to sign"),
-                    nonce: z.string()
-                        .transform(transformNonce)
+                    proof: z.string()
+                        .transform(transformHostProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
                     principals: z.array(z.string()).min(1)
                         .describe("List of principals to include on the issued certificate"),
@@ -333,8 +333,8 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
                     public_key: z.string()
                         .transform(transformPublicKey)
                         .describe("SSH public key of certificate to be renewed"),
-                    nonce: z.string()
-                        .transform(transformHostNonce)
+                    proof: z.string()
+                        .transform(transformHostProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}"),
                     lifetime: z.number()
                         .min(seconds("24 hours"))

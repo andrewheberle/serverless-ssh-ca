@@ -115,11 +115,11 @@ export class ProofOfPossession {
         }
 
         for (const key of keys) {
-            // confirm nonce fingerprint matches keys
+            // confirm proof of possession fingerprint matches keys
             if (!this.fingerprint.matches(key))
                 return false
 
-            // also config key used to sign nonce matches
+            // also confirm key used to sign proof of possession matches
             if (!this.signaturePubkey.fingerprint().matches(key))
                 return false
         }
