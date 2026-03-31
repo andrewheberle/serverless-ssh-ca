@@ -16,42 +16,11 @@ builds:
       - arm64
     goos:
       - linux
-    main: ./cmd/ssh-ca-client-cli
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    ldflags:
-      - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
-  - id: windowscli
-    binary: ssh-ca-client-cli
-    env:
-      - CGO_ENABLED=0
-    flags:
-      - -trimpath
-    goarch:
-      - amd64
-    goos:
       - windows
     main: ./cmd/ssh-ca-client-cli
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
-  - id: windowsgui
-    binary: ssh-ca-client
-    env:
-      - CGO_ENABLED=0
-    flags:
-      - -trimpath
-    goarch:
-      - amd64
-    goos:
-      - windows
-    hooks:
-      pre:
-        - go generate ./cmd/ssh-ca-client
-    main: ./cmd/ssh-ca-client
-    ldflags:
-      - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
-      - -H=windowsgui
-    mod_timestamp: "{{ .CommitTimestamp }}"
   - id: gui
     binary: ssh-ca-client
     env:
@@ -63,10 +32,12 @@ builds:
       - arm64
     goos:
       - linux
+      - windows
     main: ./cmd/ssh-ca-client
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
+      - '{{ if eq .Os "windows" }}-H=windowsgui{{ end }}'
 
 archives:
   - allow_different_binary_count: true
@@ -98,6 +69,17 @@ release:
   replace_existing_artifacts: true
   prerelease: auto
 
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
 nfpms:
   - ids:
       - cli
@@ -115,54 +97,3 @@ sboms:
     disable: false
   - artifacts: archive
     disable: false
-
-snapcrafts:
-  - id: snap
-    ids:
-      - gui
-      - cli
-    name: ssh-ca-client
-    title: Serverless SSH CA Client
-    icon: ../snap/gui/ssh-ca-client.png
-    publish: false
-    summary: A client for a Serverless SSH CA
-    description: |
-      This snap includes the graphical client-side component of a Serverless SSH CA
-      that handles requesting and renewing user certificates for SSH access on your
-      device.
-
-      Also included is the CLI version, however the snap build does not include
-      host SSH certificate management features.
-
-      **Important:** This requires the deployment of the CA component on
-      Cloudflare Workers, it does not work standalone.
-
-      Please review the documentation here: https://github.com/andrewheberle/serverless-ssh-ca
-    disable: true
-    channel_templates:
-      - edge
-      - stable
-    grade: stable
-    confinement: strict
-    base: core24
-    license: Apache-2.0
-    apps:
-      ssh-ca-client:
-        desktop: ../snap/gui/ssh-ca-client.desktop
-        plugs:
-          - desktop
-          - desktop-legacy
-          - home
-          - network
-          - network-bind
-          - password-manager-service
-      ssh-ca-client-cli:
-        plugs:
-          - desktop
-          - home
-          - network
-          - network-bind
-          - password-manager-service
-    extra_files:
-      - source: scripts/utilities
-        mode: 0755
