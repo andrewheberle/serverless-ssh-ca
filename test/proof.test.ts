@@ -40,7 +40,7 @@ const tests: testSig[] = [
         sig: "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFETUFBQUFMYzNOb0xXVmtNalUxTVRrQUFBQWdselE4SWpOeHVLMG0wOGdBcHdUUgpMUkVxUlFOSnVYZGRMek1OWHh2OUZ3WUFBQUFFWm1sc1pRQUFBQUFBQUFBR2MyaGhOVEV5QUFBQVV3QUFBQXR6CmMyZ3RaV1F5TlRVeE9RQUFBRUFRd0RKRWowNzRnekYyT2k4NkRUbllGV1BmZGc1aVQxWnRTaXoxdWYxQ0k1anAKVVVORU56b09iVmJmNjZsRlFac3hBRS9OMm5yWXJjTTQrQWNMQm80TgotLS0tLUVORCBTU0ggU0lHTkFUVVJFLS0tLS0K",
         data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg",
         from: 1765698000000,
-        wantErr: "nonce timestamp too old",
+        wantErr: "timestamp too old",
         want: false
     },
     {
@@ -48,7 +48,7 @@ const tests: testSig[] = [
         sig: "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFETUFBQUFMYzNOb0xXVmtNalUxTVRrQUFBQWdselE4SWpOeHVLMG0wOGdBcHdUUgpMUkVxUlFOSnVYZGRMek1OWHh2OUZ3WUFBQUFFWm1sc1pRQUFBQUFBQUFBR2MyaGhOVEV5QUFBQVV3QUFBQXR6CmMyZ3RaV1F5TlRVeE9RQUFBRUFRd0RKRWowNzRnekYyT2k4NkRUbllGV1BmZGc1aVQxWnRTaXoxdWYxQ0k1anAKVVVORU56b09iVmJmNjZsRlFac3hBRS9OMm5yWXJjTTQrQWNMQm80TgotLS0tLUVORCBTU0ggU0lHTkFUVVJFLS0tLS0K",
         data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg",
         from: 1765696000000,
-        wantErr: "nonce timestamp was from the future",
+        wantErr: "timestamp was from the future",
         want: false
     },
     {
@@ -64,7 +64,7 @@ const tests: testSig[] = [
         sig: "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFETUFBQUFMYzNOb0xXVmtNalUxTVRrQUFBQWdselE4SWpOeHVLMG0wOGdBcHdUUgpMUkVxUlFOSnVYZGRMek1OWHh2OUZ3WUFBQUFFWm1sc1pRQUFBQUFBQUFBR2MyaGhOVEV5QUFBQVV3QUFBQXR6CmMyZ3RaV1F5TlRVeE9RQUFBRUFRd0RKRWowNzRnekYyT2k4NkRUbllGV1BmZGc1aVQxWnRTaXoxdWYxQ0k1anAKVVVORU56b09iVmJmNjZsRlFac3hBRS9OMm5yWXJjTTQrQWNMQm80TgotLS0tLUVORCBTU0ggU0lHTkFUVVJFLS0tLS0K",
         data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg.extra",
         from: 1765699990000,
-        wantErr: "invalid nonce format",
+        wantErr: "invalid proof of possession format",
         want: true
     },
     {
@@ -72,7 +72,7 @@ const tests: testSig[] = [
         sig: "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFETUFBQUFMYzNOb0xXVmtNalUxTVRrQUFBQWdselE4SWpOeHVLMG0wOGdBcHdUUgpMUkVxUlFOSnVYZGRMek1OWHh2OUZ3WUFBQUFFWm1sc1pRQUFBQUFBQUFBR2MyaGhOVEV5QUFBQVV3QUFBQXR6CmMyZ3RaV1F5TlRVeE9RQUFBRUFRd0RKRWowNzRnekYyT2k4NkRUbllGV1BmZGc1aVQxWnRTaXoxdWYxQ0k1anAKVVVORU56b09iVmJmNjZsRlFac3hBRS9OMm5yWXJjTTQrQWNMQm80TgotLS0tLUVORCBTU0ggU0lHTkFUVVJFLS0tLS0K",
         data: "1765696780805.invalid",
         from: 1765696790000,
-        wantErr: "nonce fingerprint was an invalid format",
+        wantErr: "fingerprint was an invalid format",
         want: true
     },
     {
@@ -80,12 +80,12 @@ const tests: testSig[] = [
         sig: "invalid",
         data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg",
         from:  1765696790000,
-        wantErr: "nonce signature could not be parsed",
+        wantErr: "signature could not be parsed",
         want: false
     },
 ]
 
-describe("Nonce", async () => {
+describe("ProofOfPossession", async () => {
     const timestamp = 1765696780805
 
     for (const tt of tests) {

@@ -50,16 +50,16 @@ export class ProofOfPossession {
         const age = now - timestamp
         const skew = ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)
         if (age > skew) {
-            throw new PossessionParseError("proof of possession timestamp too old")
+            throw new PossessionParseError("timestamp too old")
         }
         if (age + skew < 0) {
-            throw new PossessionParseError("proof of possession timestamp was from the future")
+            throw new PossessionParseError("timestamp was from the future")
         }
         try {
             // parse fingerprint
             const fingerprint = parseFingerprint(fingerprintHex)
             if (fingerprint === undefined) {
-                throw new PossessionParseError("proof of possession	 fingerprint did not parse")
+                throw new PossessionParseError("fingerprint did not parse")
             }
 
             // convert siganture from base64

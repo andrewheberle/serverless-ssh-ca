@@ -5,7 +5,7 @@ import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
 import { Logger } from "@andrewheberle/ts-slog"
-import { HostNonce, Nonce, NonceParseError } from "./nonce"
+import { HostProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof"
 
 const logger = new Logger()
 
@@ -19,17 +19,17 @@ export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) 
     return z.NEVER
 }
 
-export const transformNonce = (val: string, ctx: z.core.$RefinementCtx<string>): Nonce | never => {
+export const transformNonce = (val: string, ctx: z.core.$RefinementCtx<string>): ProofOfPossession | never => {
     logger.info("starting transformNonce")
     try {
-        const nonce = new Nonce(val)
+        const nonce = new ProofOfPossession(val)
         logger.info("parsed nonce", "nonce", nonce)
 
         return nonce
     } catch (err) {
         logger.error("nonce parsing error", "error", err)
         switch (true) {
-            case (err instanceof NonceParseError):
+            case (err instanceof PossessionParseError):
                 ctx.issues.push({
                     code: "custom",
                     message: err.message,
@@ -233,7 +233,7 @@ export const transformCertificate = (val: string, ctx: z.RefinementCtx): Certifi
 }
 
 type ParsedCertificateRequest = {
-    nonce: Nonce
+    nonce: ProofOfPossession
     public_key: Key
     lifetime: number
     identity: string
@@ -260,11 +260,11 @@ export const refineCertificateRequest = async (val: ParsedCertificateRequest, ct
     }
 }
 
-export const transformHostNonce = (val: string, ctx: z.RefinementCtx): HostNonce | never => {
+export const transformHostNonce = (val: string, ctx: z.RefinementCtx): HostProofOfPossession | never => {
     try {
-        return new HostNonce(val)
+        return new HostProofOfPossession(val)
     } catch (err) {
-        if (err instanceof NonceParseError) {
+        if (err instanceof PossessionParseError) {
             return fatalIssue(ctx, err.message, val)
         }
 
@@ -279,7 +279,7 @@ type HostCertificateRequest = {
 
 type ParsedHostCertificateRequest = {
     principals: string[]
-    nonce: Nonce
+    nonce: ProofOfPossession
 } & HostCertificateRequest
 
 export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
@@ -303,7 +303,7 @@ export const refineHostCertificateRequest = async (val: ParsedHostCertificateReq
 
 type ParsedHostCertificateRenewal = {
     certificate: Certificate
-    nonce: HostNonce
+    nonce: HostProofOfPossession
 } & HostCertificateRequest
 
 export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
