@@ -5,7 +5,7 @@ import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
 import { Logger } from "@andrewheberle/ts-slog"
-import { HostNonce, Nonce, NonceParseError } from "./nonce"
+import { HostProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof"
 
 const logger = new Logger()
 
@@ -19,17 +19,15 @@ export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) 
     return z.NEVER
 }
 
-export const transformNonce = (val: string, ctx: z.core.$RefinementCtx<string>): Nonce | never => {
-    logger.info("starting transformNonce")
+export const transformProofOfPossession = (val: string, ctx: z.core.$RefinementCtx<string>): ProofOfPossession | never => {
     try {
-        const nonce = new Nonce(val)
-        logger.info("parsed nonce", "nonce", nonce)
+        const proof = new ProofOfPossession(val)
 
-        return nonce
+        return proof
     } catch (err) {
-        logger.error("nonce parsing error", "error", err)
+        logger.error("proof of possession parsing error", "error", err)
         switch (true) {
-            case (err instanceof NonceParseError):
+            case (err instanceof PossessionParseError):
                 ctx.issues.push({
                     code: "custom",
                     message: err.message,
@@ -39,7 +37,7 @@ export const transformNonce = (val: string, ctx: z.core.$RefinementCtx<string>):
             default:
                 ctx.issues.push({
                     code: "custom",
-                    message: "nonce transform unhandled error",
+                    message: "proof of possession transform unhandled error",
                     input: val
                 })
         }
@@ -233,7 +231,7 @@ export const transformCertificate = (val: string, ctx: z.RefinementCtx): Certifi
 }
 
 type ParsedCertificateRequest = {
-    nonce: Nonce
+    proof: ProofOfPossession
     public_key: Key
     lifetime: number
     identity: string
@@ -241,34 +239,60 @@ type ParsedCertificateRequest = {
 }
 
 export const refineCertificateRequest = async (val: ParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
-    logger.info("refineCertificateRequest")
     try {
-        // check nonce fingerprint matches public key
-        if (!val.nonce.matches(val.public_key)) {
-            return fatalIssue(ctx, "nonce fingerprint did not match public_key", val)
+        // check proof of possession fingerprint matches public key
+        if (!val.proof.matches(val.public_key)) {
+            return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
         }
 
-        // verify nonce signature
-        const verified = await val.nonce.verify()
+        // verify proof of possession signature
+        const verified = await val.proof.verify()
         if (!verified) {
-            return fatalIssue(ctx, "nonce signature validation failed", val)
+            return fatalIssue(ctx, "proof of possession signature validation failed", val)
         }
 
         return z.NEVER
     } catch (err) {
-        return fatalIssue(ctx, "nonce verification unhandled error", val)
+        return fatalIssue(ctx, "proof of possession verification unhandled error", val)
     }
 }
 
-export const transformHostNonce = (val: string, ctx: z.RefinementCtx): HostNonce | never => {
+type LegacyParsedCertificateRequest = {
+    nonce: ProofOfPossession
+    public_key: Key
+    lifetime: number
+    identity: string
+    extensions: string[]
+}
+
+export const refineLegacyCertificateRequest = async (val: LegacyParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
     try {
-        return new HostNonce(val)
+        // check proof of possession fingerprint matches public key
+        if (!val.nonce.matches(val.public_key)) {
+            return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
+        }
+
+        // verify proof of possession signature
+        const verified = await val.nonce.verify()
+        if (!verified) {
+            return fatalIssue(ctx, "proof of possession signature validation failed", val)
+        }
+
+        return z.NEVER
     } catch (err) {
-        if (err instanceof NonceParseError) {
+        return fatalIssue(ctx, "proof of possession verification unhandled error", val)
+    }
+}
+
+export const transformHostProofOfPossession = (val: string, ctx: z.RefinementCtx): HostProofOfPossession | never => {
+    try {
+        return new HostProofOfPossession(val)
+    } catch (err) {
+        if (err instanceof PossessionParseError) {
             return fatalIssue(ctx, err.message, val)
         }
 
-        return fatalIssue(ctx, "nonce transform unhandled error", val)
+        return fatalIssue(ctx, "host proof of possession transform unhandled error", val)
     }
 }
 
@@ -279,31 +303,55 @@ type HostCertificateRequest = {
 
 type ParsedHostCertificateRequest = {
     principals: string[]
-    nonce: Nonce
+    proof: ProofOfPossession
 } & HostCertificateRequest
 
 export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
     try {
-        // check nonce fingerprint matches public key
-        if (!val.nonce.matches(val.public_key)) {
-            return fatalIssue(ctx, "nonce fingerprint did not match public_key", val)
+        // check proof of possession fingerprint matches public key
+        if (!val.proof.matches(val.public_key)) {
+            return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
         }
 
-        // verify nonce signature
-        const verified = await val.nonce.verify()
+        // verify proof of possession signature
+        const verified = await val.proof.verify()
         if (!verified) {
-            return fatalIssue(ctx, "nonce signature validation failed", val)
+            return fatalIssue(ctx, "proof of possession signature validation failed", val)
         }
 
         return z.NEVER
     } catch (err) {
-        return fatalIssue(ctx, "nonce verification unhandled error", val)
+        return fatalIssue(ctx, "proof of possession verification unhandled error", val)
+    }
+}
+
+type LegacyParsedHostCertificateRequest = {
+    principals: string[]
+    nonce: ProofOfPossession
+} & HostCertificateRequest
+
+export const refineLegacyHostCertificateRequest = async (val: LegacyParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
+    try {
+        // check proof of possession fingerprint matches public key
+        if (!val.nonce.matches(val.public_key)) {
+            return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
+        }
+
+        // verify proof of possession signature
+        const verified = await val.nonce.verify()
+        if (!verified) {
+            return fatalIssue(ctx, "proof of possession signature validation failed", val)
+        }
+
+        return z.NEVER
+    } catch (err) {
+        return fatalIssue(ctx, "proof of possession verification unhandled error", val)
     }
 }
 
 type ParsedHostCertificateRenewal = {
     certificate: Certificate
-    nonce: HostNonce
+    proof: HostProofOfPossession
 } & HostCertificateRequest
 
 export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
@@ -313,20 +361,49 @@ export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRen
             return fatalIssue(ctx, "certificate is expired", val)
         }
 
-        // check nonce fingerprint matches public key and certificate subject key
-        if (!val.nonce.matches(val.public_key, val.certificate.subjectKey)) {
-            return fatalIssue(ctx, "nonce fingerprints did not match public_key and/or certificate", val)
+        // check proof of possession fingerprint matches public key and certificate subject key
+        if (!val.proof.matches(val.public_key, val.certificate.subjectKey)) {
+            return fatalIssue(ctx, "proof of possession fingerprints did not match public_key and/or certificate", val)
         }
 
-        // verify nonce signature
-        const verified = await val.nonce.verify()
+        // verify proof of possession signature
+        const verified = await val.proof.verify()
         if (!verified) {
-            return fatalIssue(ctx, "nonce signature validation failed", val)
+            return fatalIssue(ctx, "proof of possession signature validation failed", val)
         }
 
         return z.NEVER
     } catch (err) {
-        return fatalIssue(ctx, "nonce verification unhandled error", val)
+        return fatalIssue(ctx, "proof of possession verification unhandled error", val)
+    }
+}
+
+type LegacyParsedHostCertificateRenewal = {
+    certificate: Certificate
+    nonce: ProofOfPossession
+} & HostCertificateRequest
+
+export const refineLegacyHostCertificateRenewal = async (val: LegacyParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
+    try {
+        // check certificate is not expired
+        if (val.certificate.isExpired()) {
+            return fatalIssue(ctx, "certificate is expired", val)
+        }
+
+        // check proof of possession fingerprint matches public key and certificate subject key
+        if (!val.nonce.matches(val.public_key, val.certificate.subjectKey)) {
+            return fatalIssue(ctx, "proof of possession fingerprints did not match public_key and/or certificate", val)
+        }
+
+        // verify proof of possession signature
+        const verified = await val.nonce.verify()
+        if (!verified) {
+            return fatalIssue(ctx, "proof of possession signature validation failed", val)
+        }
+
+        return z.NEVER
+    } catch (err) {
+        return fatalIssue(ctx, "proof of possession verification unhandled error", val)
     }
 }
 

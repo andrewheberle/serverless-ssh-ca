@@ -53,11 +53,11 @@ var (
 )
 
 type CertificateSignerPayload struct {
-	Lifetime    int      `json:"lifetime"`
-	Principals  []string `json:"principals,omitempty"`
-	PublicKey   []byte   `json:"public_key"`
-	Certificate []byte   `json:"certificate,omitempty"`
-	Nonce       string   `json:"nonce"`
+	Lifetime          int      `json:"lifetime"`
+	Principals        []string `json:"principals,omitempty"`
+	PublicKey         []byte   `json:"public_key"`
+	Certificate       []byte   `json:"certificate,omitempty"`
+	ProofOfPossession string   `json:"proof_of_possession"`
 }
 
 type CertificateSignerResponse struct {
@@ -458,17 +458,17 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 		return nil, err
 	}
 
-	// generate nonce
-	nonce, err := lh.generateNonce(key)
+	// generate proof of possession
+	proof, err := lh.generateProofOfPossession(key)
 	if err != nil {
 		return nil, err
 	}
 
 	// encode json
 	payload := CertificateSignerPayload{
-		PublicKey: publicKey,
-		Lifetime:  int(lh.lifetime.Seconds()),
-		Nonce:     nonce,
+		PublicKey:         publicKey,
+		Lifetime:          int(lh.lifetime.Seconds()),
+		ProofOfPossession: proof,
 	}
 	if lh.renewal {
 		// add certificate if doing a renewal
@@ -495,7 +495,7 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 	lh.logger.Debug("certificate request",
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
-		"nonce", payload.Nonce,
+		"proof_of_possession", payload.ProofOfPossession,
 		"principals", payload.Principals,
 		"certificate", payload.Certificate,
 	)
@@ -552,8 +552,8 @@ func (lh *LoginHandler) getPublicKeyBytes(key ssh.Signer) ([]byte, error) {
 	return key.PublicKey().Marshal(), nil
 }
 
-func (lh *LoginHandler) generateNonce(key ssh.Signer) (string, error) {
-	return client.GenerateNonce(key)
+func (lh *LoginHandler) generateProofOfPossession(key ssh.Signer) (string, error) {
+	return client.GenerateProofOfPossession(key)
 }
 
 func generatePKCE() (string, string) {

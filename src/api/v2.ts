@@ -23,14 +23,14 @@ import {
 } from "../certificate"
 import {
     parseIdentity,
-    refineCertificateRequest,
-    refineHostCertificateRenewal,
-    refineHostCertificateRequest,
+    refineLegacyCertificateRequest,
+    refineLegacyHostCertificateRenewal,
+    refineLegacyHostCertificateRequest,
     split,
     transformAuthorizationHeader,
     transformCertificate,
-    transformHostNonce,
-    transformNonce,
+    transformHostProofOfPossession,
+    transformProofOfPossession,
     transformPublicKey
 } from "../utils"
 import { KeyParseError, parsePrivateKey } from "sshpk"
@@ -104,7 +104,7 @@ class CertificateRequestEndpointV2 extends OpenAPIRoute {
                         .transform(transformPublicKey)
                         .describe("SSH public key to sign"),
                     nonce: z.string()
-                        .transform(transformNonce)
+                        .transform(transformProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
                     identity: z.string()
                         .describe("Identity Token JWT from OIDC IdP"),
@@ -117,7 +117,7 @@ class CertificateRequestEndpointV2 extends OpenAPIRoute {
                         .default(seconds(env.SSH_CERTIFICATE_LIFETIME))
                         .describe("Lifetime of issued SSH certificate"),
                 })
-                    .superRefine(refineCertificateRequest)
+                    .superRefine(refineLegacyCertificateRequest)
             )
         },
         responses: {
@@ -193,7 +193,7 @@ class HostCertificateRequestEndpointV2 extends OpenAPIRoute {
                         .transform(transformPublicKey)
                         .describe("SSH public key to sign"),
                     nonce: z.string()
-                        .transform(transformNonce)
+                        .transform(transformProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
                     principals: z.array(z.string()).min(1)
                         .describe("List of principals to include on the issued certificate"),
@@ -203,7 +203,7 @@ class HostCertificateRequestEndpointV2 extends OpenAPIRoute {
                         .default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
                         .describe("Lifetime of issued Host SSH certificate"),
                 })
-                    .superRefine(refineHostCertificateRequest)
+                    .superRefine(refineLegacyHostCertificateRequest)
             )
         },
         responses: {
@@ -283,7 +283,7 @@ class HostCertificateRenewEndpointV2 extends OpenAPIRoute {
                         .transform(transformPublicKey)
                         .describe("SSH public key of certificate to be renewed"),
                     nonce: z.string()
-                        .transform(transformHostNonce)
+                        .transform(transformHostProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}"),
                     lifetime: z.number()
                         .min(seconds("24 hours"))
@@ -291,7 +291,7 @@ class HostCertificateRenewEndpointV2 extends OpenAPIRoute {
                         .default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
                         .describe("Lifetime of renewed Host SSH certificate"),
                 })
-                    .superRefine(refineHostCertificateRenewal)
+                    .superRefine(refineLegacyHostCertificateRenewal)
             )
         },
         responses: {
@@ -326,7 +326,7 @@ class HostCertificateRenewEndpointV2 extends OpenAPIRoute {
             throw new ForbiddenException("current certificate is revoked")
         }
 
-        // use smaller of the current certificate lifetime and the requested lifetime 
+        // use smaller of the current certificate lifetime and the requested lifetime
         const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
         const lifetime = originalLifetime > data.body.lifetime
             ? data.body.lifetime

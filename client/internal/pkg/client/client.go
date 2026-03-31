@@ -33,10 +33,10 @@ import (
 )
 
 type CertificateSignerPayload struct {
-	Lifetime  int    `json:"lifetime"`
-	PublicKey []byte `json:"public_key"`
-	Identity  string `json:"identity,omitempty"`
-	Nonce     string `json:"nonce"`
+	Lifetime          int    `json:"lifetime"`
+	PublicKey         []byte `json:"public_key"`
+	Identity          string `json:"identity,omitempty"`
+	ProofOfPossession string `json:"proof_of_possession"`
 }
 
 type CertificateSignerResponse struct {
@@ -536,8 +536,8 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		return nil, err
 	}
 
-	// generate nonce
-	nonce, err := lh.generateNonce()
+	// generate proof of possession
+	proof, err := lh.generateProofOfPossession()
 	if err != nil {
 		return nil, err
 	}
@@ -546,10 +546,10 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	payload := CertificateSignerPayload{
-		PublicKey: publicKey,
-		Lifetime:  int(lh.lifetime.Seconds()),
-		Identity:  id,
-		Nonce:     nonce,
+		PublicKey:         publicKey,
+		Lifetime:          int(lh.lifetime.Seconds()),
+		Identity:          id,
+		ProofOfPossession: proof,
 	}
 	if err := enc.Encode(payload); err != nil {
 		return nil, err
@@ -567,7 +567,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
 		"identity", payload.Identity,
-		"nonce", payload.Nonce,
+		"proof_of_possession", payload.ProofOfPossession,
 	)
 	res, err := client.Post(caCertUrl, "application/json", buf)
 	if err != nil {
@@ -615,16 +615,16 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	return &csr, nil
 }
 
-func (lh *LoginHandler) generateNonce() (string, error) {
+func (lh *LoginHandler) generateProofOfPossession() (string, error) {
 	signer, err := lh.config.Signer()
 	if err != nil {
 		return "", err
 	}
 
-	return GenerateNonce(signer)
+	return GenerateProofOfPossession(signer)
 }
 
-func GenerateNonce(signer ssh.Signer) (string, error) {
+func GenerateProofOfPossession(signer ssh.Signer) (string, error) {
 	// generate data to sign
 	timestamp := time.Now().UnixMilli()
 	fingerprint := ssh.FingerprintSHA256(signer.PublicKey())

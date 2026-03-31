@@ -8,6 +8,19 @@ export enum CertificateType {
     Host
 }
 
+export type CertificateRecord = {
+	id: number
+    serial: string
+    key_id: string
+    principals: string
+    extensions: string | null
+    valid_after: Date
+    valid_before: Date
+    revoked_at: Date | null
+	certificate_type: CertificateType
+	public_key: string | null
+}
+
 export const runStatement = async <T = Record<string, unknown>>(stmt: D1PreparedStatement) => {
     return await tryWhile(async () => {
         return await stmt.run<T>();
@@ -58,8 +71,8 @@ export const recordCertificate = async (certificate: Certificate, keyid: string,
         return v.name as string
     }).join(",")
     const stmt = env.DB
-        .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before, certificate_type) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(`${serial}`, keyid, subjects, extensions, certificate.validFrom.toISOString(), certificate.validUntil.toISOString(), certificateType)
+        .prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before, certificate_type, public_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(`${serial}`, keyid, subjects, extensions, certificate.validFrom.toISOString(), certificate.validUntil.toISOString(), certificateType, certificate.subjectKey.toString("ssh"))
     const res = await runStatement(stmt)
 
     if (!res.success) {
