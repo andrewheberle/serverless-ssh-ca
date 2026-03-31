@@ -76,41 +76,41 @@ func Test_GenerateNonce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := GenerateNonce(tt.signer)
+			got, gotErr := GenerateProofOfPossession(tt.signer)
 			if gotErr != nil {
 				if !tt.wantErr {
-					t.Errorf("GenerateNonce() failed: %v", gotErr)
+					t.Errorf("GenerateProofOfPossession() failed: %v", gotErr)
 				}
 				return
 			}
 			if tt.wantErr {
-				t.Fatal("GenerateNonce() succeeded unexpectedly")
+				t.Fatal("GenerateProofOfPossession() succeeded unexpectedly")
 			}
 
 			// no verification, just make sure it looks right
 			parts := strings.Split(got, ".")
 			if len(parts) != 3 {
-				t.Fatalf("GenerateNonce() generated wrong number of parts: %v", len(parts))
+				t.Fatalf("GenerateProofOfPossession() generated wrong number of parts: %v", len(parts))
 			}
 
 			// check timestamp seems ok
 			ms, err := strconv.Atoi(parts[0])
 			if err != nil {
-				t.Fatalf("GenerateNonce() timestamp was not an integer: %v", err)
+				t.Fatalf("GenerateProofOfPossession() timestamp was not an integer: %v", err)
 			}
 			ts := time.Unix(int64(ms/1000), int64((ms%1000)*1000000))
 			if ts.After(time.Now()) {
-				t.Fatalf("GenerateNonce() timestamp was in the future: %v", ts)
+				t.Fatalf("GenerateProofOfPossession() timestamp was in the future: %v", ts)
 			}
 
 			// check signature format is expected and can be parsed back
 			signature, err := base64.StdEncoding.DecodeString(parts[2])
 			if err != nil {
-				t.Fatalf("GenerateNonce() signature was not base64: %v", err)
+				t.Fatalf("GenerateProofOfPossession() signature was not base64: %v", err)
 			}
 			sig, err := sshsig.Unarmor(signature)
 			if err != nil {
-				t.Fatalf("GenerateNonce() could not dearmor signature: %v", err)
+				t.Fatalf("GenerateProofOfPossession() could not dearmor signature: %v", err)
 			}
 			if err := sshsig.Verify(
 				bytes.NewReader([]byte(fmt.Sprintf("%s.%s", parts[0], parts[1]))),
@@ -119,7 +119,7 @@ func Test_GenerateNonce(t *testing.T) {
 				sshsig.HashSHA512,
 				SignatureNamespace,
 			); err != nil {
-				t.Fatalf("GenerateNonce() signature did not verify: %v", err)
+				t.Fatalf("GenerateProofOfPossession() signature did not verify: %v", err)
 			}
 		})
 	}

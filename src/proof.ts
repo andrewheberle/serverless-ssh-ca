@@ -5,18 +5,27 @@ import { verify } from "./sshsig"
 import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
 
-export class NonceParseError extends Error {
+export class PossessionParseError extends Error {
     constructor(message: string, cause?: unknown) {
         super(message)
-        this.name = "NonceParseError"
+        this.name = "PossessionParseError"
         this.cause = cause
 
         // This is necessary for proper stack trace in TypeScript
-        Object.setPrototypeOf(this, NonceParseError.prototype)
+        Object.setPrototypeOf(this, PossessionParseError.prototype)
     }
 }
 
-export class Nonce {
+/**
+ * ProofOfPossession is used to check/enforce proof of possession for a SSH private key.
+ *
+ * This is used to verify that the requester of a certificate actually possesses the private key corresponding to the public key in the certificate request.
+ *
+ * The proof of possession is a signed message containing a timestamp and the fingerprint of the public key.
+ *
+ * The signature is made with the private key corresponding to the public key in the certificate request and is a BASE64 encoded SSHSIG signature.
+ */
+export class ProofOfPossession {
     readonly timestamp: number
     readonly fingerprint: Fingerprint
     readonly signature: Sig
@@ -26,7 +35,7 @@ export class Nonce {
     constructor(nonce: string, from?: number) {
         const parts = nonce.split(".")
         if (parts.length !== 3) {
-            throw new NonceParseError("invalid nonce format")
+            throw new PossessionParseError("invalid proof of possession format")
         }
 
         const [timestampStr, fingerprintHex, signatureBase64] = parts
@@ -34,23 +43,23 @@ export class Nonce {
         // verify timestamp
         const timestamp: number = parseInt(timestampStr, 10)
         if (isNaN(timestamp)) {
-            throw new NonceParseError("timestamp was not a number")
+            throw new PossessionParseError("timestamp was not a number")
         }
 
         const now = from !== undefined ? from : Date.now()
         const age = now - timestamp
         const skew = ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)
         if (age > skew) {
-            throw new NonceParseError("nonce timestamp too old")
+            throw new PossessionParseError("timestamp too old")
         }
         if (age + skew < 0) {
-            throw new NonceParseError("nonce timestamp was from the future")
+            throw new PossessionParseError("timestamp was from the future")
         }
         try {
             // parse fingerprint
             const fingerprint = parseFingerprint(fingerprintHex)
             if (fingerprint === undefined) {
-                throw new NonceParseError("nonce fingerprint did not parse")
+                throw new PossessionParseError("fingerprint did not parse")
             }
 
             // convert siganture from base64
@@ -61,7 +70,7 @@ export class Nonce {
             try {
                 this.signature = parse(signature)
             } catch (err) {
-                throw new NonceParseError("nonce signature could not be parsed", err)
+                throw new PossessionParseError("proof of possession signature could not be parsed", err)
             }
             this.fingerprint = fingerprint
             this.data = `${timestamp}.${fingerprintHex}`
@@ -69,10 +78,10 @@ export class Nonce {
         } catch (err) {
             switch (true) {
                 case (err instanceof FingerprintFormatError):
-                    throw new NonceParseError("nonce fingerprint was an invalid format", err)
+                    throw new PossessionParseError("proof of possession fingerprint was an invalid format", err)
                 case (err instanceof DOMException):
                     if (err.name == "InvalidCharacterError") {
-                        throw new NonceParseError("nonce signature could not be parsed", err)
+                        throw new PossessionParseError("proof of possession signature could not be parsed", err)
                     }
                 default:
                     throw err
@@ -81,8 +90,8 @@ export class Nonce {
     }
 
     /**
-     * 
-     * @returns 
+     *
+     * @returns
      */
     async verify(): Promise<boolean> {
         try {
@@ -93,9 +102,9 @@ export class Nonce {
     }
 
     /**
-     * 
+     *
      * @param keys array of keys to verify finterprint against
-     * @returns 
+     * @returns
      */
     matches(key: Key): boolean
     matches(...keys: Key[]): boolean
@@ -106,11 +115,11 @@ export class Nonce {
         }
 
         for (const key of keys) {
-            // confirm nonce fingerprint matches keys
+            // confirm proof of possession fingerprint matches keys
             if (!this.fingerprint.matches(key))
                 return false
-        
-            // also config key used to sign nonce matches
+
+            // also confirm key used to sign proof of possession matches
             if (!this.signaturePubkey.fingerprint().matches(key))
                 return false
         }
@@ -119,7 +128,7 @@ export class Nonce {
     }
 }
 
-export class HostNonce extends Nonce {
+export class HostProofOfPossession extends ProofOfPossession {
     matches(...keys: Key[]): boolean {
         if (keys.length === 1) {
             // must verify key and cert
