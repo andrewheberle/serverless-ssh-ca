@@ -56,11 +56,6 @@ func TestConfigDirsSnap(t *testing.T) {
 			panic(err)
 		}
 	}
-	if os.Getenv("SNAP_DATA") == "" {
-		if err := os.Setenv("SNAP_DATA", "/var/snap/ssh-ca-client/ssh-ca-client"); err != nil {
-			panic(err)
-		}
-	}
 	if err := os.Unsetenv("IGNORE_SNAP_DURING_TEST"); err != nil {
 		// unset this so previous tests dont cause problems
 		panic(err)
@@ -72,7 +67,7 @@ func TestConfigDirsSnap(t *testing.T) {
 		want2   string
 		wantErr bool
 	}{
-		{"test results", os.Getenv("SNAP_USER_DATA"), os.Getenv("SNAP_DATA"), false},
+		{"test results", os.Getenv("SNAP_USER_DATA"), filepath.Join("/etc", AppName), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

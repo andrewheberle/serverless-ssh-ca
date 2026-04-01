@@ -31,8 +31,8 @@ func LogDir() (string, error) {
 
 func ConfigDirs() (user, system string, err error) {
 	// are we running as a snap?
-	if os.Getenv("SNAP_USER_DATA") != "" && os.Getenv("SNAP_DATA") != "" && os.Getenv("IGNORE_SNAP_DURING_TEST") == "" {
-		return os.Getenv("SNAP_USER_DATA"), os.Getenv("SNAP_DATA"), nil
+	if os.Getenv("SNAP_USER_DATA") != "" && os.Getenv("IGNORE_SNAP_DURING_TEST") == "" {
+		return os.Getenv("SNAP_USER_DATA"), filepath.Join("/etc", AppName), nil
 	}
 
 	dir, err := os.UserConfigDir()
