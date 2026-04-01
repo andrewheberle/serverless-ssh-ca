@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Handle change of config location in v0.15.5
+[ -f "$SNAP_DATA/config.yml" ] && mv -f "$SNAP_DATA/config.yml" "$SNAP_DATA/etc/config.yml"
