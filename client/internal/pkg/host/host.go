@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -517,6 +518,8 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 
 	// ensure status code was 200 OK
 	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		lh.logger.Debug("got unexpected response code from CA", "status", res.StatusCode, "body", string(body))
 		return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
 	}
 

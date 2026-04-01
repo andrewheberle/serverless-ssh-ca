@@ -19,7 +19,7 @@ app.onError((err, c) => {
         if (err.cause !== undefined) {
             logger.error(message, "status", err.status, "error", err.cause)
         } else {
-            logger.error(message, "status", err.status, "error", "undefined")
+            logger.error(message, "status", err.status)
         }
 
         return err.getResponse()
