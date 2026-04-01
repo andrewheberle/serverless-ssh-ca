@@ -147,7 +147,6 @@ snapcrafts:
     license: Apache-2.0
     apps:
       ssh-ca-client:
-        desktop: ${SNAP}/meta/gui/ssh-ca-client.desktop
         plugs:
           - desktop
           - desktop-legacy
@@ -172,3 +171,6 @@ snapcrafts:
         mode: 0755
       - source: snap/gui
         destination: meta/gui
+    layout:
+      /etc/serverless-ssh-ca:
+        bind: $SNAP_DATA/etc
