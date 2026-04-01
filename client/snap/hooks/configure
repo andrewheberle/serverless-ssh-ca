@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# shellcheck source=../../client/scripts/utilities/bin/management
+# shellcheck source=../scripts/management
 . "$SNAP/bin/management"
 
 handle_config() {
@@ -16,7 +16,7 @@ handle_config() {
         config="$(printf '%s\ntrusted_ca: %s\n' "$config" "$ca")"
     fi
 
-    if ! tempconfig="$(mktemp "$SNAP_DATA/config.yml.XXXXXXXX")"; then
+    if ! tempconfig="$(mktemp "$SNAP_DATA/etc/config.yml.XXXXXXXX")"; then
         return $?
     fi
 
@@ -30,7 +30,7 @@ handle_config() {
         return $?
     fi
 
-    mv -f "$tempconfig" "$SNAP_DATA/config.yml"
+    mv -f "$tempconfig" "$SNAP_DATA/etc/config.yml"
 }
 
 handle_config
