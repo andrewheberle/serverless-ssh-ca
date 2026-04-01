@@ -1,11 +1,13 @@
-//go:build !snap
-
 package version
 
-// verson is set via ldflags
-var version = "devel"
+// verson should be set via ldflags
+var version = "unset"
 
-// Version returns the version set via ldflags or debug.BuildInfo
+// Version returns the version set via ldflags or devel if unset
 func Version() string {
-	return version
+	if version != "unset" {
+		return version
+	}
+
+	return "devel"
 }
