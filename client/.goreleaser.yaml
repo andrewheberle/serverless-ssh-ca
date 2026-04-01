@@ -123,7 +123,6 @@ snapcrafts:
       - snap
     name: ssh-ca-client
     title: Serverless SSH CA Client
-    icon: snap/gui/ssh-ca-client.png
     publish: false
     summary: A client for a Serverless SSH CA
     description: |
