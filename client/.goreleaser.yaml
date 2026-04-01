@@ -167,10 +167,10 @@ snapcrafts:
         destination: bin/management
         mode: 0755
       - source: snap/hooks/configure
-        destination: snap/hooks/configure
+        destination: meta/hooks/configure
         mode: 0755
       - source: snap/hooks/post-refresh
-        destination: snap/hooks/post-refresh
+        destination: meta/hooks/post-refresh
         mode: 0755
       - source: snap/gui
         destination: meta/gui
