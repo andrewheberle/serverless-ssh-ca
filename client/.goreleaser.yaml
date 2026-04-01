@@ -169,8 +169,8 @@ snapcrafts:
       - source: snap/hooks/configure
         destination: snap/hooks/configure
         mode: 0755
-      - source: snap/hooks/pre-refresh
-        destination: snap/hooks/pre-refresh
+      - source: snap/hooks/post-refresh
+        destination: snap/hooks/post-refresh
         mode: 0755
       - source: snap/gui
         destination: meta/gui
