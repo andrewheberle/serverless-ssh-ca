@@ -66,12 +66,14 @@ jobs:
         with:
           name: client-dist-artifact
           path: client/dist
-      - uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1.2.0
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        with:
-          snap: client/dist/*.snap
-          release: edge
+      - name: Install Snapcraft and Log In
+        uses: samuelmeuli/action-snapcraft@fceeb3c308e76f3487e72ef608618de625fb7fe8 # v3.0.1
+      - name: Upload to Snap Store
+        run: find client/dist -name *.snap -exec snapcraft upload {} --release=edge \;
+
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+
   msi:
     name: Package as an MSI for Windows
     runs-on: windows-latest

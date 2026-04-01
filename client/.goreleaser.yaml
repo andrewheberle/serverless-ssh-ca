@@ -38,9 +38,28 @@ builds:
     ldflags:
       - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
       - '{{ if eq .Os "windows" }}-H=windowsgui{{ end }}'
+  - id: snap
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    tags:
+      - snap
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - linux
+    main: ./...
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
 
 archives:
-  - allow_different_binary_count: true
+  - ids:
+      - cli
+      - gui
+    allow_different_binary_count: true
     formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
@@ -101,8 +120,7 @@ sboms:
 snapcrafts:
   - id: snap
     ids:
-      - gui
-      - cli
+      - snap
     name: ssh-ca-client
     title: Serverless SSH CA Client
     icon: snap/gui/ssh-ca-client.png
