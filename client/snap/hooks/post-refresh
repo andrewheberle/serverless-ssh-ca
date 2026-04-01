@@ -1,4 +1,6 @@
 #!/bin/sh
 
 # Handle change of config location after v0.15.4
-[ -f "$SNAP_DATA/config.yml" ] && mv -f "$SNAP_DATA/config.yml" "$SNAP_DATA/etc/config.yml"
+if [ -f "$SNAP_DATA/config.yml" ]; then
+    mv -f "$SNAP_DATA/config.yml" "$SNAP_DATA/etc/config.yml"
+fi
