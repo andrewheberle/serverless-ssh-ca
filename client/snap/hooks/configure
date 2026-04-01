@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# shellcheck source=../../client/scripts/utilities/bin/management
+. "$SNAP/bin/management"
+
+handle_config() {
+    # Check required config is set
+    if ! has_config_set; then
+        return $?
+    fi
+
+    config="$(printf 'issuer: %s\nclient_id: %s\nscopes: %s\nredirect_url: %s\nca_url: %s\n' \
+        "$(issuer)" "$(client_id)" "$(scopes)" "$(redirect_url)" "$(ca_url)")"
+
+    if ca="$(trusted_ca)"; then
+        config="$(printf '%s\ntrusted_ca: %s\n' "$config" "$ca")"
+    fi
+
+    if ! tempconfig="$(mktemp "$SNAP_DATA/config.yml.XXXXXXXX")"; then
+        return $?
+    fi
+
+    if ! echo "$config" > "$tempconfig"; then
+        rm -f "$tempconfig"
+        return $?
+    fi
+
+    if ! chmod 0644 "$tempconfig"; then
+        rm -f "$tempconfig"
+        return $?
+    fi
+
+    mv -f "$tempconfig" "$SNAP_DATA/config.yml"
+}
+
+handle_config
