@@ -575,12 +575,17 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		return nil, err
 	}
 	defer func() {
-		_ = res.Body.Close()
+		if err := res.Body.Close(); err != nil {
+			lh.logger.Warn("error closing response body", "error", err)
+		}
 	}()
 
 	// ensure status code was 200 OK
 	if res.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(res.Body)
+		var body []byte
+		if res.Body != nil {
+			body, _ = io.ReadAll(res.Body)
+		}
 		lh.logger.Debug("got unexpected response code from CA", "status", res.StatusCode, "body", string(body))
 		return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
 	}
