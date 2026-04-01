@@ -97,3 +97,61 @@ sboms:
     disable: false
   - artifacts: archive
     disable: false
+
+snapcrafts:
+  - id: snap
+    ids:
+      - gui
+      - cli
+    name: ssh-ca-client
+    title: Serverless SSH CA Client
+    icon: snap/gui/ssh-ca-client.png
+    publish: false
+    summary: A client for a Serverless SSH CA
+    description: |
+      This snap includes the graphical client-side component of a Serverless SSH CA
+      that handles requesting and renewing user certificates for SSH access on your
+      device.
+
+      Also included is the CLI version, however the snap build does not include
+      host SSH certificate or KRL management features.
+
+      **Important:** This requires the deployment of the CA component on
+      Cloudflare Workers, it does not work standalone.
+
+      Please review the documentation here: https://github.com/andrewheberle/serverless-ssh-ca
+    disable: false
+    channel_templates:
+      - edge
+      - stable
+    grade: stable
+    confinement: strict
+    base: core24
+    license: Apache-2.0
+    apps:
+      ssh-ca-client:
+        desktop: ${SNAP}/meta/gui/ssh-ca-client.desktop
+        plugs:
+          - desktop
+          - desktop-legacy
+          - home
+          - network
+          - network-bind
+          - password-manager-service
+      cli:
+        command: ssh-ca-client-cli
+        plugs:
+          - desktop
+          - home
+          - network
+          - network-bind
+          - password-manager-service
+    extra_files:
+      - source: snap/scripts/management
+        destination: bin/management
+        mode: 0755
+      - source: snap/hooks/configure
+        destination: snap/hooks/configure
+        mode: 0755
+      - source: snap/gui
+        destination: meta/gui

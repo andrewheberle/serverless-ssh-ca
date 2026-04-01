@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Serverless SSH CA Client
+Exec=ssh-ca-client
+Icon=${SNAP}/meta/gui/ssh-ca-client.png
+Type=Application
