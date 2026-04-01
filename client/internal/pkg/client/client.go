@@ -37,7 +37,7 @@ type CertificateSignerPayload struct {
 	Lifetime          int    `json:"lifetime"`
 	PublicKey         []byte `json:"public_key"`
 	Identity          string `json:"identity,omitempty"`
-	ProofOfPossession string `json:"proof_of_possession"`
+	ProofOfPossession string `json:"proof"`
 }
 
 type CertificateSignerResponse struct {
@@ -568,7 +568,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
 		"identity", payload.Identity,
-		"proof_of_possession", payload.ProofOfPossession,
+		"proo", payload.ProofOfPossession,
 	)
 	res, err := client.Post(caCertUrl, "application/json", buf)
 	if err != nil {

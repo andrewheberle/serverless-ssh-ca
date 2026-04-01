@@ -58,7 +58,7 @@ type CertificateSignerPayload struct {
 	Principals        []string `json:"principals,omitempty"`
 	PublicKey         []byte   `json:"public_key"`
 	Certificate       []byte   `json:"certificate,omitempty"`
-	ProofOfPossession string   `json:"proof_of_possession"`
+	ProofOfPossession string   `json:"proof"`
 	Identity          string   `json:"identity,omitempty"`
 }
 
@@ -504,7 +504,7 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 	lh.logger.Debug("certificate request",
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
-		"proof_of_possession", payload.ProofOfPossession,
+		"proof", payload.ProofOfPossession,
 		"principals", payload.Principals,
 		"certificate", payload.Certificate,
 	)
