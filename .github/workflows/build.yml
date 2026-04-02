@@ -36,7 +36,7 @@ jobs:
       - name: Generate code with go generate
         run: |
           go generate ./...
-          git diff --exit-code || (echo "Generated code is out of date. Please run 'go generate ./...' and commit the changes." && exit 1)
+          git diff --exit-code ./client || (echo "Generated code is out of date. Please run 'go generate ./...' and commit the changes." && exit 1)
         working-directory: ./client
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0

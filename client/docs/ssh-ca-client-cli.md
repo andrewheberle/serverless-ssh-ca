@@ -5,7 +5,7 @@ ssh-ca-client-cli - CLI to interact with the Serverless SSH CA
 ## Synopsis
 
 ```sh
-ssh-ca-client-cli [options] [subcommand]                
+ssh-ca-client-cli [options] [subcommand]
 ```
 
 ## Options
