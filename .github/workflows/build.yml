@@ -100,9 +100,9 @@ jobs:
           cache: true
       - name: Build MSI
         run: |
-          cd client
           go tool go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client_$(git describe --tags)_amd64.msi" --version "$(git describe --tags)"
           Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client_$(git describe --tags)_amd64.msi").Hash) ssh-ca-client_$(git describe --tags)_amd64.msi" | Out-File -FilePath ".\dist\ssh-ca-client.sha256sum"
+        working-directory: ./client
       - name: Upload MSI as artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:

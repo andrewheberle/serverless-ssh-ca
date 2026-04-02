@@ -135,10 +135,14 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
     async handle(c: AppContext) {
         const data = await this.getValidatedData<typeof this.schema>()
 
-        logger.info("handling user certificated request", "for", data.headers.Authorization.email)
+		const l = logger.with("certificate_type", "user", "action", "request", "email", data.headers.Authorization.email)
 
         const identity = await parseIdentity(data.body.identity, c.env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
         if (identity.sub !== data.headers["Authorization"].sub) {
+			l.error("token subjects did not match for user certificate request",
+				"identity.sub", identity.sub,
+				"auth.sub", data.headers["Authorization"].sub,
+			)
             throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
         }
 
@@ -157,8 +161,10 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
             try {
                 await recordCertificate(certificate, data.headers.Authorization.email)
             } catch (err) {
-                logger.error("there was a problem adding issued user certificate to database", "error", err)
+                l.error("there was a problem adding issued certificate to database", "error", err)
             }
+
+			l.info("completed issuing certificate", "principals", certificate.subjects.map(v => v.toString()).join(","), "serial", certificate.serial.toString())
 
             return c.json(response)
         } catch (err) {
@@ -279,16 +285,21 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
     async handle(c: AppContext) {
         const data = await this.getValidatedData<typeof this.schema>()
 
-        logger.info("handling host certificate request", "for", data.headers.Authorization.email)
+		const l = logger.with("certificate_type", "host", "action", "request", "email", data.headers.Authorization.email)
 
 		const identity = await parseIdentity(data.body.identity, c.env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES_CLAIM)
         if (identity.sub !== data.headers["Authorization"].sub) {
+			l.error("token subjects did not match for host certificate request",
+				"identity.sub", identity.sub,
+				"auth.sub", data.headers["Authorization"].sub,
+			)
             throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
         }
 
         // check user can issue host certificates
         if (!split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !identity.principals.some((p: string) => split(env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
-            throw new ForbiddenException("User not allowed to issue host certificates")
+            l.error("unauthorized host certificate request", "email", data.headers.Authorization.email)
+			throw new ForbiddenException("User not allowed to issue host certificates")
         }
 
         const opts: CreateHostCertificateOptions = {
@@ -305,8 +316,10 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
             try {
                 await recordCertificate(certificate, `host_${certificate.subjects[0].hostname}`, CertificateType.Host)
             } catch (err) {
-                logger.error("there was a problem adding issued host certificate to database", "error", err)
+                l.error("there was a problem adding issued certificate to database", "error", err)
             }
+
+			l.info("completed issuing certificate", "principals", certificate.subjects.map(v => v.toString()).join(","), "serial", certificate.serial.toString())
 
             return c.json(response)
         } catch (err) {
@@ -376,11 +389,12 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
     async handle(c: AppContext) {
         const data = await this.getValidatedData<typeof this.schema>()
 
-        logger.info("handling host certificate renewal")
+		const l = logger.with("certificate_type", "host", "action", "renewal")
 
         // ensure certificate presented for renewal process is not revoked
         const serial = data.body.certificate.serial.readBigUInt64BE(0)
         if (await isRevoked(serial)) {
+			l.error("attempt to renew using revoked certificate", "serial", serial)
             throw new ForbiddenException("current certificate is revoked")
         }
 
@@ -404,8 +418,10 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
             try {
                 await recordCertificate(certificate, `host_${certificate.subjects[0].hostname}`, CertificateType.Host)
             } catch (err) {
-                logger.error("there was a problem adding issued host certificate to database", "error", err)
+                l.error("there was a problem adding issued certificate to database", "error", err)
             }
+
+			l.info("completed issuing certificate", "principals", certificate.subjects.map(v => v.toString()).join(","), "serial", certificate.serial.readBigUInt64BE(0))
 
             return c.json(response)
         } catch (err) {
