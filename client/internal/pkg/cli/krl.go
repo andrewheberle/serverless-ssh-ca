@@ -25,8 +25,13 @@ type krlCommand struct {
 	config *config.SystemConfig
 	krlUrl string
 	logger *slog.Logger
+	client krlHttpClient
 
 	*simplecommand.Command
+}
+
+type krlHttpClient interface {
+	Get(url string) (*http.Response, error)
 }
 
 func (c *krlCommand) Init(cd *simplecobra.Commandeer) error {
@@ -74,23 +79,10 @@ func (c *krlCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 }
 
 func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
-	res, err := http.Get(c.krlUrl)
+	// get KRL payload from CA
+	payload, err := c.getKrlPayload()
 	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := res.Body.Close(); err != nil {
-			c.logger.Warn("there was a problem closing the response body", "error", err)
-		}
-	}()
-
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status code for KRL: %d", res.StatusCode)
-	}
-
-	var payload krlResponsePayload
-	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
-		return err
+		return fmt.Errorf("could not get krl: %w", err)
 	}
 
 	// parse krl
@@ -148,6 +140,39 @@ func (c *krlCommand) getKrlUrl() (string, error) {
 	}
 
 	return url.JoinPath(c.config.CertificateAuthorityURL, "/api/v3/user/krl")
+}
+
+func (c *krlCommand) getKrlPayload() (*krlResponsePayload, error) {
+	if c.client == nil {
+		c.client = http.DefaultClient
+	}
+
+	res, err := c.client.Get(c.krlUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			c.logger.Warn("there was a problem closing the response body", "error", err)
+		}
+	}()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad status code for KRL: %d", res.StatusCode)
+	}
+
+	var payload krlResponsePayload
+
+	// set up decoder
+	dec := json.NewDecoder(res.Body)
+	dec.DisallowUnknownFields()
+
+	// decode json
+	if err := dec.Decode(&payload); err != nil {
+		return nil, err
+	}
+
+	return &payload, nil
 }
 
 type krlResponsePayload struct {
