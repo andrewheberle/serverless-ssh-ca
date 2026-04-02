@@ -15,9 +15,9 @@ export const app = new Hono()
 // add error handling
 app.onError((err, c) => {
     if (err instanceof HTTPException) {
-        const message = err.message === "" ? "HTTPException" : err.message
+        const message = err.message === "" ? "got HTTPException from router" : err.message
         if (err.cause !== undefined) {
-            logger.error(message, "status", err.status, "error", err.cause)
+            logger.error(message, "status", err.status, "cause", err.cause)
         } else {
             logger.error(message, "status", err.status)
         }
@@ -26,8 +26,8 @@ app.onError((err, c) => {
     }
 
     // Handle other errors
-    logger.error("unexpected error", "error", err)
-    return c.json({ error: "Internal Server Error" }, 500)
+    logger.error("unexpected error from router", "error", err)
+    return c.json({ success: false, errors: [{ code: 7000, message: "Internal Server Error" }] }, 500)
 })
 
 export const openapi = fromHono(app)
