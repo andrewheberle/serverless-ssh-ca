@@ -281,15 +281,13 @@ ssh-ca-client-cli host --principals remotehost --principals remotehost.example.c
 ssh-ca-client-cli host --renew
 ```
 
-
-
 ## As a GUI
 
 The GUI supports the following command line flags:
 
 | Flag              | Type            | Description                                                      |
 |-------------------|-----------------|------------------------------------------------------------------|
-| `--life`          | `time.Duration` | Lifetime of SSH certificate                                      | 
+| `--life`          | `time.Duration` | Lifetime of SSH certificate                                      |
 | `--renew`         | `time.Duration` | Renew once remaining time gets below this value                  |
 | `--addr`          | `string`        | Listen address for OIDC auth flow                                |
 | `--log`           | `string`        | Path to log file                                                 |
@@ -301,15 +299,15 @@ The GUI supports the following command line flags:
 
 The defaults are as follows:
 
-| Flag              | Default (Windows)                                  | Default (Linux)                         | 
+| Flag              | Default (Windows)                                  | Default (Linux)                         |
 |-------------------|----------------------------------------------------|-----------------------------------------|
-| `--life`          | `24h`                                              | `24h`                                   | 
+| `--life`          | `24h`                                              | `24h`                                   |
 | `--renew`         | `1h`                                               | `1h`                                    |
 | `--addr`          | `localhost:3000`                                   | `localhost:3000`                        |
 | `--log`           | `%PROGRAMDATA%\Serverless SSH CA Client/tray.log`  | `~/.config/serverless-ssh-ca/tray.log`  |
 | `--crash`         | `%PROGRAMDATA%\Serverless SSH CA Client/crash.log` | `~/.config/serverless-ssh-ca/crash.log` |
 | `--config`        | `%APPDATA%\Serverless SSH CA Client/config.yml`    | `/etc/serverless-ssh-ca/config.yml`     |
-| `--user`          | `%PROGRAMDATA%\Serverless SSH CA Client/user.yml`  | `~/.config/serverless-ssh-ca/user.yml`  | 
+| `--user`          | `%PROGRAMDATA%\Serverless SSH CA Client/user.yml`  | `~/.config/serverless-ssh-ca/user.yml`  |
 | `--disable-proxy` | `false`                                            | `true`                                  |
 | `--add-on-start`  | `true`                                             | `true`                                  |
 

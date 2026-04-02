@@ -30,7 +30,7 @@ app.onError((err, c) => {
     return c.json({ error: "Internal Server Error" }, 500)
 })
 
-const openapi = fromHono(app)
+export const openapi = fromHono(app)
 
 export const oidcAuth = openapi.registry.registerComponent(
     "securitySchemes",

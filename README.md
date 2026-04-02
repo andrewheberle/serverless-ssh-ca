@@ -9,7 +9,7 @@ to provide signed certificates for SSH users and hosts running on Cloudflare Wor
 
 ## Architecture
 
-The solution comprises of the CA running as a Worker, a Go based client and 
+The solution comprises of the CA running as a Worker, a Go based client and
 a third party OIDC IdP.
 
 The IdP may be any OIDC compatible service that returns a JWT with at least
@@ -29,7 +29,7 @@ The flow to obtain a User SSH certificate using the CLI version is as follows:
 5. The client uses the JWT from the IdP as `Authorization: Bearer <TOKEN>`
    in a `POST` request containing the users SSH public key to the CA's
    `/api/v3/user/certificate` endpoint
-6. The CA verifies the incoming JWT and assuming it is valid and verified, will 
+6. The CA verifies the incoming JWT and assuming it is valid and verified, will
    respond with a signed certificate based on the provided public key
 7. The client saves the certificate and adds the SSH private key and
    certificate to the local SSH Agent.
@@ -173,7 +173,7 @@ npm install
     // The supported JWT algorithms as a comma seperated list
     "JWT_ALGORITHMS": "RS256",
     // An OIDC claim included in the users identity token that will be used to
-    // populate the list of principals on the issued certificate 
+    // populate the list of principals on the issued certificate
     "JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": "groups",
     // The lifetime of the issued SSH certificates
     "SSH_CERTIFICATE_LIFETIME": "24 hours",
@@ -306,7 +306,7 @@ cannot be read (assuming DPAPI is secure).
 On Linux a random key is generated and saved in the users `login` keyring
 which is then used to encrypt this sensitive material using AES-GCM encryption.
 
-On other platforms, this is not the case and this data is simply stored as 
+On other platforms, this is not the case and this data is simply stored as
 BASE64 encoded strings, so security is less than ideal and filesystem
 permissions must be used to prevent unauthorised access.
 

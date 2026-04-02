@@ -233,7 +233,7 @@ class HostCertificateRequestEndpointV2 extends OpenAPIRoute {
         logger.info("handling host certificate request", "for", data.headers.Authorization.email)
 
         // check user can issue host certificates
-        if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email)) {
+        if (!split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email)) {
             throw new ForbiddenException("User not allowed to issue host certificates")
         }
 

@@ -22,6 +22,7 @@ import (
 	"codeberg.org/sdassow/atomic"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -460,54 +461,20 @@ func (lh *LoginHandler) httpClient(token *oauth2.Token) (*http.Client, error) {
 }
 
 func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, cert []byte, id string) (*CertificateSignerResponse, error) {
-	// get public key
-	publicKey, err := lh.getPublicKeyBytes(key)
-	if err != nil {
-		return nil, err
-	}
-
-	// generate proof of possession
-	proof, err := lh.generateProofOfPossession(key)
-	if err != nil {
-		return nil, err
-	}
-
-	// encode json
-	payload := CertificateSignerPayload{
-		PublicKey:         publicKey,
-		Lifetime:          int(lh.lifetime.Seconds()),
-		ProofOfPossession: proof,
-	}
-	if lh.renewal {
-		// add certificate if doing a renewal
-		payload.Certificate = cert
-	} else {
-		// add principals and identity if doing initial request
-		payload.Principals = lh.principals
-		payload.Identity = id
-	}
-
-	// convert to JSON
-	b, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
 	// build url
 	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL, lh.apiPath())
 	if err != nil {
 		return nil, err
 	}
 
+	// generate payload bytes
+	b, err := lh.signingRequestPayloadBytes(key, cert, id)
+	if err != nil {
+		return nil, err
+	}
+
 	// do POST
 	lh.logger.Info("sending request to CA", "url", caCertUrl)
-	lh.logger.Debug("certificate request",
-		"public_key", payload.PublicKey,
-		"lifetime", payload.Lifetime,
-		"proof", payload.ProofOfPossession,
-		"principals", payload.Principals,
-		"certificate", payload.Certificate,
-	)
 	res, err := client.Post(caCertUrl, "application/json", bytes.NewReader(b))
 	if err != nil {
 		return nil, err
@@ -554,6 +521,60 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 	}
 
 	return &csr, nil
+}
+
+func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, id string) ([]byte, error) {
+	// get public key
+	publicKey, err := lh.getPublicKeyBytes(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate proof of possession
+	proof, err := lh.generateProofOfPossession(key)
+	if err != nil {
+		return nil, err
+	}
+
+	lifetime := int(lh.lifetime.Seconds())
+
+	if lh.renewal {
+		payload := model.PostHostCertificateRenewEndpointJSONBody{
+			PublicKey:   base64.StdEncoding.EncodeToString(publicKey),
+			Lifetime:    &lifetime,
+			Proof:       proof,
+			Certificate: base64.StdEncoding.EncodeToString(cert),
+		}
+
+		lh.logger.Debug("certificate request payload",
+			"public_key", payload.PublicKey,
+			"lifetime", payload.Lifetime,
+			"proof", payload.Proof,
+			"certificate", payload.Certificate,
+			"renewal", lh.renewal,
+		)
+
+		return json.Marshal(payload)
+	}
+
+	payload := model.PostHostCertificateRequestEndpointJSONBody{
+		PublicKey:  base64.StdEncoding.EncodeToString(publicKey),
+		Lifetime:   &lifetime,
+		Proof:      proof,
+		Principals: lh.principals,
+		Identity:   id,
+	}
+
+	lh.logger.Debug("certificate request payload",
+		"public_key", payload.PublicKey,
+		"lifetime", payload.Lifetime,
+		"proof", payload.Proof,
+		"principals", payload.Principals,
+		"identity", payload.Identity,
+		"renewal", lh.renewal,
+	)
+
+	return json.Marshal(payload)
 }
 
 func (lh *LoginHandler) apiPath() string {
