@@ -24,6 +24,11 @@ jobs:
           go-version: stable
           cache-dependency-path: client/go.sum
           cache: true
+      - name: Generate code with go generate
+        run: |
+          go generate ./...
+          git diff --exit-code || (echo "Generated code is out of date. Please run 'go generate ./...' and commit the changes." && exit 1)
+        working-directory: ./client
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
       - name: Install Snapcraft
@@ -101,7 +106,7 @@ jobs:
       - name: Build MSI
         run: |
           cd client
-          go tool github.com/mh-cbon/go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client_$(git describe --tags)_amd64.msi" --version "$(git describe --tags)"
+          go tool go-msi make --arch amd64 --out "$(Join-Path $([System.Environment]::CurrentDirectory) "tmp")" --src ".\templates" --msi ".\dist\ssh-ca-client_$(git describe --tags)_amd64.msi" --version "$(git describe --tags)"
           Write-Output "$((Get-FileHash -Algorithm SHA256 -Path ".\dist\ssh-ca-client_$(git describe --tags)_amd64.msi").Hash) ssh-ca-client_$(git describe --tags)_amd64.msi" | Out-File -FilePath ".\dist\ssh-ca-client.sha256sum"
       - name: Upload MSI as artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0

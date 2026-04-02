@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
@@ -546,11 +547,12 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	// encode json
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
-	payload := CertificateSignerPayload{
-		PublicKey:         publicKey,
-		Lifetime:          int(lh.lifetime.Seconds()),
-		Identity:          id,
-		ProofOfPossession: proof,
+	lifetime := int(lh.lifetime.Seconds())
+	payload := model.PostUserCertificateRequestEndpointJSONBody{
+		PublicKey: base64.StdEncoding.EncodeToString(publicKey),
+		Lifetime:  &lifetime,
+		Identity:  id,
+		Proof:     proof,
 	}
 	if err := enc.Encode(payload); err != nil {
 		return nil, err
@@ -568,7 +570,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
 		"identity", payload.Identity,
-		"proo", payload.ProofOfPossession,
+		"proo", payload.Proof,
 	)
 	res, err := client.Post(caCertUrl, "application/json", buf)
 	if err != nil {

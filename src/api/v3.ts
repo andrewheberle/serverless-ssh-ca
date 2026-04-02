@@ -92,7 +92,7 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
             headers: HeaderSchema,
             body: contentJson(
                 z.object({
-                    public_key: z.string()
+                    public_key: z.base64()
                         .transform(transformPublicKey)
                         .describe("SSH public key to sign"),
                     proof: z.string()
@@ -102,8 +102,8 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
                         .describe("Identity Token JWT from OIDC IdP"),
                     extensions: z.array(z.string())
                         .default(split(env.SSH_CERTIFICATE_EXTENSIONS))
-                        .describe("Extensions to include in issued SSH certificate in seconds"),
-                    lifetime: z.number()
+                        .describe("Extensions to include in the issued SSH certificate"),
+                    lifetime: z.int()
                         .min(seconds("5 minutes"))
                         .max(seconds(env.SSH_CERTIFICATE_LIFETIME))
                         .default(seconds(env.SSH_CERTIFICATE_LIFETIME))
@@ -236,7 +236,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
             headers: HeaderSchema,
             body: contentJson(
                 z.object({
-                    public_key: z.string()
+                    public_key: z.base64()
                         .transform(transformPublicKey)
                         .describe("SSH public key to sign"),
                     proof: z.string()
@@ -246,7 +246,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
                         .describe("Identity Token JWT from OIDC IdP"),
                     principals: z.array(z.string()).min(1)
                         .describe("List of principals to include on the issued certificate"),
-                    lifetime: z.number()
+                    lifetime: z.int()
                         .min(seconds("24 hours"))
                         .max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
                         .default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
@@ -287,7 +287,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
         }
 
         // check user can issue host certificates
-        if (!split(env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !identity.principals.some((p: string) => split(env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
+        if (!split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !identity.principals.some((p: string) => split(env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
             throw new ForbiddenException("User not allowed to issue host certificates")
         }
 
@@ -334,16 +334,16 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
         request: {
             body: contentJson(
                 z.object({
-                    certificate: z.string()
+                    certificate: z.base64()
                         .transform(transformCertificate)
                         .describe("SSH certificate to renew"),
-                    public_key: z.string()
+                    public_key: z.base64()
                         .transform(transformPublicKey)
                         .describe("SSH public key of certificate to be renewed"),
                     proof: z.string()
                         .transform(transformHostProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}"),
-                    lifetime: z.number()
+                    lifetime: z.int()
                         .min(seconds("24 hours"))
                         .max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
                         .default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))

@@ -1,0 +1,11 @@
+package: model
+generate:
+  models: true
+  embedded-spec: false
+  strict-server: false
+  client: false
+  gorilla-server: false
+  std-http-server: false
+output: model.gen.go
+output-options:
+  skip-prune: false
