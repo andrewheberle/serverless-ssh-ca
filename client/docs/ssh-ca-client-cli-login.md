@@ -10,7 +10,6 @@ ssh-ca-client-cli [global options] login ] [--add]
                                            [--force]
                                            [--life <duration>]
                                            [--skip-agent]
-                       
 ```
 
 ## Description

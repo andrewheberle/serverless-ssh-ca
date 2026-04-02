@@ -13,7 +13,6 @@ ssh-ca-client-cli [global options] host [--addr <address>]
                                         [--principals <principals>]
                                         [--renew]
                                         [--renewat <percent>]
-                       
 ```
 
 ## Description
@@ -60,7 +59,7 @@ period left.
 
 `--key <key(s)>`
 A list of one or more host keys to request certificates for. This option may be
-passed a comma seperate list of keys or may be provided more than once so 
+passed a comma seperate list of keys or may be provided more than once so
 `--key /etc/ssh/ssh_host_ed25519_key,/etc/ssh/ssh_host_ecdsa_key`
 and `--key /etc/ssh/ssh_host_ed25519_key --key /etc/ssh/ssh_host_ecdsa_key` are
 functionally identical.

@@ -28,10 +28,19 @@ jobs:
           go-version: stable
           cache-dependency-path: client/go.sum
           cache: true
+      - name: Set up Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          cache: "npm"
+      - name: Install NPM dependencies
+        run: npm install
+      - name: Build Worker
+        run: npm run build
       - name: Generate code with go generate
         run: |
           go generate ./...
-          git diff --exit-code || (echo "Generated code is out of date. Please run 'go generate ./...' and commit the changes." && exit 1)
+          git diff --exit-code -- . || (echo "Generated code is out of date. Please run 'go generate ./...' and commit the changes." && exit 1)
         working-directory: ./client
       - uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
       - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0

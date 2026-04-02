@@ -39,7 +39,7 @@ Without this option the default is to download and parse the user KRL
 
 `--out`
 `-f`
-The output file for the verified KRL. 
+The output file for the verified KRL.
 
 ## Examples
 

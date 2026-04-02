@@ -5,7 +5,7 @@ ssh-ca-client-cli-version - Show the current version of the ssh-ca-client-cli
 ## Synopsis
 
 ```sh
-ssh-ca-client-cli [global options] version                       
+ssh-ca-client-cli [global options] version
 ```
 
 ## Description
