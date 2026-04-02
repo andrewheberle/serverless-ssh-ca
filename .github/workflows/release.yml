@@ -35,8 +35,6 @@ jobs:
           cache: "npm"
       - name: Install NPM dependencies
         run: npm install
-      - name: Build Worker
-        run: npm run build
       - name: Generate code with go generate
         run: |
           go generate ./...
