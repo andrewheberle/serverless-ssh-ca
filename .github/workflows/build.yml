@@ -10,7 +10,7 @@ permissions: {}
 
 jobs:
   client:
-    name: Build Client with GoReleaser
+    name: Build Client and Worker
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,6 +24,12 @@ jobs:
           go-version: stable
           cache-dependency-path: client/go.sum
           cache: true
+      - name: Set up Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+      - name: Install NPM dependencies
+        run: npm install
+      - name: Build Worker
+        run: npm run build
       - name: Generate code with go generate
         run: |
           go generate ./...
@@ -46,20 +52,6 @@ jobs:
           name: client-dist-artifact
           path: client/dist
           retention-days: 1
-  worker:
-    name: Build Worker with Wrangler
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - name: Set up Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-      - name: Install NPM dependencies
-        run: npm install
-      - name: Build Worker
-        run: npm run build
   snapcraft:
     name: Publish Snap
     runs-on: ubuntu-latest
