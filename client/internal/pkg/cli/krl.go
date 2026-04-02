@@ -95,7 +95,8 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 
 	// parse krl
 	c.logger.Debug("parsing krl to ensure its valid")
-	if _, err := krl.ParseKRL(payload.KeyRevocationList); err != nil {
+	parsedKrl, err := krl.ParseKRL(payload.KeyRevocationList)
+	if err != nil {
 		return fmt.Errorf("problem parsing krl: %w", err)
 	}
 
@@ -110,8 +111,21 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 		}
 
 		c.logger.Info("signature verified ok")
+
+		// check that the krl is for our CA
+		for _, section := range parsedKrl.Sections {
+			switch s := section.(type) {
+			case *krl.KRLCertificateSection:
+				krlCA := s.CA.Marshal()
+				if !bytes.Equal(krlCA, c.config.CertificateAuthority().Marshal()) {
+					return fmt.Errorf("encountered krl certificate section with unexpected CA: %v", krlCA)
+				}
+			default:
+				return fmt.Errorf("encountered unexpected section type in krl: %T", s)
+			}
+		}
 	} else {
-		c.logger.Warn("trusted_ca not set so signature will not be verified")
+		c.logger.Warn("trusted_ca not set so signature and CA of krl will not be verified")
 
 		if !c.force && c.out != "" {
 			c.logger.Info("skipping writing krl to output location without force option set", "out", c.out)
