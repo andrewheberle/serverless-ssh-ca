@@ -66,7 +66,7 @@
 		"wrangler:deploy": "wrangler deploy"
 	},
 	"dependencies": {
-		"@andrewheberle/ts-slog": "^1.1.0",
+		"@andrewheberle/ts-slog": "^1.3.0",
 		"@cloudflare/actors": "^0.0.1-beta.6",
 		"chanfana": "^3.0.0",
 		"hono": "^4.10.6",
