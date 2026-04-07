@@ -100,7 +100,14 @@ export const RevocationListEndpointSchema = {
 		"200": {
 			description: "Returns an Open SSH Key Revocation List as BASE64 and an SSHSIG signature for verification",
 			...contentJson(z.object({
-				krl: z.base64()
+				krl: z.stringFormat("byte", (val: string): boolean => {
+					try {
+						atob(val)
+						return true
+					} catch (err) {
+						return false
+					}
+				})
 					.meta({ title: "Key Revocation List" }),
 				signature: z.string()
 			})

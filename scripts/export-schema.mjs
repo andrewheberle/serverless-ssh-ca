@@ -28,7 +28,7 @@ async function waitForSchema(timeoutMs) {
 	return null
 }
 
-const wrangler = spawn('npm', ['run', 'dev'], {
+const wrangler = spawn('npx', ['wrangler', 'dev'], {
 	stdio: 'inherit',
 })
 
