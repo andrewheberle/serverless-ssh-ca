@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,10 +10,9 @@ import (
 
 	"codeberg.org/sdassow/atomic"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/krl"
 	"github.com/andrewheberle/simplecommand"
 	"github.com/bep/simplecobra"
-	"github.com/forfuncsake/krl"
-	"github.com/hiddeco/sshsig"
 )
 
 type krlCommand struct {
@@ -85,39 +83,17 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 		return fmt.Errorf("could not get krl: %w", err)
 	}
 
-	// parse krl
-	c.logger.Debug("parsing krl to ensure its valid")
-	parsedKrl, err := krl.ParseKRL(payload.KeyRevocationList)
-	if err != nil {
-		return fmt.Errorf("problem parsing krl: %w", err)
-	}
-
-	if c.config.TrustedCertificateAuthority != "" {
-		sig, err := sshsig.Unarmor([]byte(payload.Signature))
-		if err != nil {
-			return fmt.Errorf("problem unarmoring signature: %w", err)
-		}
-
-		if err := sshsig.Verify(bytes.NewReader(payload.KeyRevocationList), sig, c.config.CertificateAuthority(), sig.HashAlgorithm, "file"); err != nil {
-			return fmt.Errorf("signature verification failed: %w", err)
-		}
-
-		c.logger.Info("signature verified ok")
-
-		// check that the krl is for our CA
-		for _, section := range parsedKrl.Sections {
-			switch s := section.(type) {
-			case *krl.KRLCertificateSection:
-				krlCA := s.CA.Marshal()
-				if !bytes.Equal(krlCA, c.config.CertificateAuthority().Marshal()) {
-					return fmt.Errorf("encountered krl certificate section with unexpected CA: %v", krlCA)
-				}
-			default:
-				return fmt.Errorf("encountered unexpected section type in krl: %T", s)
-			}
+	if pub := c.config.CertificateAuthority(); pub != nil {
+		if err := payload.VerifyStrict(pub); err != nil {
+			c.logger.Error("verification of krl failed", "error", err)
+			return err
 		}
 	} else {
 		c.logger.Warn("trusted_ca not set so signature and CA of krl will not be verified")
+		if err := payload.Verify(nil); err != nil {
+			c.logger.Error("verification of krl failed", "error", err)
+			return err
+		}
 
 		if !c.force && c.out != "" {
 			c.logger.Info("skipping writing krl to output location without force option set", "out", c.out)
@@ -142,7 +118,7 @@ func (c *krlCommand) getKrlUrl() (string, error) {
 	return url.JoinPath(c.config.CertificateAuthorityURL, "/api/v3/user/krl")
 }
 
-func (c *krlCommand) getKrlPayload() (*krlResponsePayload, error) {
+func (c *krlCommand) getKrlPayload() (*krl.Response, error) {
 	if c.client == nil {
 		c.client = http.DefaultClient
 	}
@@ -161,21 +137,5 @@ func (c *krlCommand) getKrlPayload() (*krlResponsePayload, error) {
 		return nil, fmt.Errorf("bad status code for KRL: %d", res.StatusCode)
 	}
 
-	var payload krlResponsePayload
-
-	// set up decoder
-	dec := json.NewDecoder(res.Body)
-	dec.DisallowUnknownFields()
-
-	// decode json
-	if err := dec.Decode(&payload); err != nil {
-		return nil, err
-	}
-
-	return &payload, nil
-}
-
-type krlResponsePayload struct {
-	KeyRevocationList []byte `json:"krl"`
-	Signature         string `json:"signature"`
+	return krl.Read(res.Body)
 }

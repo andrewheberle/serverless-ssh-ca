@@ -88,7 +88,7 @@ function caKeyWireBytes(caKey: PrivateKey): Uint8Array {
 
 const SSHSIG_MAGIC = new TextEncoder().encode("SSHSIG")
 const SIG_VERSION = 1
-const NAMESPACE = "file"
+const NAMESPACE = "krl@com.github.serverless-ssh-ca.andrewheberle"
 const HASH_ALGORITHM = "sha512"
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -242,13 +242,13 @@ export class KRLBuilder {
     /**
      * Add certificate serial numbers to be revoked.
      * May be called multiple times all serials are merged into one section.
-     * 
+     *
      * This must not be called after generate() has been called
      */
     addSerials(serials: bigint[]): this {
-        if (this._krl !== null) { 
+        if (this._krl !== null) {
             throw new Error("addSerials cannot be called after KRL has been generated")
-        } 
+        }
         this._serials.push(...serials)
         return this
     }
@@ -256,11 +256,11 @@ export class KRLBuilder {
     /**
      * Add certificate key ID strings to be revoked.
      * May be called multiple times all key IDs are merged into one section.
-     * 
+     *
      * This must not be called after generate() has been called
      */
     addKeyIds(keyIds: string[]): this {
-        if (this._krl !== null) { 
+        if (this._krl !== null) {
             throw new Error("addKeyIds cannot be called after KRL has been generated")
         }
         this._keyIds.push(...keyIds)
@@ -341,7 +341,7 @@ export class KRLBuilder {
 
     /**
      * Return the SSHSIG signature of the KRL.
-     * 
+     *
      * This must be called after generate()
      *
      * The returned string can be verified with ssh-keygen:
@@ -356,12 +356,12 @@ export class KRLBuilder {
             krl = this._krl
         }
         const { cryptoKey, sigAlgo, webCryptoAlgo } = await importPrivateKey(this._caKey)
-    
+
         // 1. Hash the KRL bytes with SHA-512.
         const krlHash = new Uint8Array(
             await crypto.subtle.digest("SHA-512", krl),
         )
-    
+
         // 2. Build the signed data blob.
         //
         //   byte[6]  "SSHSIG"
@@ -376,18 +376,18 @@ export class KRLBuilder {
             encodeString(HASH_ALGORITHM),
             encodeString(krlHash),
         )
-    
+
         // 3. Sign the blob.
         const rawSig = new Uint8Array(
             await crypto.subtle.sign(webCryptoAlgo, cryptoKey, signedData),
         )
-    
+
         // 4. Encode the signature into SSH wire format.
         const sshSig =
             sigAlgo === "ssh-ed25519"
                 ? wrapEd25519Sig(rawSig)
                 : p1363ToSshEcdsaSig(rawSig, sigAlgo)
-    
+
         // 5. Assemble the outer SSHSIG blob.
         //
         //   byte[6]  "SSHSIG"
@@ -407,7 +407,7 @@ export class KRLBuilder {
             encodeString(HASH_ALGORITHM),
             encodeString(sshSig),
         )
-    
+
         // 6. Armor and return.
         return armorSignature(sigBlob)
     }
