@@ -312,7 +312,9 @@ permissions must be used to prevent unauthorised access.
 
 ### SSH Endpoints
 
-For systems to allow SSH login using certiifcates the following configuration
+#### Host Configuration
+
+For systems to allow SSH login using certificates the following configuration
 changes must be made:
 
 ```ssh
@@ -343,6 +345,32 @@ as the SSH user `admin` for the bearer of an issued (and valid) certificate:
 ```
 ssh-admin
 ```
+
+#### Client Configuration
+
+In order for a client to trust a certificate presented by a host the following
+configuration must be added to `/etc/ssh/ssh_known_hosts` (system wide) or
+`~/.ssh/known_hosts` (user specific):
+
+```
+@cert-authority *.example.com ecdsa-sha2-nistp256 ....
+```
+
+The format of the above file is documented in the `ssh(1)` man page however
+the important items of note is the `*.example.com` above tells `ssh` that the
+CA public key (ie `ecdsa-sha2-nistp256 ....`) is trusted for all hosts, that
+match `*.example.com`.
+
+This will need adjusting depending on your environment along with the actual
+SSH CA public key which can be retrieved as follows:
+
+```sh
+curl https://ssh-ca.example.com/api/v3/ca
+```
+
+Once the above configuration is completed and host certificates are in place
+clients will not require "trust on first use" (TOFU) as the certificate will be
+verified as being signed by the configured SSH CA.
 
 # Attributions
 
