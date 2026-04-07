@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/krl"
 )
 
 func Test_krlCommand_getKrlUrl(t *testing.T) {
@@ -45,6 +46,13 @@ type mockClient struct {
 }
 
 func (m *mockClient) Get(url string) (*http.Response, error) {
+	if url != "https://ssh.example.com/api/v3/host/krl" {
+		return &http.Response{
+			StatusCode: 404,
+			Body:       &mockBody{r: bytes.NewReader(make([]byte, 0))},
+		}, nil
+	}
+
 	return &http.Response{
 		StatusCode: 200,
 		Body:       &mockBody{r: bytes.NewReader(m.res)},
@@ -67,12 +75,22 @@ func Test_krlCommand_getKrlPayload(t *testing.T) {
 	tests := []struct {
 		name    string
 		c       *krlCommand
-		want    *krlResponsePayload
+		want    *krl.Response
 		wantErr bool
 	}{
+		{"bad URL",
+			&krlCommand{
+				krlUrl: "https://ssh.example.com/api/v3/host/missing",
+				client: &mockClient{
+					res: []byte("invalid"),
+				},
+			},
+			nil,
+			true,
+		},
 		{"invalid response",
 			&krlCommand{
-				krlUrl: "https://ssh.example.com/api/v4/host/krl",
+				krlUrl: "https://ssh.example.com/api/v3/host/krl",
 				client: &mockClient{
 					res: []byte("invalid"),
 				},
@@ -82,7 +100,7 @@ func Test_krlCommand_getKrlPayload(t *testing.T) {
 		},
 		{"empty response",
 			&krlCommand{
-				krlUrl: "https://ssh.example.com/api/v4/host/krl",
+				krlUrl: "https://ssh.example.com/api/v3/host/krl",
 				client: &mockClient{
 					res: make([]byte, 0),
 				},
@@ -92,20 +110,20 @@ func Test_krlCommand_getKrlPayload(t *testing.T) {
 		},
 		{"empty but valid json",
 			&krlCommand{
-				krlUrl: "https://ssh.example.com/api/v4/host/krl",
+				krlUrl: "https://ssh.example.com/api/v3/host/krl",
 				client: &mockClient{
 					res: []byte("{}"),
 				},
 			},
-			&krlResponsePayload{},
+			&krl.Response{},
 			false,
 		},
 		{"has valid response",
 			&krlCommand{
-				krlUrl: "https://ssh.example.com/api/v4/host/krl",
+				krlUrl: "https://ssh.example.com/api/v3/host/krl",
 				client: &mockClient{
 					res: []byte("{\"krl\":\"dGhla3JsYXNiYXNlNjQ=\", \"signature\":\"sshsig\"}")}},
-			&krlResponsePayload{
+			&krl.Response{
 				KeyRevocationList: []byte("thekrlasbase64"),
 				Signature:         "sshsig",
 			},
@@ -113,7 +131,7 @@ func Test_krlCommand_getKrlPayload(t *testing.T) {
 		},
 		{"has valid response with extra field",
 			&krlCommand{
-				krlUrl: "https://ssh.example.com/api/v4/host/krl",
+				krlUrl: "https://ssh.example.com/api/v3/host/krl",
 				client: &mockClient{
 					res: []byte("{\"krl\":\"dGhla3JsYXNiYXNlNjQ=\", \"signature\":\"sshsig\", \"extrafield\":\"shouldcauseerror\"}")}},
 			nil,
