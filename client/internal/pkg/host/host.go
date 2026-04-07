@@ -23,6 +23,7 @@ import (
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
+	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/proof"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -590,7 +591,12 @@ func (lh *LoginHandler) getPublicKeyBytes(key ssh.Signer) ([]byte, error) {
 }
 
 func (lh *LoginHandler) generateProofOfPossession(key ssh.Signer) (string, error) {
-	return client.GenerateProofOfPossession(key)
+	proof, err := proof.Generate(key)
+	if err != nil {
+		return "", err
+	}
+
+	return proof.String(), err
 }
 
 func generatePKCE() (string, string) {

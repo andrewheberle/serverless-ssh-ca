@@ -16,12 +16,12 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
+	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/proof"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
@@ -29,8 +29,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/hiddeco/sshsig"
-	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
 
@@ -552,7 +550,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		PublicKey: base64.StdEncoding.EncodeToString(publicKey),
 		Lifetime:  &lifetime,
 		Identity:  id,
-		Proof:     proof,
+		Proof:     proof.String(),
 	}
 	if err := enc.Encode(payload); err != nil {
 		return nil, err
@@ -625,35 +623,13 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	return &csr, nil
 }
 
-func (lh *LoginHandler) generateProofOfPossession() (string, error) {
+func (lh *LoginHandler) generateProofOfPossession() (*proof.Proof, error) {
 	signer, err := lh.config.Signer()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return GenerateProofOfPossession(signer)
-}
-
-func GenerateProofOfPossession(signer ssh.Signer) (string, error) {
-	// generate data to sign
-	timestamp := time.Now().UnixMilli()
-	fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
-	dataToSign := []string{
-		fmt.Sprintf("%d", timestamp),
-		fingerprint,
-	}
-
-	// sign data and add to end
-	data := []byte(strings.Join(dataToSign, "."))
-	sig, err := sshsig.Sign(bytes.NewReader(data), signer, sshsig.HashSHA512, "file")
-	if err != nil {
-		return "", err
-	}
-	armoredSignature := sshsig.Armor(sig)
-	signedData := append(dataToSign, base64.StdEncoding.EncodeToString(armoredSignature))
-
-	// return encoded data
-	return strings.Join(signedData, "."), nil
+	return proof.Generate(signer)
 }
 
 // ExecuteLogin performs [*LoginHandler.Start()], attempts to open the users
