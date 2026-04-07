@@ -2,6 +2,7 @@ package krl_test
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -72,20 +73,20 @@ func TestReadAndVerify(t *testing.T) {
 		strict        bool
 		wantVerifyErr bool
 	}{
-		{"invalid data", []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}, "", &krl.Response{KeyRevocationList: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}, Signature: ""}, false, nil, false, true},
-		{"empty krl", emptykrl, "", &krl.Response{KeyRevocationList: emptykrl, Signature: ""}, false, nil, false, false},
-		{"krl with one serial", singleitemkrl, "", &krl.Response{KeyRevocationList: singleitemkrl, Signature: ""}, false, nil, false, false},
-		{"empty krl (strict no signature)", emptykrl, "", &krl.Response{KeyRevocationList: emptykrl, Signature: ""}, false, nil, true, true},
-		{"krl with one serial (strict no signature)", singleitemkrl, "", &krl.Response{KeyRevocationList: singleitemkrl, Signature: ""}, false, nil, true, true},
-		{"empty krl (strict with signature)", emptykrl, emptykrlSignature, &krl.Response{KeyRevocationList: emptykrl, Signature: emptykrlSignature}, false, pub, true, false},
-		{"krl with one serial (strict with signature)", singleitemkrl, singleitemkrlSignature, &krl.Response{KeyRevocationList: singleitemkrl, Signature: singleitemkrlSignature}, false, pub, true, false},
-		{"krl with one serial (strict with signature and alt ca)", singleitemkrl, singleitemkrlSignature, &krl.Response{KeyRevocationList: singleitemkrl, Signature: singleitemkrlSignature}, false, altpub, true, true},
-		{"krl with one serial (strict with invalid signature)", singleitemkrl, emptykrlSignature, &krl.Response{KeyRevocationList: singleitemkrl, Signature: emptykrlSignature}, false, pub, true, true},
+		{"invalid data", []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}, "", &krl.Response{Krl: base64.StdEncoding.EncodeToString([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0}), Signature: ""}, false, nil, false, true},
+		{"empty krl", emptykrl, "", &krl.Response{Krl: base64.StdEncoding.EncodeToString(emptykrl), Signature: ""}, false, nil, false, false},
+		{"krl with one serial", singleitemkrl, "", &krl.Response{Krl: base64.StdEncoding.EncodeToString(singleitemkrl), Signature: ""}, false, nil, false, false},
+		{"empty krl (strict no signature)", emptykrl, "", &krl.Response{Krl: base64.StdEncoding.EncodeToString(emptykrl), Signature: ""}, false, nil, true, true},
+		{"krl with one serial (strict no signature)", singleitemkrl, "", &krl.Response{Krl: base64.StdEncoding.EncodeToString(singleitemkrl), Signature: ""}, false, nil, true, true},
+		{"empty krl (strict with signature)", emptykrl, emptykrlSignature, &krl.Response{Krl: base64.StdEncoding.EncodeToString(emptykrl), Signature: emptykrlSignature}, false, pub, true, false},
+		{"krl with one serial (strict with signature)", singleitemkrl, singleitemkrlSignature, &krl.Response{Krl: base64.StdEncoding.EncodeToString(singleitemkrl), Signature: singleitemkrlSignature}, false, pub, true, false},
+		{"krl with one serial (strict with signature and alt ca)", singleitemkrl, singleitemkrlSignature, &krl.Response{Krl: base64.StdEncoding.EncodeToString(singleitemkrl), Signature: singleitemkrlSignature}, false, altpub, true, true},
+		{"krl with one serial (strict with invalid signature)", singleitemkrl, emptykrlSignature, &krl.Response{Krl: base64.StdEncoding.EncodeToString(singleitemkrl), Signature: emptykrlSignature}, false, pub, true, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := json.Marshal(krl.Response{KeyRevocationList: tt.krldata, Signature: tt.signature})
+			b, err := json.Marshal(krl.Response{Krl: base64.StdEncoding.EncodeToString(tt.krldata), Signature: tt.signature})
 			if err != nil {
 				t.Fatalf("json.Marshal() failed: %s", err)
 			}

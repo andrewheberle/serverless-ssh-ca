@@ -7,6 +7,69 @@ const (
 	OidcAuthScopes = "oidcAuth.Scopes"
 )
 
+// CertificateResponse defines model for Certificate Response.
+type CertificateResponse struct {
+	Certificate string `json:"certificate"`
+}
+
+// HostCertificateRenew defines model for Host Certificate Renew.
+type HostCertificateRenew struct {
+	// Certificate SSH certificate to renew
+	Certificate string `json:"certificate"`
+
+	// Lifetime Lifetime of renewed Host SSH certificate
+	Lifetime *int `json:"lifetime,omitempty"`
+
+	// Proof Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}
+	Proof string `json:"proof"`
+
+	// PublicKey SSH public key of certificate to be renewed
+	PublicKey string `json:"public_key"`
+}
+
+// HostCertificateRequest defines model for Host Certificate Request.
+type HostCertificateRequest struct {
+	// Identity Identity Token JWT from OIDC IdP
+	Identity string `json:"identity"`
+
+	// Lifetime Lifetime of issued Host SSH certificate
+	Lifetime *int `json:"lifetime,omitempty"`
+
+	// Principals List of principals to include on the issued certificate
+	Principals []string `json:"principals"`
+
+	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}
+	Proof string `json:"proof"`
+
+	// PublicKey SSH public key to sign
+	PublicKey string `json:"public_key"`
+}
+
+// KeyRevocationListResponse defines model for Key Revocation List Response.
+type KeyRevocationListResponse struct {
+	// Krl Key Revocation List
+	Krl       string `json:"krl"`
+	Signature string `json:"signature"`
+}
+
+// UserCertificateRequest defines model for User Certificate Request.
+type UserCertificateRequest struct {
+	// Extensions Extensions to include in the issued SSH certificate
+	Extensions *[]string `json:"extensions,omitempty"`
+
+	// Identity Identity Token JWT from OIDC IdP
+	Identity string `json:"identity"`
+
+	// Lifetime Lifetime of issued SSH certificate
+	Lifetime *int `json:"lifetime,omitempty"`
+
+	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}
+	Proof string `json:"proof"`
+
+	// PublicKey SSH public key to sign
+	PublicKey string `json:"public_key"`
+}
+
 // PostCertificateRequestEndpointV2JSONBody defines parameters for PostCertificateRequestEndpointV2.
 type PostCertificateRequestEndpointV2JSONBody struct {
 	// Extensions Extensions to include in issued SSH certificate in seconds
@@ -67,61 +130,10 @@ type PostHostCertificateRequestEndpointV2Params struct {
 	Authorization string `json:"Authorization"`
 }
 
-// PostHostCertificateRequestEndpointJSONBody defines parameters for PostHostCertificateRequestEndpoint.
-type PostHostCertificateRequestEndpointJSONBody struct {
-	// Identity Identity Token JWT from OIDC IdP
-	Identity string `json:"identity"`
-
-	// Lifetime Lifetime of issued Host SSH certificate
-	Lifetime *int `json:"lifetime,omitempty"`
-
-	// Principals List of principals to include on the issued certificate
-	Principals []string `json:"principals"`
-
-	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}
-	Proof string `json:"proof"`
-
-	// PublicKey SSH public key to sign
-	PublicKey string `json:"public_key"`
-}
-
 // PostHostCertificateRequestEndpointParams defines parameters for PostHostCertificateRequestEndpoint.
 type PostHostCertificateRequestEndpointParams struct {
 	// Authorization Access Token JWT from OIDC IdP
 	Authorization string `json:"Authorization"`
-}
-
-// PostHostCertificateRenewEndpointJSONBody defines parameters for PostHostCertificateRenewEndpoint.
-type PostHostCertificateRenewEndpointJSONBody struct {
-	// Certificate SSH certificate to renew
-	Certificate string `json:"certificate"`
-
-	// Lifetime Lifetime of renewed Host SSH certificate
-	Lifetime *int `json:"lifetime,omitempty"`
-
-	// Proof Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}
-	Proof string `json:"proof"`
-
-	// PublicKey SSH public key of certificate to be renewed
-	PublicKey string `json:"public_key"`
-}
-
-// PostUserCertificateRequestEndpointJSONBody defines parameters for PostUserCertificateRequestEndpoint.
-type PostUserCertificateRequestEndpointJSONBody struct {
-	// Extensions Extensions to include in the issued SSH certificate
-	Extensions *[]string `json:"extensions,omitempty"`
-
-	// Identity Identity Token JWT from OIDC IdP
-	Identity string `json:"identity"`
-
-	// Lifetime Lifetime of issued SSH certificate
-	Lifetime *int `json:"lifetime,omitempty"`
-
-	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}
-	Proof string `json:"proof"`
-
-	// PublicKey SSH public key to sign
-	PublicKey string `json:"public_key"`
 }
 
 // PostUserCertificateRequestEndpointParams defines parameters for PostUserCertificateRequestEndpoint.
@@ -140,10 +152,10 @@ type PostHostCertificateRenewEndpointV2JSONRequestBody PostHostCertificateRenewE
 type PostHostCertificateRequestEndpointV2JSONRequestBody PostHostCertificateRequestEndpointV2JSONBody
 
 // PostHostCertificateRequestEndpointJSONRequestBody defines body for PostHostCertificateRequestEndpoint for application/json ContentType.
-type PostHostCertificateRequestEndpointJSONRequestBody PostHostCertificateRequestEndpointJSONBody
+type PostHostCertificateRequestEndpointJSONRequestBody = HostCertificateRequest
 
 // PostHostCertificateRenewEndpointJSONRequestBody defines body for PostHostCertificateRenewEndpoint for application/json ContentType.
-type PostHostCertificateRenewEndpointJSONRequestBody PostHostCertificateRenewEndpointJSONBody
+type PostHostCertificateRenewEndpointJSONRequestBody = HostCertificateRenew
 
 // PostUserCertificateRequestEndpointJSONRequestBody defines body for PostUserCertificateRequestEndpoint for application/json ContentType.
-type PostUserCertificateRequestEndpointJSONRequestBody PostUserCertificateRequestEndpointJSONBody
+type PostUserCertificateRequestEndpointJSONRequestBody = UserCertificateRequest

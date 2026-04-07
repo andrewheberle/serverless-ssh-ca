@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/base64"
 	"net/http"
 	"reflect"
 	"testing"
@@ -124,8 +125,8 @@ func Test_krlCommand_getKrlPayload(t *testing.T) {
 				client: &mockClient{
 					res: []byte("{\"krl\":\"dGhla3JsYXNiYXNlNjQ=\", \"signature\":\"sshsig\"}")}},
 			&krl.Response{
-				KeyRevocationList: []byte("thekrlasbase64"),
-				Signature:         "sshsig",
+				Krl:       base64.StdEncoding.EncodeToString([]byte("thekrlasbase64")),
+				Signature: "sshsig",
 			},
 			false,
 		},
