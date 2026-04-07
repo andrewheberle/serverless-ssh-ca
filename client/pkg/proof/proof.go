@@ -14,7 +14,10 @@ import (
 )
 
 type Proof struct {
-	data string
+	timestamp   int64
+	fingerprint string
+	signature   *sshsig.Signature
+	data        []byte
 }
 
 // The namespace used for signing the proof
@@ -34,32 +37,30 @@ func Generate(signer ssh.Signer) (*Proof, error) {
 	// generate data to sign
 	timestamp := getTimestamp()
 	fingerprint := ssh.FingerprintSHA256(signer.PublicKey())
-	dataToSign := []string{
-		fmt.Sprintf("%d", timestamp),
-		fingerprint,
-	}
+	data := data(timestamp, fingerprint)
 
-	// sign data and add to end
-	data := []byte(strings.Join(dataToSign, "."))
+	// generate signature of data
 	sig, err := sshsig.Sign(bytes.NewReader(data), signer, sshsig.HashSHA512, Namespace)
 	if err != nil {
 		return nil, err
 	}
-	armoredSignature := sshsig.Armor(sig)
-	signedData := append(dataToSign, base64.StdEncoding.EncodeToString(armoredSignature))
 
 	// return encoded data
-	return &Proof{data: strings.Join(signedData, ".")}, nil
+	return &Proof{timestamp: timestamp, fingerprint: fingerprint, signature: sig, data: data}, nil
 }
 
 // Parse takes a proof string and validates it is in the expected format, returning a Proof struct if valid.
 func Parse(proof string) (Proof, error) {
-	_, _, _, err := parse(proof)
+	timestamp, fingerprint, signature, err := parse(proof)
 	if err != nil {
 		return Proof{}, fmt.Errorf("invalid proof format: %v", err)
 	}
 
-	return Proof{data: proof}, nil
+	return Proof{timestamp: timestamp, fingerprint: fingerprint, signature: signature, data: data(timestamp, fingerprint)}, nil
+}
+
+func data(timestamp int64, fingerprint string) []byte {
+	return fmt.Appendf(nil, "%d.%s", timestamp, fingerprint)
 }
 
 func parse(proof string) (timestamp int64, fingerprint string, signature *sshsig.Signature, err error) {
@@ -94,13 +95,8 @@ func parse(proof string) (timestamp int64, fingerprint string, signature *sshsig
 
 // Verify checks the proof is valid by verifying the signature and that the timestamp is within the allowed range.
 func (p Proof) Verify(pub ssh.PublicKey, allowedrange time.Duration) error {
-	timestamp, fingerprint, signature, err := parse(p.data)
-	if err != nil {
-		return err
-	}
-
 	// verify timestamp is within allowed range (this is to prevent replay attacks, but allows for some clock skew between client and server)
-	proofTime := time.UnixMilli(timestamp)
+	proofTime := time.UnixMilli(p.timestamp)
 	now := getTimestamp()
 	if proofTime.Before(time.UnixMilli(now).Add(-allowedrange)) || proofTime.After(time.UnixMilli(now).Add(allowedrange)) {
 		return fmt.Errorf("proof timestamp is outside of allowed time range")
@@ -108,13 +104,13 @@ func (p Proof) Verify(pub ssh.PublicKey, allowedrange time.Duration) error {
 
 	// verify fingerprint matches signer
 	expectedFingerprint := ssh.FingerprintSHA256(pub)
-	if fingerprint != expectedFingerprint {
-		return fmt.Errorf("proof fingerprint did not match (expected fingerprint %s, got %s)", expectedFingerprint, fingerprint)
+	if p.fingerprint != expectedFingerprint {
+		return fmt.Errorf("proof fingerprint did not match (expected fingerprint %s, got %s)", expectedFingerprint, p.fingerprint)
 	}
 
 	// verify signature
-	data := fmt.Appendf(nil, "%d.%s", timestamp, fingerprint)
-	if err := sshsig.Verify(bytes.NewReader(data), signature, pub, sshsig.HashSHA512, Namespace); err != nil {
+	data := data(p.timestamp, p.fingerprint)
+	if err := sshsig.Verify(bytes.NewReader(data), p.signature, pub, sshsig.HashSHA512, Namespace); err != nil {
 		return fmt.Errorf("signature did not verify: %v", err)
 	}
 
@@ -126,7 +122,7 @@ var _ fmt.Stringer = Proof{}
 
 // String returns the proof data as a string
 func (p Proof) String() string {
-	return p.data
+	return fmt.Sprintf("%d.%s.%s", p.timestamp, p.fingerprint, base64.StdEncoding.EncodeToString(sshsig.Armor(p.signature)))
 }
 
 // Ensure Proof implements json.Marshaler interface
@@ -134,5 +130,5 @@ var _ json.Marshaler = &Proof{}
 
 // MarshalJSON returns the proof data as a JSON string
 func (p Proof) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.data)
+	return json.Marshal(p.String())
 }

@@ -3,6 +3,7 @@ import {
 	adminSecretsStore,
 	createExecutionContext,
 	waitOnExecutionContext,
+	// @ts-ignore: this import errors but is fine in tests
 } from "cloudflare:test"
 import { describe, it, expect } from "vitest"
 import worker from "../src"

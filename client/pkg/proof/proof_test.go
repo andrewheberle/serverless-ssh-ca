@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -163,6 +164,119 @@ func TestParse(t *testing.T) {
 			// This tests error conditions so should never be equal
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Parse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProof_String(t *testing.T) {
+	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	ecdsaSigner, err := ssh.NewSignerFromKey(ecdsaKey)
+	if err != nil {
+		panic(err)
+	}
+
+	getTimestamp = func() int64 {
+		return 12345
+	}
+
+	proof, err := Generate(ecdsaSigner)
+	if err != nil {
+		panic(err)
+	}
+	tests := []struct {
+		name  string
+		proof Proof
+	}{
+		{"just expect three parts", *proof},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.proof.String()
+			parts := strings.Split(got, ".")
+			if len(parts) != 3 {
+				t.Fatalf("Proof.String() did not have three parts: %v", got)
+			}
+			if parts[0] != "12345" {
+				t.Errorf("Proof.String() timestamp part was not expected: %v", parts[0])
+			}
+			if parts[1] != ssh.FingerprintSHA256(ecdsaSigner.PublicKey()) {
+				t.Errorf("Proof.String() fingerprint part was not expected: %v", parts[1])
+			}
+			signature, err := base64.StdEncoding.DecodeString(parts[2])
+			if err != nil {
+				t.Errorf("Proof.String() signature part was not valid base64: %v", err)
+			}
+			if _, err := sshsig.Unarmor(signature); err != nil {
+				t.Errorf("Proof.String() signature part was not a valid armored signature: %v", err)
+			}
+		})
+	}
+}
+
+func TestProof_MarshalJSON(t *testing.T) {
+	ecdsaKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	ecdsaSigner, err := ssh.NewSignerFromKey(ecdsaKey)
+	if err != nil {
+		panic(err)
+	}
+
+	getTimestamp = func() int64 {
+		return 12345
+	}
+
+	proof, err := Generate(ecdsaSigner)
+	if err != nil {
+		panic(err)
+	}
+
+	tests := []struct {
+		name    string
+		proof   Proof
+		wantErr bool
+		want    []byte
+	}{
+		{"as JSON", *proof, false, fmt.Appendf(nil, "%d.%s.%s", proof.timestamp, proof.fingerprint, base64.StdEncoding.EncodeToString(sshsig.Armor(proof.signature)))},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := tt.proof.MarshalJSON()
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("MarshalJSON() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("MarshalJSON() succeeded unexpectedly")
+			}
+
+			// unmarshal the JSON output and check it has the expected format and values
+			var unmarshaled string
+			if err := json.Unmarshal(got, &unmarshaled); err != nil {
+				t.Fatalf("Failed to unmarshal MarshalJSON() output: %v", err)
+			}
+			if unmarshaled != string(tt.want) {
+				t.Errorf("MarshalJSON() output did not match expected: got %s, want %s", unmarshaled, string(tt.want))
+			}
+			timestamp, fingerprint, signature, err := parse(unmarshaled)
+			if err != nil {
+				t.Errorf("Failed to parse MarshalJSON() output: %v", err)
+			}
+			if timestamp != tt.proof.timestamp {
+				t.Errorf("MarshalJSON() timestamp did not match expected: got %d, want %d", timestamp, tt.proof.timestamp)
+			}
+			if fingerprint != tt.proof.fingerprint {
+				t.Errorf("MarshalJSON() fingerprint did not match expected: got %s, want %s", fingerprint, tt.proof.fingerprint)
+			}
+			if !bytes.Equal(signature.Signature.Blob, tt.proof.signature.Signature.Blob) || signature.Signature.Format != tt.proof.signature.Signature.Format {
+				t.Errorf("MarshalJSON() signature did not match expected")
 			}
 		})
 	}
