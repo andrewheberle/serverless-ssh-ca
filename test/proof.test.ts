@@ -8,6 +8,7 @@ type testSig = {
     data: string
     from: number
     want: boolean
+	namespace?: string
     wantErr?: string
     matches?: string[]
     wantMatches?: boolean
@@ -35,6 +36,14 @@ const tests: testSig[] = [
         from: 1765696790000,
         want: true
     },
+	{
+        name: "should fail verification due to namespace mismatch",
+        sig: "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFETUFBQUFMYzNOb0xXVmtNalUxTVRrQUFBQWdselE4SWpOeHVLMG0wOGdBcHdUUgpMUkVxUlFOSnVYZGRMek1OWHh2OUZ3WUFBQUFFWm1sc1pRQUFBQUFBQUFBR2MyaGhOVEV5QUFBQVV3QUFBQXR6CmMyZ3RaV1F5TlRVeE9RQUFBRUFRd0RKRWowNzRnekYyT2k4NkRUbllGV1BmZGc1aVQxWnRTaXoxdWYxQ0k1anAKVVVORU56b09iVmJmNjZsRlFac3hBRS9OMm5yWXJjTTQrQWNMQm80TgotLS0tLUVORCBTU0ggU0lHTkFUVVJFLS0tLS0K",
+        data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg",
+        from: 1765696790000,
+        want: false,
+		namespace: "some-other-namespace"
+    },
     {
         name: "should error due to old timestamp",
         sig: "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFETUFBQUFMYzNOb0xXVmtNalUxTVRrQUFBQWdselE4SWpOeHVLMG0wOGdBcHdUUgpMUkVxUlFOSnVYZGRMek1OWHh2OUZ3WUFBQUFFWm1sc1pRQUFBQUFBQUFBR2MyaGhOVEV5QUFBQVV3QUFBQXR6CmMyZ3RaV1F5TlRVeE9RQUFBRUFRd0RKRWowNzRnekYyT2k4NkRUbllGV1BmZGc1aVQxWnRTaXoxdWYxQ0k1anAKVVVORU56b09iVmJmNjZsRlFac3hBRS9OMm5yWXJjTTQrQWNMQm80TgotLS0tLUVORCBTU0ggU0lHTkFUVVJFLS0tLS0K",
@@ -58,6 +67,7 @@ const tests: testSig[] = [
         from: 1765699990000,
         wantErr: "timestamp was not a number",
         want: true
+
     },
     {
         name: "should error due to extra data",
@@ -65,7 +75,7 @@ const tests: testSig[] = [
         data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg.extra",
         from: 1765699990000,
         wantErr: "invalid proof of possession format",
-        want: true
+        want: false
     },
     {
         name: "should error due to invalid fingerprint",
@@ -73,7 +83,7 @@ const tests: testSig[] = [
         data: "1765696780805.invalid",
         from: 1765696790000,
         wantErr: "fingerprint was an invalid format",
-        want: true
+        want: false
     },
     {
         name: "should fail verify due to bad signature",
@@ -98,7 +108,7 @@ describe("ProofOfPossession", async () => {
 
                 // verify timestamp and signature
                 expect(nonce.timestamp).toBe(timestamp)
-                expect(await nonce.verify()).toBe(tt.want)
+                expect(await nonce.verify(tt.namespace)).toBe(tt.want)
 
                 // check matches for keys
                 if (tt.matches !== undefined) {

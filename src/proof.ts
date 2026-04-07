@@ -5,6 +5,8 @@ import { verify } from "./sshsig"
 import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
 
+const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
+
 export class PossessionParseError extends Error {
     constructor(message: string, cause?: unknown) {
         super(message)
@@ -17,13 +19,18 @@ export class PossessionParseError extends Error {
 }
 
 /**
- * ProofOfPossession is used to check/enforce proof of possession for a SSH private key.
+ * ProofOfPossession is used to check/enforce proof of possession for a SSH
+ * private key.
  *
- * This is used to verify that the requester of a certificate actually possesses the private key corresponding to the public key in the certificate request.
+ * This is used to verify that the requester of a certificate actually
+ * possesses the private key corresponding to the public key in the certificate
+ * request.
  *
- * The proof of possession is a signed message containing a timestamp and the fingerprint of the public key.
+ * The proof of possession is a signed message containing a timestamp and the
+ * fingerprint of the public key.
  *
- * The signature is made with the private key corresponding to the public key in the certificate request and is a BASE64 encoded SSHSIG signature.
+ * The signature is made with the private key corresponding to the public key
+ * in the certificate request and is a BASE64 encoded SSHSIG signature.
  */
 export class ProofOfPossession {
     readonly timestamp: number
@@ -91,11 +98,11 @@ export class ProofOfPossession {
 
     /**
      *
-     * @returns
+     * @returns true if signature is valid, false otherwise
      */
-    async verify(): Promise<boolean> {
+    async verify(namespace?: string): Promise<boolean> {
         try {
-            return await verify(this.signature, this.data)
+            return await verify(this.signature, this.data, { namespace: namespace })
         } catch (err) {
             return false
         }
@@ -104,7 +111,7 @@ export class ProofOfPossession {
     /**
      *
      * @param keys array of keys to verify finterprint against
-     * @returns
+     * @returns true if the proof of possession fingerprint matches any of the provided keys, false otherwise
      */
     matches(key: Key): boolean
     matches(...keys: Key[]): boolean
