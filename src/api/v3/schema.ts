@@ -66,7 +66,7 @@ const HeaderSchema = z.object({
 })
 
 const certificate = openapiStringByte
-	.meta({ description: "Issue Certificate" })
+	.meta({ description: "Issued Certificate" })
 
 export const CaPublicKeyEndpointSchema = {
 	responses: {
