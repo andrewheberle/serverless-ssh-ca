@@ -20,27 +20,53 @@ import {
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 
-const openapiStringByte = z.base64().openapi({ format: "byte" })
+const openapiStringByte = z.base64()
+	.transform((v) => {
+		const a = z.util.base64ToUint8Array(v)
+		return Buffer.from(
+			a.buffer,
+			a.byteOffset,
+			a.length
+		)
+	})
+	.openapi({ format: "byte" })
 
 const proofOfPossession = z.string()
-	.meta({ description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}" })
+	.meta({
+		description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}",
+		example: "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFHZ0FBQUFUWldOa2MyRXRjMmhoTWkxdWFYTjBjREkxTmdBQUFBaHVhWE4wY0RJMQpOZ0FBQUVFRUR6Ymk4OE10alBYSDFCb1JURU9HaS96aEc4QnhQNVZUUW5OQkFNMGZtMExtekErUUZkUlNVYVRFCkdNN2l0QjhINmZNZFAydlAxcElQcGUyOWVLQkJZd0FBQUFSbWFXeGxBQUFBQUFBQUFBWnphR0UxTVRJQUFBQmsKQUFBQUUyVmpaSE5oTFhOb1lUSXRibWx6ZEhBeU5UWUFBQUJKQUFBQUlHdmZVZGNDQkRXa3ZwL0ZHS3NkakgrRQpKZzZXN0EvWUJVZng2Z0srQ01raEFBQUFJUUQxOFd5cDNZejZ0eXNvdllXbEJHTXprRnlYbFRrSHM5blVVRXJqCkczNWVPQT09Ci0tLS0tRU5EIFNTSCBTSUdOQVRVUkUtLS0tLQo="
+	})
 
 const publicKey = openapiStringByte
 	.transform(transformPublicKey)
-	.meta({ description: "SSH public key to sign" })
+	.meta({
+		description: "SSH public key to sign",
+		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
+	})
 
 const identityToken = z.string()
-	.meta({ description: "Identity Token JWT from OIDC IdP" })
+	.meta({
+		description: "Identity Token JWT from OIDC IdP",
+		example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
+	})
+
+const accessToken = z.string()
+	.meta({
+		description: "Access Token JWT from OIDC IdP",
+		example: "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
+	})
+	.startsWith("Bearer ")
+	.transform(transformAuthorizationHeader)
 
 const krl = openapiStringByte
-	.meta({ title: "Key Revocation List" })
+	.meta({ description: "Key Revocation List" })
 
-export const HeaderSchema = z.object({
-	"Authorization": z.string()
-		.meta({ description: "Access Token JWT from OIDC IdP" })
-		.startsWith("Bearer ")
-		.transform(transformAuthorizationHeader)
+const HeaderSchema = z.object({
+	"Authorization": accessToken
 })
+
+const certificate = openapiStringByte
+	.meta({ description: "Issue Certificate" })
 
 export const CaPublicKeyEndpointSchema = {
 	responses: {
@@ -87,7 +113,7 @@ export const UserCertificateRequestEndpointSchema = {
 		"200": {
 			description: "SSH User Certificate issued successfully",
 			...contentJson(z.object({
-				certificate: z.string(),
+				certificate: certificate,
 			})
 				.openapi("Certificate Response")
 			)
@@ -150,7 +176,7 @@ export const HostCertificateRequestEndpointSchema = {
 		"200": {
 			description: "SSH Host Certificate issued successfully",
 			...contentJson(z.object({
-				certificate: z.string(),
+				certificate: certificate,
 			})
 				.openapi("Certificate Response")
 			)
