@@ -20,12 +20,23 @@ import {
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 
+const proofOfPossession = z.base64()
+	.openapi({ format: "byte" })
+	.meta({ description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}" })
+
+const publicKey = z.base64()
+	.openapi({ format: "byte" })
+	.transform(transformPublicKey)
+	.meta({ description: "SSH public key to sign" })
+
+const identityToken = z.string()
+	.meta({ description: "Identity Token JWT from OIDC IdP" })
+
 export const HeaderSchema = z.object({
 	"Authorization": z.string()
 		.meta({ description: "Access Token JWT from OIDC IdP" })
 		.startsWith("Bearer ")
 		.transform(transformAuthorizationHeader)
-
 })
 
 export const CaPublicKeyEndpointSchema = {
@@ -52,14 +63,10 @@ export const UserCertificateRequestEndpointSchema = {
 		headers: HeaderSchema,
 		body: contentJson(
 			z.object({
-				public_key: z.base64()
-					.transform(transformPublicKey)
-					.meta({ description: "SSH public key to sign" }),
-				proof: z.string()
-					.transform(transformProofOfPossession)
-					.meta({ description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}" }),
-				identity: z.string()
-					.meta({ description: "Identity Token JWT from OIDC IdP" }),
+				public_key: publicKey,
+				proof: proofOfPossession
+					.transform(transformProofOfPossession),
+				identity: identityToken,
 				extensions: z.array(z.string())
 					.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
 					.meta({ description: "Extensions to include in the issued SSH certificate" }),
@@ -128,14 +135,10 @@ export const HostCertificateRequestEndpointSchema = {
 		headers: HeaderSchema,
 		body: contentJson(
 			z.object({
-				public_key: z.base64()
-					.transform(transformPublicKey)
-					.meta({ description: "SSH public key to sign" }),
-				proof: z.string()
-					.transform(transformHostProofOfPossession)
-					.meta({ description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}" }),
-				identity: z.string()
-					.meta({ description: "Identity Token JWT from OIDC IdP" }),
+				public_key: publicKey,
+				proof: proofOfPossession
+					.transform(transformHostProofOfPossession),
+				identity: identity,
 				principals: z.array(z.string()).min(1)
 					.meta({ description: "List of principals to include on the issued certificate" }),
 				lifetime: z.int()
