@@ -568,7 +568,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 		"public_key", payload.PublicKey,
 		"lifetime", payload.Lifetime,
 		"identity", payload.Identity,
-		"proo", payload.Proof,
+		"proof", payload.Proof,
 	)
 	res, err := client.Post(caCertUrl, "application/json", buf)
 	if err != nil {
