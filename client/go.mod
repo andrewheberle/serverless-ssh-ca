@@ -20,7 +20,7 @@ require (
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.49.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.43.0
 	golang.zx2c4.com/wireguard/windows v0.5.3
 	sigs.k8s.io/yaml v1.6.0
 )
