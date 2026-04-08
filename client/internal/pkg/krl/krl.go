@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
 	sshkrl "github.com/forfuncsake/krl"
 	"github.com/hiddeco/sshsig"
 	"golang.org/x/crypto/ssh"
@@ -14,10 +15,7 @@ import (
 
 const Namespace = "krl@com.github.serverless-ssh-ca.andrewheberle"
 
-type Response struct {
-	KeyRevocationList []byte `json:"krl"`
-	Signature         string `json:"signature"`
-}
+type Response model.KeyRevocationListResponse
 
 var (
 	ErrNoPublicKey       = errors.New("no public key provided for signature verification")
@@ -42,7 +40,7 @@ func Read(reader io.Reader) (*Response, error) {
 
 func (r *Response) VerifyStrict(pub ssh.PublicKey) error {
 	// parse the KRL
-	parsedKrl, err := sshkrl.ParseKRL(r.KeyRevocationList)
+	parsedKrl, err := sshkrl.ParseKRL(r.Krl)
 	if err != nil {
 		return fmt.Errorf("problem parsing krl: %w", err)
 	}
@@ -65,7 +63,7 @@ func (r *Response) VerifyStrict(pub ssh.PublicKey) error {
 		return fmt.Errorf("problem unarmoring signature: %w", err)
 	}
 
-	if err := sshsig.Verify(bytes.NewReader(r.KeyRevocationList), sig, pub, sshsig.HashSHA512, Namespace); err != nil {
+	if err := sshsig.Verify(bytes.NewReader(r.Krl), sig, pub, sshsig.HashSHA512, Namespace); err != nil {
 		return fmt.Errorf("signature verification failed: %w", err)
 	}
 

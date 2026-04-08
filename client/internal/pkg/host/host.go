@@ -540,11 +540,11 @@ func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, 
 	lifetime := int(lh.lifetime.Seconds())
 
 	if lh.renewal {
-		payload := model.PostHostCertificateRenewEndpointJSONBody{
-			PublicKey:   base64.StdEncoding.EncodeToString(publicKey),
+		payload := model.HostCertificateRenew{
+			PublicKey:   publicKey,
 			Lifetime:    &lifetime,
 			Proof:       proof,
-			Certificate: base64.StdEncoding.EncodeToString(cert),
+			Certificate: cert,
 		}
 
 		lh.logger.Debug("certificate request payload",
@@ -558,8 +558,8 @@ func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, 
 		return json.Marshal(payload)
 	}
 
-	payload := model.PostHostCertificateRequestEndpointJSONBody{
-		PublicKey:  base64.StdEncoding.EncodeToString(publicKey),
+	payload := model.HostCertificateRequest{
+		PublicKey:  publicKey,
 		Lifetime:   &lifetime,
 		Proof:      proof,
 		Principals: lh.principals,

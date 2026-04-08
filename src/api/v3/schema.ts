@@ -20,11 +20,26 @@ import {
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 
+const openapiStringByte = z.base64().openapi({ format: "byte" })
+
+const proofOfPossession = z.string()
+	.meta({ description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}" })
+
+const publicKey = openapiStringByte
+	.transform(transformPublicKey)
+	.meta({ description: "SSH public key to sign" })
+
+const identityToken = z.string()
+	.meta({ description: "Identity Token JWT from OIDC IdP" })
+
+const krl = openapiStringByte
+	.meta({ title: "Key Revocation List" })
+
 export const HeaderSchema = z.object({
 	"Authorization": z.string()
+		.meta({ description: "Access Token JWT from OIDC IdP" })
 		.startsWith("Bearer ")
 		.transform(transformAuthorizationHeader)
-		.describe("Access Token JWT from OIDC IdP")
 })
 
 export const CaPublicKeyEndpointSchema = {
@@ -51,24 +66,21 @@ export const UserCertificateRequestEndpointSchema = {
 		headers: HeaderSchema,
 		body: contentJson(
 			z.object({
-				public_key: z.base64()
-					.transform(transformPublicKey)
-					.describe("SSH public key to sign"),
-				proof: z.string()
-					.transform(transformProofOfPossession)
-					.describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
-				identity: z.string()
-					.describe("Identity Token JWT from OIDC IdP"),
+				public_key: publicKey,
+				proof: proofOfPossession
+					.transform(transformProofOfPossession),
+				identity: identityToken,
 				extensions: z.array(z.string())
 					.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
-					.describe("Extensions to include in the issued SSH certificate"),
+					.meta({ description: "Extensions to include in the issued SSH certificate" }),
 				lifetime: z.int()
 					.min(seconds("5 minutes"))
 					.max(seconds(env.SSH_CERTIFICATE_LIFETIME))
 					.default(seconds(env.SSH_CERTIFICATE_LIFETIME))
-					.describe("Lifetime of issued SSH certificate"),
+					.meta({ description: "Lifetime of issued SSH certificate" }),
 			})
 				.superRefine(refineCertificateRequest)
+				.openapi("User Certificate Request")
 		)
 	},
 	responses: {
@@ -76,7 +88,9 @@ export const UserCertificateRequestEndpointSchema = {
 			description: "SSH User Certificate issued successfully",
 			...contentJson(z.object({
 				certificate: z.string(),
-			}))
+			})
+				.openapi("Certificate Response")
+			)
 		},
 		"401": {
 			description: "Access to the endpoint is Unauthorized",
@@ -96,9 +110,11 @@ export const RevocationListEndpointSchema = {
 		"200": {
 			description: "Returns an Open SSH Key Revocation List as BASE64 and an SSHSIG signature for verification",
 			...contentJson(z.object({
-				krl: z.base64(),
+				krl: krl,
 				signature: z.string()
-			}))
+			})
+				.openapi("Key Revocation List Response")
+			)
 		},
 		...InternalServerErrorException.schema(),
 	}
@@ -114,23 +130,20 @@ export const HostCertificateRequestEndpointSchema = {
 		headers: HeaderSchema,
 		body: contentJson(
 			z.object({
-				public_key: z.base64()
-					.transform(transformPublicKey)
-					.describe("SSH public key to sign"),
-				proof: z.string()
-					.transform(transformHostProofOfPossession)
-					.describe("Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}"),
-				identity: z.string()
-					.describe("Identity Token JWT from OIDC IdP"),
+				public_key: publicKey,
+				proof: proofOfPossession
+					.transform(transformHostProofOfPossession),
+				identity: identityToken,
 				principals: z.array(z.string()).min(1)
-					.describe("List of principals to include on the issued certificate"),
+					.meta({ description: "List of principals to include on the issued certificate" }),
 				lifetime: z.int()
 					.min(seconds("24 hours"))
 					.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 					.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-					.describe("Lifetime of issued Host SSH certificate"),
+					.meta({ description: "Lifetime of issued Host SSH certificate" }),
 			})
 				.superRefine(refineHostCertificateRequest)
+				.openapi("Host Certificate Request")
 		)
 	},
 	responses: {
@@ -138,7 +151,9 @@ export const HostCertificateRequestEndpointSchema = {
 			description: "SSH Host Certificate issued successfully",
 			...contentJson(z.object({
 				certificate: z.string(),
-			}))
+			})
+				.openapi("Certificate Response")
+			)
 		},
 		"401": {
 			description: "Access to the endpoint is Unauthorized",
@@ -158,30 +173,30 @@ export const HostCertificateRenewEndpointSchema = {
 	request: {
 		body: contentJson(
 			z.object({
-				certificate: z.base64()
+				certificate: openapiStringByte
 					.transform(transformCertificate)
-					.describe("SSH certificate to renew"),
-				public_key: z.base64()
-					.transform(transformPublicKey)
-					.describe("SSH public key of certificate to be renewed"),
-				proof: z.string()
-					.transform(transformHostProofOfPossession)
-					.describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}"),
+					.meta({ description: "SSH certificate to renew" }),
+				public_key: publicKey,
+				proof: proofOfPossession
+					.transform(transformHostProofOfPossession),
 				lifetime: z.int()
 					.min(seconds("24 hours"))
 					.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 					.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-					.describe("Lifetime of renewed Host SSH certificate"),
+					.meta({ description: "Lifetime of renewed Host SSH certificate" }),
 			})
 				.superRefine(refineHostCertificateRenewal)
+				.openapi("Host Certificate Renew")
 		)
 	},
 	responses: {
 		"200": {
 			description: "SSH Host Certificate renewed successfully",
 			...contentJson(z.object({
-				certificate: z.string(),
-			}))
+				certificate: z.string()
+			})
+				.openapi("Certificate Response")
+			),
 		},
 		"401": {
 			description: "Access to the endpoint is Unauthorized",

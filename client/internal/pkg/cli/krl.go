@@ -104,7 +104,7 @@ func (c *krlCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args [
 
 	if c.out != "" {
 		c.logger.Info("writing krl to output file", "out", c.out)
-		return atomic.WriteFile(c.out, bytes.NewReader(payload.KeyRevocationList), atomic.FileMode(0440))
+		return atomic.WriteFile(c.out, bytes.NewReader([]byte(payload.Krl)), atomic.FileMode(0440))
 	}
 
 	return nil
