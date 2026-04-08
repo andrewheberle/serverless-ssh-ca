@@ -94,28 +94,19 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
     }
 }
 
-export const transformPublicKey = (val: string, ctx: z.RefinementCtx): Key | never => {
+export const transformPublicKey = (val: string | Buffer<ArrayBufferLike>, ctx: z.RefinementCtx): Key | never => {
     try {
-        const decoded = atob(val)
-        const key = parseKey(decoded)
+        const key = typeof val === "string" ? parseKey(Buffer.from(val, "base64")) : parseKey(val)
 
         return key
     } catch (err) {
         switch (true) {
-            case (err instanceof DOMException):
-                if (err.name === "InvalidCharacterError") {
-                    ctx.issues.push({
-                        code: "custom",
-                        message: "not valid base64 encoded data",
-                        input: val
-                    })
-                } else {
-                    ctx.issues.push({
-                        code: "custom",
-                        message: "unhandled error parsing base64 public_key",
-                        input: val
-                    })
-                }
+            case (err instanceof TypeError):
+                ctx.issues.push({
+                    code: "custom",
+                    message: err.message,
+                    input: val
+                })
                 break
             case (err instanceof KeyParseError):
                 ctx.issues.push({
@@ -138,8 +129,8 @@ export const transformPublicKey = (val: string, ctx: z.RefinementCtx): Key | nev
 
 export const identityPrincipals = (payload: CertificateRequestJWTPayload, claim?: string): string[] => {
     if (claim === undefined) {
-		claim = env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM
-	}
+        claim = env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM
+    }
 
     const p = payload[claim]
     if (p === undefined) {
@@ -188,28 +179,25 @@ export const parseIdentity = async (jwt: string | undefined, claim?: string): Pr
     }
 }
 
-export const transformCertificate = (val: string, ctx: z.RefinementCtx): Certificate | never => {
+/**
+ * 
+ * @param val A SSH certificate either a base64 encoded "string" or a "Buffer\<ArrayBufferLike\>"
+ * @param ctx The Zod context for any errors
+ * @returns 
+ */
+export const transformCertificate = (val: string | Buffer<ArrayBufferLike>, ctx: z.RefinementCtx): Certificate | never => {
     try {
-        const decoded = atob(val)
-        const cert = parseCertificate(decoded, "openssh")
+        const cert = typeof val === "string" ? parseCertificate(Buffer.from(val, "base64"), "openssh") : parseCertificate(val, "openssh")
 
         return cert
     } catch (err) {
         switch (true) {
-            case (err instanceof DOMException):
-                if (err.name === "InvalidCharacterError") {
-                    ctx.issues.push({
-                        code: "custom",
-                        message: "the content was not valid base64 encoded data",
-                        input: val
-                    })
-                } else {
-                    ctx.issues.push({
-                        code: "custom",
-                        message: "unhandled error parsing base64 certificate",
-                        input: val
-                    })
-                }
+            case (err instanceof TypeError):
+                ctx.issues.push({
+                    code: "custom",
+                    message: err.message,
+                    input: val
+                })
                 break
             case (err instanceof CertificateParseError):
                 ctx.issues.push({
@@ -416,18 +404,18 @@ export const split = (v: string): string[] => {
 }
 
 export const getPublic = async (key?: PrivateKey) => {
-	if (key === undefined) {
-		// grab private key from secret store
-		const secret = await env.PRIVATE_KEY.get()
+    if (key === undefined) {
+        // grab private key from secret store
+        const secret = await env.PRIVATE_KEY.get()
 
-		// parse it
-		key = parsePrivateKey(secret)
-	}
+        // parse it
+        key = parsePrivateKey(secret)
+    }
 
-	// convert to a public key and add comment
-	const pub = key.toPublic()
-	pub.comment = env.ISSUER_DN
+    // convert to a public key and add comment
+    const pub = key.toPublic()
+    pub.comment = env.ISSUER_DN
 
-	// return in ssh format trimmed of any whitespace
-	return pub.toString("ssh").trim()
+    // return in ssh format trimmed of any whitespace
+    return pub.toString("ssh").trim()
 }

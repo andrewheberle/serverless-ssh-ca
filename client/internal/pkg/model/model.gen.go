@@ -9,7 +9,8 @@ const (
 
 // CertificateResponse defines model for Certificate Response.
 type CertificateResponse struct {
-	Certificate string `json:"certificate"`
+	// Certificate Issued Certificate
+	Certificate []byte `json:"certificate"`
 }
 
 // HostCertificateRenew defines model for Host Certificate Renew.

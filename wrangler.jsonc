@@ -25,6 +25,7 @@
 		"IS_PRODUCTION": "true",
 		"ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
 		"JWT_JWKS_URL": "https://idp.example.com/.well-known/jwks.json",
+		"JWT_AUD": "audience",
 		"JWT_ISSUER": "https://idp.example.com",
 		"JWT_ALGORITHMS": "RS256",
 		"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": "groups",

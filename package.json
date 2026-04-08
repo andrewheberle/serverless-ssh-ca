@@ -9,6 +9,9 @@
 			"JWT_JWKS_URL": {
 				"description": "This is the URL for the JWKS so the CA can verify the JWT provided by the client"
 			},
+			"JWT_AUD": {
+				"description": "The expected audience (AUD) of the JWT. May be a comma seperated list, a single string or a blank string to disable validating the AUD claim of the JWT"
+			},
 			"JWT_ISSUER": {
 				"description": "The issuer of the JWT access and identity tokens provided by the client"
 			},

@@ -64,9 +64,6 @@ type CertificateSignerPayload struct {
 	Identity          string   `json:"identity,omitempty"`
 }
 
-type CertificateSignerResponse struct {
-	Certificate []byte `json:"certificate"`
-}
 type LoginHandler struct {
 	keys         []sshKey
 	principals   []string
@@ -461,7 +458,7 @@ func (lh *LoginHandler) httpClient(token *oauth2.Token) (*http.Client, error) {
 	}, nil
 }
 
-func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, cert []byte, id string) (*CertificateSignerResponse, error) {
+func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, cert []byte, id string) (*model.CertificateResponse, error) {
 	// build url
 	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL, lh.apiPath())
 	if err != nil {
@@ -497,7 +494,7 @@ func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, ce
 	}
 
 	// parse response body
-	var csr CertificateSignerResponse
+	var csr model.CertificateResponse
 	dec := json.NewDecoder(res.Body)
 	if err := dec.Decode(&csr); err != nil {
 		return nil, err

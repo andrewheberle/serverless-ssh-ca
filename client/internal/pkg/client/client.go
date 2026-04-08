@@ -39,10 +39,6 @@ type CertificateSignerPayload struct {
 	ProofOfPossession string `json:"proof"`
 }
 
-type CertificateSignerResponse struct {
-	Certificate []byte `json:"certificate"`
-}
-
 type LoginHandler struct {
 	showTokens       bool
 	skipAgent        bool
@@ -519,7 +515,7 @@ func (t *customTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerResponse, error) {
+func (lh *LoginHandler) doSigningRequest(access, id string) (*model.CertificateResponse, error) {
 	client := &http.Client{
 		Timeout: time.Second * 3,
 		Transport: &customTransport{
@@ -591,7 +587,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	}
 
 	// parse response body
-	var csr CertificateSignerResponse
+	var csr model.CertificateResponse
 	dec := json.NewDecoder(res.Body)
 	if err := dec.Decode(&csr); err != nil {
 		return nil, err
