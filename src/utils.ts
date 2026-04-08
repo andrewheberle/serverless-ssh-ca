@@ -408,7 +408,7 @@ export const refineLegacyHostCertificateRenewal = async (val: LegacyParsedHostCe
 }
 
 export const split = (v: string): string[] => {
-    if (v === "") {
+    if (v === "" || v === undefined) {
         return []
     }
 
