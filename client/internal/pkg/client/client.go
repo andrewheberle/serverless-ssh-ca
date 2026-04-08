@@ -547,7 +547,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*CertificateSignerR
 	enc := json.NewEncoder(buf)
 	lifetime := int(lh.lifetime.Seconds())
 	payload := model.UserCertificateRequest{
-		PublicKey: base64.StdEncoding.EncodeToString(publicKey),
+		PublicKey: publicKey,
 		Lifetime:  &lifetime,
 		Identity:  id,
 		Proof:     proof.String(),

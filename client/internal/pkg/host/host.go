@@ -541,10 +541,10 @@ func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, 
 
 	if lh.renewal {
 		payload := model.HostCertificateRenew{
-			PublicKey:   base64.StdEncoding.EncodeToString(publicKey),
+			PublicKey:   publicKey,
 			Lifetime:    &lifetime,
 			Proof:       proof,
-			Certificate: base64.StdEncoding.EncodeToString(cert),
+			Certificate: cert,
 		}
 
 		lh.logger.Debug("certificate request payload",
@@ -559,7 +559,7 @@ func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, 
 	}
 
 	payload := model.HostCertificateRequest{
-		PublicKey:  base64.StdEncoding.EncodeToString(publicKey),
+		PublicKey:  publicKey,
 		Lifetime:   &lifetime,
 		Proof:      proof,
 		Principals: lh.principals,

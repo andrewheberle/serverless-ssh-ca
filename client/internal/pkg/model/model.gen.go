@@ -15,16 +15,16 @@ type CertificateResponse struct {
 // HostCertificateRenew defines model for Host Certificate Renew.
 type HostCertificateRenew struct {
 	// Certificate SSH certificate to renew
-	Certificate string `json:"certificate"`
+	Certificate []byte `json:"certificate"`
 
 	// Lifetime Lifetime of renewed Host SSH certificate
 	Lifetime *int `json:"lifetime,omitempty"`
 
-	// Proof Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}
+	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}
 	Proof string `json:"proof"`
 
-	// PublicKey SSH public key of certificate to be renewed
-	PublicKey string `json:"public_key"`
+	// PublicKey SSH public key to sign
+	PublicKey []byte `json:"public_key"`
 }
 
 // HostCertificateRequest defines model for Host Certificate Request.
@@ -38,17 +38,17 @@ type HostCertificateRequest struct {
 	// Principals List of principals to include on the issued certificate
 	Principals []string `json:"principals"`
 
-	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}
+	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}
 	Proof string `json:"proof"`
 
 	// PublicKey SSH public key to sign
-	PublicKey string `json:"public_key"`
+	PublicKey []byte `json:"public_key"`
 }
 
 // KeyRevocationListResponse defines model for Key Revocation List Response.
 type KeyRevocationListResponse struct {
 	// Krl Key Revocation List
-	Krl       string `json:"krl"`
+	Krl       []byte `json:"krl"`
 	Signature string `json:"signature"`
 }
 
@@ -63,11 +63,11 @@ type UserCertificateRequest struct {
 	// Lifetime Lifetime of issued SSH certificate
 	Lifetime *int `json:"lifetime,omitempty"`
 
-	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${format}:${signature}
+	// Proof Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}
 	Proof string `json:"proof"`
 
 	// PublicKey SSH public key to sign
-	PublicKey string `json:"public_key"`
+	PublicKey []byte `json:"public_key"`
 }
 
 // PostCertificateRequestEndpointV2JSONBody defines parameters for PostCertificateRequestEndpointV2.

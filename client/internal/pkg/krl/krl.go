@@ -2,7 +2,6 @@ package krl
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,18 +38,9 @@ func Read(reader io.Reader) (*Response, error) {
 	return &payload, nil
 }
 
-func (r *Response) KeyRevocationList() ([]byte, error) {
-	return base64.StdEncoding.DecodeString(r.Krl)
-}
-
 func (r *Response) VerifyStrict(pub ssh.PublicKey) error {
-	krlbytes, err := r.KeyRevocationList()
-	if err != nil {
-		return fmt.Errorf("problem converting base64 to bytes")
-	}
-
 	// parse the KRL
-	parsedKrl, err := sshkrl.ParseKRL(krlbytes)
+	parsedKrl, err := sshkrl.ParseKRL(r.Krl)
 	if err != nil {
 		return fmt.Errorf("problem parsing krl: %w", err)
 	}
@@ -73,7 +63,7 @@ func (r *Response) VerifyStrict(pub ssh.PublicKey) error {
 		return fmt.Errorf("problem unarmoring signature: %w", err)
 	}
 
-	if err := sshsig.Verify(bytes.NewReader(krlbytes), sig, pub, sshsig.HashSHA512, Namespace); err != nil {
+	if err := sshsig.Verify(bytes.NewReader(r.Krl), sig, pub, sshsig.HashSHA512, Namespace); err != nil {
 		return fmt.Errorf("signature verification failed: %w", err)
 	}
 

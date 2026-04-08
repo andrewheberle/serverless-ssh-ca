@@ -20,17 +20,20 @@ import {
 import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
 
-const proofOfPossession = z.base64()
-	.openapi({ format: "byte" })
+const openapiStringByte = z.base64().openapi({ format: "byte" })
+
+const proofOfPossession = z.string()
 	.meta({ description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}" })
 
-const publicKey = z.base64()
-	.openapi({ format: "byte" })
+const publicKey = openapiStringByte
 	.transform(transformPublicKey)
 	.meta({ description: "SSH public key to sign" })
 
 const identityToken = z.string()
 	.meta({ description: "Identity Token JWT from OIDC IdP" })
+
+const krl = openapiStringByte
+	.meta({ title: "Key Revocation List" })
 
 export const HeaderSchema = z.object({
 	"Authorization": z.string()
@@ -107,15 +110,7 @@ export const RevocationListEndpointSchema = {
 		"200": {
 			description: "Returns an Open SSH Key Revocation List as BASE64 and an SSHSIG signature for verification",
 			...contentJson(z.object({
-				krl: z.stringFormat("byte", (val: string): boolean => {
-					try {
-						atob(val)
-						return true
-					} catch (err) {
-						return false
-					}
-				})
-					.meta({ title: "Key Revocation List" }),
+				krl: krl,
 				signature: z.string()
 			})
 				.openapi("Key Revocation List Response")
@@ -138,7 +133,7 @@ export const HostCertificateRequestEndpointSchema = {
 				public_key: publicKey,
 				proof: proofOfPossession
 					.transform(transformHostProofOfPossession),
-				identity: identity,
+				identity: identityToken,
 				principals: z.array(z.string()).min(1)
 					.meta({ description: "List of principals to include on the issued certificate" }),
 				lifetime: z.int()
@@ -178,15 +173,12 @@ export const HostCertificateRenewEndpointSchema = {
 	request: {
 		body: contentJson(
 			z.object({
-				certificate: z.base64()
+				certificate: openapiStringByte
 					.transform(transformCertificate)
 					.meta({ description: "SSH certificate to renew" }),
-				public_key: z.base64()
-					.transform(transformPublicKey)
-					.meta({ description: "SSH public key of certificate to be renewed" }),
-				proof: z.string()
-					.transform(transformHostProofOfPossession)
-					.meta({ description: "Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}" }),
+				public_key: publicKey,
+				proof: proofOfPossession
+					.transform(transformHostProofOfPossession),
 				lifetime: z.int()
 					.min(seconds("24 hours"))
 					.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
