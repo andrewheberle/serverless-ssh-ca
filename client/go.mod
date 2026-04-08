@@ -9,7 +9,7 @@ require (
 	github.com/andrewheberle/simplecommand v0.5.1
 	github.com/andrewheberle/sshagent v1.0.0
 	github.com/bep/simplecobra v0.7.0
-	github.com/coreos/go-oidc/v3 v3.17.0
+	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/forfuncsake/krl v0.1.0
 	github.com/gen2brain/beeep v0.11.2
 	github.com/gorilla/securecookie v1.1.2
@@ -34,7 +34,7 @@ require (
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/esiqveland/notify v0.13.3 // indirect
 	github.com/getkin/kin-openapi v0.133.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
