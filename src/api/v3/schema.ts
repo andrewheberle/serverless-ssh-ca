@@ -9,8 +9,10 @@ import {
 	refineHostCertificateRequest,
 	transformCertificate,
 	refineHostCertificateRenewal,
+	refineRevokeCertificate,
 } from "../../utils"
 import {
+	ConflictException,
 	contentJson,
 	ForbiddenException,
 	InputValidationException,
@@ -128,6 +130,11 @@ export const UserCertificateRequestEndpointSchema = {
 }
 
 export const RevocationListEndpointSchema = {
+	request: {
+		params: z.object({
+			certificateType: z.enum(["user", "host"])
+		}),
+	},
 	responses: {
 		"200": {
 			description: "Returns an Open SSH Key Revocation List as BASE64 and an SSHSIG signature for verification",
@@ -219,5 +226,40 @@ export const HostCertificateRenewEndpointSchema = {
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+	}
+}
+
+export const RevokeCertificateEndpointSchema = {
+	request: {
+		params: z.object({
+			certificateType: z.enum(["user", "host"])
+		}),
+		body: contentJson(
+			z.object({
+				serial: z.bigint()
+					.meta({ description: "Serial number of certificate to revoke" }),
+				public_key: publicKey,
+				proof: proofOfPossession
+					.transform(transformProofOfPossession),
+			})
+				.openapi("Certificate Revocation")
+				.superRefine(refineRevokeCertificate)
+		)
+	},
+	responses: {
+		"200": {
+			description: "SSH certificate revoked successfully",
+			...contentJson(z.object({
+				revoked_at: z.iso.datetime(),
+			})
+				.openapi("Revocation Response")
+			),
+		},
+		...UnauthorizedException.schema(),
+		...ForbiddenException.schema(),
+		...InputValidationException.schema(),
+		...UnprocessableEntityException.schema(),
+		...InternalServerErrorException.schema(),
+		...ConflictException.schema()
 	}
 }
