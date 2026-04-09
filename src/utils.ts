@@ -245,6 +245,7 @@ export const refineCertificateRequest = async (val: ParsedCertificateRequest, ct
 
         return z.NEVER
     } catch (err) {
+		logger.error("proof of possession verification unhandled error", "in", "refineCertificateRequest", "error", err)
         return fatalIssue(ctx, "proof of possession verification unhandled error", val)
     }
 }
