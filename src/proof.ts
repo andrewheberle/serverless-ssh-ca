@@ -39,8 +39,8 @@ export class ProofOfPossession {
     private readonly signaturePubkey: Key
     private readonly data: string
 
-    constructor(nonce: string, from?: number) {
-        const parts = nonce.split(".")
+    constructor(proof: string, from?: number) {
+        const parts = proof.split(".")
         if (parts.length !== 3) {
             throw new PossessionParseError("invalid proof of possession format")
         }
@@ -70,7 +70,7 @@ export class ProofOfPossession {
             }
 
             // convert siganture from base64
-            const signature = atob(signatureBase64)
+            const signature = Buffer.from(signatureBase64, "base64").toString()
 
             // set values
             this.timestamp = timestamp
