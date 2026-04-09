@@ -285,7 +285,8 @@ export const transformHostProofOfPossession = (val: string, ctx: z.RefinementCtx
             return fatalIssue(ctx, err.message, val)
         }
 
-        return fatalIssue(ctx, "host proof of possession transform unhandled error", val)
+		logger.error("proof of possession verification unhandled error", "in", "transformHostProofOfPossession", "error", err)
+        return fatalIssue(ctx, "proof of possession transform unhandled error", val)
     }
 }
 
@@ -314,6 +315,7 @@ export const refineHostCertificateRequest = async (val: ParsedHostCertificateReq
 
         return z.NEVER
     } catch (err) {
+		logger.error("proof of possession verification unhandled error", "in", "refineHostCertificateRequest", "error", err)
         return fatalIssue(ctx, "proof of possession verification unhandled error", val)
     }
 }
@@ -367,6 +369,33 @@ export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRen
 
         return z.NEVER
     } catch (err) {
+		logger.error("proof of possession verification unhandled error", "in", "refineHostCertificateRenewal", "error", err)
+        return fatalIssue(ctx, "proof of possession verification unhandled error", val)
+    }
+}
+
+type ParsedRevokeCertificate = {
+	serial: bigint
+	public_key: Key
+	proof: ProofOfPossession
+}
+
+export const refineRevokeCertificate = async (val: ParsedRevokeCertificate, ctx: z.RefinementCtx): Promise<never> => {
+    try {
+        // check proof of possession fingerprint matches public key
+        if (!val.proof.matches(val.public_key)) {
+            return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
+        }
+
+        // verify proof of possession signature
+        const verified = await val.proof.verify()
+        if (!verified) {
+            return fatalIssue(ctx, "proof of possession signature validation failed", val)
+        }
+
+        return z.NEVER
+    } catch (err) {
+		logger.error("proof of possession verification unhandled error", "in", "refineRevokeCertificate", "error", err)
         return fatalIssue(ctx, "proof of possession verification unhandled error", val)
     }
 }

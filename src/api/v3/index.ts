@@ -1,8 +1,11 @@
 import { group, Logger } from "@andrewheberle/ts-slog"
 import {
+	ApiException,
+	ConflictException,
 	ForbiddenException,
 	fromHono,
 	InternalServerErrorException,
+	NotFoundException,
 	OpenAPIRoute,
 	UnauthorizedException,
 	UnprocessableEntityException,
@@ -32,6 +35,9 @@ import {
 	getRevocationList,
 	isRevoked,
 	recordCertificate,
+	RevocationStatus,
+	revocationStatus,
+	revokeCertificate,
 } from "../../db"
 import { KRLBuilder } from "../../krl"
 import {
@@ -39,6 +45,7 @@ import {
 	HostCertificateRenewEndpointSchema,
 	HostCertificateRequestEndpointSchema,
 	RevocationListEndpointSchema,
+	RevokeCertificateEndpointSchema,
 	UserCertificateRequestEndpointSchema,
 } from "./schema"
 
@@ -50,17 +57,26 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
 	schema = CaPublicKeyEndpointSchema
 
 	async handle(c: AppContext) {
+		const l = logger.with(
+			...group("request", "action", "ca"),
+		)
 		try {
 			const pub = await getPublic()
 
 			return c.text(`${pub}\n`)
 		} catch (err) {
-			if (err instanceof KeyParseError) {
-				throw new InternalServerErrorException("Error parsing private key")
+			switch (true) {
+				case (err instanceof KeyParseError):
+					l.error("error parsing private key")
+					throw new InternalServerErrorException("error parsing private key")
+				case (err instanceof ApiException):
+					// re-throw any exisiting chanfana error
+					throw err
+				default:
+					// otherwise throw as InternalServerErrorException
+					l.error("unhandled error", "error", err)
+					throw new InternalServerErrorException(`${err}`)
 			}
-
-			// otherwise throw as InternalServerErrorException
-			throw new InternalServerErrorException(`${err}`)
 		}
 	}
 }
@@ -114,21 +130,38 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
 
 			return c.json(response)
 		} catch (err) {
-			// otherwise throw as InternalServerErrorException
-			throw new InternalServerErrorException(`${err}`)
+			switch (true) {
+				case (err instanceof ApiException):
+					// re-throw any exisiting chanfana error
+					throw err
+				default:
+					// otherwise throw as InternalServerErrorException
+					l.error("unhandled error", "error", err)
+					throw new InternalServerErrorException(`${err}`)
+			}
 		}
 	}
 }
 api.post("/user/certificate", UserCertificateRequestEndpoint)
 
-class UserRevocationListEndpoint extends OpenAPIRoute {
-	certificateType: CertificateType = CertificateType.User
+class RevocationListEndpoint extends OpenAPIRoute {
 	schema = RevocationListEndpointSchema
 
 	async handle(c: AppContext) {
+		const data = await this.getValidatedData<typeof this.schema>()
+
+		const l = logger.with(
+			...group("request",
+				"type", data.params.certificateType,
+				"action", "krl",
+			),
+		)
+
+		const certificateType = data.params.certificateType === "user" ? CertificateType.User : CertificateType.Host
+
 		try {
 			// get revoked serials
-			const serials = (await getRevocationList(this.certificateType)).map(v => BigInt(v))
+			const serials = (await getRevocationList(certificateType)).map(v => BigInt(v))
 
 			// grab private key from secret store
 			const secret = await c.env.PRIVATE_KEY.get()
@@ -157,14 +190,22 @@ class UserRevocationListEndpoint extends OpenAPIRoute {
 				signature: signature,
 			})
 		} catch (err) {
-			logger.error("krl error", "error", err)
-			// otherwise throw as InternalServerErrorException
-			throw new InternalServerErrorException(`${err}`)
+			switch (true) {
+				case (err instanceof KeyParseError):
+					l.error("error parsing private key")
+					throw new InternalServerErrorException("error parsing private key")
+				case (err instanceof ApiException):
+					// re-throw any exisiting chanfana error
+					throw err
+				default:
+					// otherwise throw as InternalServerErrorException
+					l.error("unhandled error", "error", err)
+					throw new InternalServerErrorException(`${err}`)
+			}
 		}
 	}
 }
-
-api.get("/user/krl", UserRevocationListEndpoint)
+api.get("/:certificateType/krl", RevocationListEndpoint)
 
 class HostCertificateRequestEndpoint extends OpenAPIRoute {
 	schema = HostCertificateRequestEndpointSchema
@@ -226,23 +267,18 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 			return c.json(response)
 		} catch (err) {
 			switch (true) {
-				case (err instanceof DOMException):
-					if (err.name === "InvalidCharacterError") {
-						throw new UnprocessableEntityException("The content was not valid base64 encoded data")
-					}
+				case (err instanceof ApiException):
+					// re-throw any exisiting chanfana error
+					throw err
+				default:
+					// otherwise throw as InternalServerErrorException
+					l.error("unhandled error", "error", err)
+					throw new InternalServerErrorException(`${err}`)
 			}
-
-			// otherwise throw as InternalServerErrorException
-			throw new InternalServerErrorException(`${err}`)
 		}
 	}
 }
 api.post("/host/certificate", HostCertificateRequestEndpoint)
-
-class HostRevocationListEndpoint extends UserRevocationListEndpoint {
-	certificateType: CertificateType = CertificateType.Host
-}
-api.get("/host/krl", HostRevocationListEndpoint)
 
 class HostCertificateRenewEndpoint extends OpenAPIRoute {
 	schema = HostCertificateRenewEndpointSchema
@@ -252,7 +288,11 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 		const serial = data.body.certificate.serial.readBigUInt64BE(0)
 
 		const l = logger.with(
-			...group("request", "type", "host", "action", "renewal", "serial", serial),
+			...group("request",
+				"type", "host",
+				"action", "renewal",
+				"serial", serial,
+			),
 		)
 
 		// ensure certificate presented for renewal process is not revoked
@@ -294,17 +334,73 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 			return c.json(response)
 		} catch (err) {
 			switch (true) {
-				case (err instanceof DOMException):
-					if (err.name === "InvalidCharacterError") {
-						throw new UnprocessableEntityException("The content was not valid base64 encoded data")
-					}
+				case (err instanceof ApiException):
+					// re-throw any exisiting chanfana error
+					throw err
 				case (err instanceof BadIssuerError):
 					throw new UnprocessableEntityException(err.message)
+				default:
+					// otherwise throw as InternalServerErrorException
+					l.error("unhandled error", "error", err)
+					throw new InternalServerErrorException(`${err}`)
 			}
-
-			// otherwise throw as InternalServerErrorException
-			throw new InternalServerErrorException(`${err}`)
 		}
 	}
 }
 api.post("/host/renew", HostCertificateRenewEndpoint)
+
+class RevokeCertificateEndpoint extends OpenAPIRoute {
+	schema = RevokeCertificateEndpointSchema
+
+	async handle(c: AppContext) {
+		const data = await this.getValidatedData<typeof this.schema>()
+
+		const l = logger.with(
+			...group("request", "type", data.params.certificateType, "action", "revoke", "serial", data.body.serial),
+		)
+
+		const certificatetype = data.params.certificateType === "user" ? CertificateType.User : CertificateType.Host
+
+		// ensure certificate can be revoked
+		const status = await revocationStatus(data.body.serial, data.body.public_key.toString("ssh"), certificatetype)
+		switch (status) {
+			case RevocationStatus.Revoked:
+				l.warn("certificate is already revoked")
+				throw new ConflictException("certificate is already revoked")
+			case RevocationStatus.Unrevokable:
+				l.warn("cannot revoke this certificate")
+				throw new ForbiddenException("cannot revoke this certificate")
+			case RevocationStatus.NotFound:
+				l.warn("certificate not found")
+				throw new NotFoundException("certificate not found")
+		}
+
+		try {
+			const res = await revokeCertificate(data.body.serial)
+
+			if (res.length === 0) {
+				throw new InternalServerErrorException("no results were returned for revocation")
+			}
+
+			if (res.length > 1) {
+				logger.warn("more than one revocation result was returned", "count", res.length)
+			}
+
+			logger.info("completed revocation")
+			return c.json({
+				revoked_at: res[0].revoked_at
+			})
+		} catch (err) {
+			switch (true) {
+				case (err instanceof ApiException):
+					// re-throw any exisiting chanfana error
+					throw err
+				default:
+					// otherwise throw as InternalServerErrorException
+					l.error("unhandled error", "error", err)
+					throw new InternalServerErrorException(`${err}`)
+			}
+		}
+	}
+}
+api.post("/:certificateType/revoke", RevokeCertificateEndpoint)
