@@ -87,8 +87,9 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
             case (err instanceof JWKInvalid):
                 return fatalIssue(ctx, "the access token JWK was invalid", val)
             case (err instanceof JWKSInvalid):
-                return fatalIssue(ctx, "the access token JWK was invalid", val)
+                return fatalIssue(ctx, "the access token JWKS was invalid", val)
             default:
+				logger.error("unhandled access token validation error", "in", "transformAuthorizationHeader", "error", err, "val", val)
                 return fatalIssue(ctx, "unhandled access token validation error", val)
         }
     }
@@ -180,10 +181,10 @@ export const parseIdentity = async (jwt: string | undefined, claim?: string): Pr
 }
 
 /**
- * 
+ *
  * @param val A SSH certificate either a base64 encoded "string" or a "Buffer\<ArrayBufferLike\>"
  * @param ctx The Zod context for any errors
- * @returns 
+ * @returns
  */
 export const transformCertificate = (val: string | Buffer<ArrayBufferLike>, ctx: z.RefinementCtx): Certificate | never => {
     try {
