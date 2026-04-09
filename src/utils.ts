@@ -266,7 +266,7 @@ export const refineLegacyCertificateRequest = async (val: LegacyParsedCertificat
         }
 
         // verify proof of possession signature
-        const verified = await val.nonce.verify()
+        const verified = await val.nonce.verify("file")
         if (!verified) {
             return fatalIssue(ctx, "proof of possession signature validation failed", val)
         }
@@ -331,7 +331,7 @@ export const refineLegacyHostCertificateRequest = async (val: LegacyParsedHostCe
         }
 
         // verify proof of possession signature
-        const verified = await val.nonce.verify()
+        const verified = await val.nonce.verify("file")
         if (!verified) {
             return fatalIssue(ctx, "proof of possession signature validation failed", val)
         }
@@ -389,7 +389,7 @@ export const refineLegacyHostCertificateRenewal = async (val: LegacyParsedHostCe
         }
 
         // verify proof of possession signature
-        const verified = await val.nonce.verify()
+        const verified = await val.nonce.verify("file")
         if (!verified) {
             return fatalIssue(ctx, "proof of possession signature validation failed", val)
         }

@@ -22,12 +22,12 @@ export async function verify(
     ],
   );
 
-  const writer = new Writer(100);
+  const writer = new Writer(96 + signature.namespace.length);
   // https://github.com/openssh/openssh-portable/blob/d575cf44895104e0fcb0629920fb645207218129/PROTOCOL.sshsig
   // MAGIC_PREAMBLE
   writer.writeBytes("SSHSIG");
   // namespace
-  writer.writeString("file");
+  writer.writeString(signature.namespace);
   // reserved
   writer.writeUint32(0);
   // hash_algorithm
