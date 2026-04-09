@@ -96,7 +96,7 @@ func (c *loginCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args
 			return nil
 
 		} else {
-			c.logger.Info("renewal forced despite current certificate having more than 50% of its lifetime lef")
+			c.logger.Info("renewal forced despite current certificate having more than 50% of its lifetime left")
 		}
 	}
 

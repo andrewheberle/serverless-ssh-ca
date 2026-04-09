@@ -562,7 +562,7 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*model.CertificateR
 	lh.logger.Info("sending request to CA", "url", caCertUrl)
 	lh.logger.Debug("certificate request",
 		"public_key", payload.PublicKey,
-		"lifetime", payload.Lifetime,
+		"lifetime", *payload.Lifetime,
 		"identity", payload.Identity,
 		"proof", payload.Proof,
 	)
