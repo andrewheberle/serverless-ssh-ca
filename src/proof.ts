@@ -101,11 +101,7 @@ export class ProofOfPossession {
      * @returns true if signature is valid, false otherwise
      */
     async verify(namespace?: string): Promise<boolean> {
-        try {
-            return await verify(this.signature, this.data, { namespace: namespace })
-        } catch (err) {
-            return false
-        }
+		return await verify(this.signature, this.data, { namespace: namespace })
     }
 
     /**
