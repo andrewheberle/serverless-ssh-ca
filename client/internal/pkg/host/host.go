@@ -565,7 +565,7 @@ func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, 
 
 	lh.logger.Debug("certificate request payload",
 		"public_key", payload.PublicKey,
-		"lifetime", payload.Lifetime,
+		"lifetime", *payload.Lifetime,
 		"proof", payload.Proof,
 		"principals", payload.Principals,
 		"identity", payload.Identity,

@@ -85,11 +85,11 @@ func TestGenerate(t *testing.T) {
 			}
 
 			// check timestamp seems ok
-			ms, err := strconv.Atoi(parts[0])
+			ms, err := strconv.ParseInt(parts[0], 10, 64)
 			if err != nil {
 				t.Fatalf("Generate() timestamp was not an integer: %v", err)
 			}
-			ts := time.Unix(int64(ms/1000), int64((ms%1000)*1000000))
+			ts := time.Unix(ms/1000, (ms%1000)*1000000)
 			if ts.UnixMilli() != now.UnixMilli() {
 				t.Fatalf("Generate() timestamp did not match expected: %v", ts)
 			}
@@ -104,7 +104,7 @@ func TestGenerate(t *testing.T) {
 				t.Fatalf("Generate() could not dearmor signature: %v", err)
 			}
 			if err := sshsig.Verify(
-				bytes.NewReader([]byte(fmt.Sprintf("%s.%s", parts[0], parts[1]))),
+				bytes.NewReader(fmt.Appendf(nil, "%d.%s", ms, parts[1])),
 				sig,
 				tt.signer.PublicKey(),
 				sshsig.HashSHA512,

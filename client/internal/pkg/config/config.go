@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -206,8 +207,11 @@ func (c *Config) getPublicKeyBytes() ([]byte, error) {
 		return nil, err
 	}
 
-	// return as public key
-	return ssh.MarshalAuthorizedKey(key.PublicKey()), nil
+	// get public key and marshal in authorized_keys format
+	pub := ssh.MarshalAuthorizedKey(key.PublicKey())
+
+	// return as public key without a newline
+	return bytes.TrimSuffix(pub, []byte("\n")), nil
 }
 
 func (c *Config) GetCertificateBytes() ([]byte, error) {

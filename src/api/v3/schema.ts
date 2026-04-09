@@ -15,6 +15,7 @@ import {
 	ForbiddenException,
 	InputValidationException,
 	InternalServerErrorException,
+	UnauthorizedException,
 	UnprocessableEntityException,
 } from "chanfana"
 import { env } from "cloudflare:workers"
@@ -118,12 +119,7 @@ export const UserCertificateRequestEndpointSchema = {
 				.openapi("Certificate Response")
 			)
 		},
-		"401": {
-			description: "Access to the endpoint is Unauthorized",
-			...contentJson(z.object({
-				error: z.literal("Unauthorized")
-			}))
-		},
+		...UnauthorizedException.schema(),
 		...ForbiddenException.schema(),
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
@@ -181,13 +177,7 @@ export const HostCertificateRequestEndpointSchema = {
 				.openapi("Certificate Response")
 			)
 		},
-		"401": {
-			description: "Access to the endpoint is Unauthorized",
-			...contentJson(z.object({
-				status: z.literal(401),
-				error: z.literal("Unauthorized")
-			}))
-		},
+		...UnauthorizedException.schema(),
 		...ForbiddenException.schema(),
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
@@ -224,13 +214,7 @@ export const HostCertificateRenewEndpointSchema = {
 				.openapi("Certificate Response")
 			),
 		},
-		"401": {
-			description: "Access to the endpoint is Unauthorized",
-			...contentJson(z.object({
-				status: z.literal(401),
-				error: z.literal("Unauthorized")
-			}))
-		},
+		...UnauthorizedException.schema(),
 		...ForbiddenException.schema(),
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),

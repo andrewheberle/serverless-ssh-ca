@@ -345,8 +345,8 @@ func TestConfig_getPublicKeyBytes(t *testing.T) {
 		panic(err)
 	}
 
-	// convert to public key
-	publicBytes := ssh.MarshalAuthorizedKey(key.PublicKey())
+	// convert to public key (trim newline)
+	publicBytes := bytes.TrimSuffix(ssh.MarshalAuthorizedKey(key.PublicKey()), []byte("\n"))
 
 	tests := []struct {
 		name    string

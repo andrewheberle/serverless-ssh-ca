@@ -4,6 +4,7 @@ import {
 	fromHono,
 	InternalServerErrorException,
 	OpenAPIRoute,
+	UnauthorizedException,
 	UnprocessableEntityException,
 } from "chanfana"
 import { Hono } from "hono"
@@ -195,7 +196,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 		// check user can issue host certificates
 		if (!split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !identity.principals.some((p: string) => split(env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
 			l.error("unauthorized host certificate request")
-			throw new ForbiddenException("User not allowed to issue host certificates")
+			throw new UnauthorizedException("User not allowed to issue host certificates")
 		}
 
 		const opts: CreateHostCertificateOptions = {
@@ -206,7 +207,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 		try {
 			const certificate = await createSignedHostCertificate(data.body.public_key, opts)
 			const response: CertificateSignerResponse = {
-				certificate: btoa(certificate.toString("openssh"))
+				certificate: certificate.toBuffer("openssh").toString("base64")
 			}
 
 			try {
@@ -255,7 +256,6 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 		)
 
 		// ensure certificate presented for renewal process is not revoked
-
 		if (await isRevoked(serial)) {
 			l.error("attempt to renew using revoked certificate")
 			throw new ForbiddenException("current certificate is revoked")
