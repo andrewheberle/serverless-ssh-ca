@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers"
-import { JWKInvalid, JWKSInvalid, JWSInvalid, JWTInvalid } from "jose/errors"
+import { JWKInvalid, JWKSInvalid, JWSInvalid, JWTClaimValidationFailed, JWTInvalid } from "jose/errors"
 import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificate, parseKey, parsePrivateKey, PrivateKey } from "sshpk"
 import z from "zod"
 import { verifyJWT } from "./verify"
@@ -88,8 +88,10 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
                 return fatalIssue(ctx, "the access token JWK was invalid", val)
             case (err instanceof JWKSInvalid):
                 return fatalIssue(ctx, "the access token JWKS was invalid", val)
+			case (err instanceof JWTClaimValidationFailed):
+				return fatalIssue(ctx, "claim validtion of the JWT failed", val)
             default:
-				logger.error("unhandled access token validation error", "in", "transformAuthorizationHeader", "error", err, "val", val)
+				logger.error("unhandled access token validation error", "in", "transformAuthorizationHeader", "error", err)
                 return fatalIssue(ctx, "unhandled access token validation error", val)
         }
     }
@@ -170,7 +172,8 @@ export const parseIdentity = async (jwt: string | undefined, claim?: string): Pr
         }
     }
 
-    const { payload } = await verifyJWT(jwt)
+	const aud = env.JWT_AUD === undefined || env.JWT_AUD as string === "" ? undefined : split(env.JWT_AUD as string)
+    const { payload } = await verifyJWT(jwt, { aud: aud })
 
     const principals = identityPrincipals(payload, claim)
 
