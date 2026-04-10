@@ -16,6 +16,7 @@ require (
 	github.com/gorilla/sessions v1.4.0
 	github.com/hiddeco/sshsig v0.2.0
 	github.com/ndbeals/winssh-pageant v0.0.0-20230609194536-9f88b630ebec
+	github.com/oapi-codegen/runtime v1.4.0
 	github.com/spf13/pflag v1.0.10
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.49.0
@@ -29,6 +30,7 @@ require (
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
@@ -39,6 +41,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackmordaunt/icns/v3 v3.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

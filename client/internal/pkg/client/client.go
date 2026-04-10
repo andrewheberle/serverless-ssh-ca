@@ -6,10 +6,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -19,8 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/api"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/proof"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
@@ -56,6 +54,7 @@ type LoginHandler struct {
 	allowWithoutKey  bool
 	pageantProxy     bool
 	mu               sync.RWMutex
+	client           *api.ClientWithResponses
 }
 
 const (
@@ -75,8 +74,6 @@ var (
 
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
-
-	userAgentFull = GenerateUserAgent(UserAgent)
 )
 
 // NewLoginHandler creates a new handler
@@ -89,6 +86,12 @@ func NewLoginHandler(config *config.Config, opts ...LoginHandlerOption) (*LoginH
 
 	// set redirectURL
 	redirectURL, err := url.Parse(config.Oidc().RedirectURL)
+	if err != nil {
+		return nil, err
+	}
+
+	// set up *api.Client
+	c, err := api.NewClientWithResponses(config.CertificateAuthorityURL(), api.WithHTTPClient(NewHttpClient()))
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +112,7 @@ func NewLoginHandler(config *config.Config, opts ...LoginHandlerOption) (*LoginH
 		done:             make(chan error),
 		pageantProxyDone: make(chan bool),
 		logger:           DefaultLogger,
+		client:           c,
 	}
 
 	// set from options
@@ -515,17 +519,7 @@ func (t *customTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func (lh *LoginHandler) doSigningRequest(access, id string) (*model.CertificateResponse, error) {
-	client := &http.Client{
-		Timeout: time.Second * 3,
-		Transport: &customTransport{
-			Headers: map[string]string{
-				"Authorization": "Bearer " + access,
-				"User-Agent":    userAgentFull,
-			},
-		},
-	}
-
+func (lh *LoginHandler) doSigningRequest(access, id string) (*api.CertificateResponse, error) {
 	// get public key
 	publicKey, err := lh.config.GetPublicKeyBytes()
 	if err != nil {
@@ -538,85 +532,74 @@ func (lh *LoginHandler) doSigningRequest(access, id string) (*model.CertificateR
 		return nil, err
 	}
 
-	// encode json
-	buf := new(bytes.Buffer)
-	enc := json.NewEncoder(buf)
+	// build request
 	lifetime := int(lh.lifetime.Seconds())
-	payload := model.UserCertificateRequest{
+	payload := api.UserCertificateRequest{
 		PublicKey: publicKey,
 		Lifetime:  &lifetime,
 		Identity:  id,
 		Proof:     proof.String(),
 	}
-	if err := enc.Encode(payload); err != nil {
-		return nil, err
-	}
 
-	// build url
-	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL(), "/api/v3/user/certificate")
-	if err != nil {
-		return nil, err
-	}
-
-	// do POST
-	lh.logger.Info("sending request to CA", "url", caCertUrl)
+	lh.logger.Info("sending request to CA", "url", lh.config.CertificateAuthorityURL())
 	lh.logger.Debug("certificate request",
 		"public_key", payload.PublicKey,
 		"lifetime", *payload.Lifetime,
 		"identity", payload.Identity,
 		"proof", payload.Proof,
 	)
-	res, err := client.Post(caCertUrl, "application/json", buf)
+
+	// do request
+	res, err := lh.client.PostUserCertificateRequestEndpointWithResponse(
+		context.TODO(),
+		&api.PostUserCertificateRequestEndpointParams{
+			Authorization: "Bearer " + access,
+		},
+		payload,
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := res.Body.Close(); err != nil {
-			lh.logger.Warn("error closing response body", "error", err)
-		}
-	}()
 
 	// ensure status code was 200 OK
-	if res.StatusCode != http.StatusOK {
-		var body []byte
-		if res.Body != nil {
-			body, _ = io.ReadAll(res.Body)
-		}
-		lh.logger.Debug("got unexpected response code from CA", "status", res.StatusCode, "body", string(body))
-		return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
+	if res.StatusCode() != http.StatusOK {
+		lh.logger.Debug("got unexpected response code from CA", "status", res.StatusCode(), "body", string(res.Body))
+		return nil, fmt.Errorf("bad status code: %d", res.StatusCode())
 	}
 
-	// parse response body
-	var csr model.CertificateResponse
-	dec := json.NewDecoder(res.Body)
-	if err := dec.Decode(&csr); err != nil {
+	// verify certificate
+	if err := lh.verifycertificate(res.JSON200.Certificate); err != nil {
 		return nil, err
 	}
 
+	return res.JSON200, nil
+}
+
+func (lh *LoginHandler) verifycertificate(cert []byte) error {
 	// parse the cert we got back
-	newCert, err := sshcert.ParseCert(csr.Certificate)
+	newCert, err := sshcert.ParseCert(cert)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse cert from CA: %w", err)
+		return fmt.Errorf("could not parse certificate from CA: %w", err)
 	}
 
 	key, err := lh.config.Signer()
 	if err != nil {
-		return nil, fmt.Errorf("could not verify cert from CA: %w", err)
+		return fmt.Errorf("could not verify certificate from CA: %w", err)
 	}
 
 	// check its as we expect by comparing the subject key to our public key
 	if !bytes.Equal(newCert.Key.Marshal(), key.PublicKey().Marshal()) {
-		return nil, fmt.Errorf("certficate from CA had different subject key than expected")
+		return fmt.Errorf("certficate from CA had different subject key than expected")
 	}
 
 	// check against CA
 	if ca := lh.config.CertificateAuthority(); ca != nil {
 		if !bytes.Equal(ca.Marshal(), newCert.SignatureKey.Marshal()) {
-			return nil, fmt.Errorf("certficate was signed by an unknown CA")
+			return fmt.Errorf("certficate was signed by an unknown CA")
 		}
 	}
 
-	return &csr, nil
+	return nil
 }
 
 func (lh *LoginHandler) generateProofOfPossession() (*proof.Proof, error) {
@@ -711,5 +694,17 @@ func GenerateUserAgent(name string) string {
 func clearBytes(b []byte) {
 	for i := range b {
 		b[i] = 0
+	}
+}
+
+func NewHttpClient() *http.Client {
+	// custom *http.Client
+	return &http.Client{
+		Timeout: time.Second * 3,
+		Transport: &customTransport{
+			Headers: map[string]string{
+				"User-Agent": GenerateUserAgent(UserAgent),
+			},
+		},
 	}
 }

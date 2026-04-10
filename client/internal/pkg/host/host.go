@@ -6,10 +6,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -20,9 +18,9 @@ import (
 	"time"
 
 	"codeberg.org/sdassow/atomic"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/api"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/proof"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
@@ -51,8 +49,6 @@ var (
 
 	// DefaultLogger is the default [*slog.Logger] used
 	DefaultLogger = slog.Default()
-
-	userAgentFull = client.GenerateUserAgent(client.UserAgent)
 )
 
 type CertificateSignerPayload struct {
@@ -81,6 +77,7 @@ type LoginHandler struct {
 	mu           sync.RWMutex
 	renewal      bool
 	delay        time.Duration
+	client       *api.ClientWithResponses
 
 	// for testing
 	now time.Time
@@ -169,7 +166,7 @@ func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...
 		return nil, ErrNoKeys
 	}
 
-	// set out keys in the LoginHandler
+	// set keys in the LoginHandler
 	lh.keys = keys
 
 	if !lh.renewal {
@@ -208,6 +205,13 @@ func NewHostLoginHandler(keypath []string, config *config.SystemConfig, opts ...
 			}
 		}
 	}
+
+	// set up *api.ClientWithResponses
+	c, err := api.NewClientWithResponses(config.CertificateAuthorityURL, api.WithHTTPClient(client.NewHttpClient()))
+	if err != nil {
+		return nil, err
+	}
+	lh.client = c
 
 	return lh, nil
 }
@@ -346,11 +350,6 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 	errs := make([]error, 0)
 
-	client, err := lh.httpClient(token)
-	if err != nil {
-		return err
-	}
-
 	// extract id_token from token (this is not verified here as it is up to the caller to verify)
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
@@ -370,7 +369,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			}
 		}
 
-		csr, err := lh.doSigningRequest(client, k.key, k.certBytes, rawIDToken)
+		csr, err := lh.doSigningRequest(k.key, k.certBytes, token.AccessToken, rawIDToken)
 		if err != nil {
 			logger.Warn("error completing signing request", "error", err)
 			errs = append(errs, err)
@@ -432,96 +431,7 @@ func (t *customTransport) transport() http.RoundTripper {
 	return http.DefaultTransport
 }
 
-func (lh *LoginHandler) httpClient(token *oauth2.Token) (*http.Client, error) {
-	if lh.renewal {
-		return &http.Client{
-			Timeout: time.Second * 3,
-			Transport: &customTransport{
-				Headers: map[string]string{
-					"User-Agent": userAgentFull,
-				},
-			},
-		}, nil
-	}
-
-	if token == nil {
-		return nil, fmt.Errorf("token was nil")
-	}
-	return &http.Client{
-		Timeout: time.Second * 3,
-		Transport: &customTransport{
-			Headers: map[string]string{
-				"Authorization": "Bearer " + token.AccessToken,
-				"User-Agent":    userAgentFull,
-			},
-		},
-	}, nil
-}
-
-func (lh *LoginHandler) doSigningRequest(client *http.Client, key ssh.Signer, cert []byte, id string) (*model.CertificateResponse, error) {
-	// build url
-	caCertUrl, err := url.JoinPath(lh.config.CertificateAuthorityURL, lh.apiPath())
-	if err != nil {
-		return nil, err
-	}
-
-	// generate payload bytes
-	b, err := lh.signingRequestPayloadBytes(key, cert, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// do POST
-	lh.logger.Info("sending request to CA", "url", caCertUrl)
-	res, err := client.Post(caCertUrl, "application/json", bytes.NewReader(b))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := res.Body.Close(); err != nil {
-			lh.logger.Warn("error closing response body", "error", err)
-		}
-	}()
-
-	// ensure status code was 200 OK
-	if res.StatusCode != http.StatusOK {
-		var body []byte
-		if res.Body != nil {
-			body, _ = io.ReadAll(res.Body)
-		}
-		lh.logger.Debug("got unexpected response code from CA", "status", res.StatusCode, "body", string(body))
-		return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
-	}
-
-	// parse response body
-	var csr model.CertificateResponse
-	dec := json.NewDecoder(res.Body)
-	if err := dec.Decode(&csr); err != nil {
-		return nil, err
-	}
-
-	// parse the cert we got back
-	newCert, err := sshcert.ParseCert(csr.Certificate)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse cert from CA: %w", err)
-	}
-
-	// check its as we expect by comparing the subject key to our public key
-	if !bytes.Equal(newCert.Key.Marshal(), key.PublicKey().Marshal()) {
-		return nil, fmt.Errorf("certficate from CA had different subject key than expected")
-	}
-
-	// check against CA
-	if ca := lh.config.CertificateAuthority(); ca != nil {
-		if !bytes.Equal(ca.Marshal(), newCert.SignatureKey.Marshal()) {
-			return nil, fmt.Errorf("certficate was signed by an unknown CA")
-		}
-	}
-
-	return &csr, nil
-}
-
-func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, id string) ([]byte, error) {
+func (lh *LoginHandler) doSigningRequest(key ssh.Signer, cert []byte, access, id string) (*api.CertificateResponse, error) {
 	// get public key
 	publicKey, err := lh.getPublicKeyBytes(key)
 	if err != nil {
@@ -537,50 +447,107 @@ func (lh *LoginHandler) signingRequestPayloadBytes(key ssh.Signer, cert []byte, 
 	lifetime := int(lh.lifetime.Seconds())
 
 	if lh.renewal {
-		payload := model.HostCertificateRenew{
+		// generate payload
+		payload := api.HostCertificateRenew{
 			PublicKey:   publicKey,
 			Lifetime:    &lifetime,
 			Proof:       proof,
 			Certificate: cert,
 		}
 
-		lh.logger.Debug("certificate request payload",
+		lh.logger.Info("sending request to CA", "url", lh.config.CertificateAuthorityURL)
+		lh.logger.Debug("certificate renewal payload",
 			"public_key", payload.PublicKey,
-			"lifetime", payload.Lifetime,
+			"lifetime", *payload.Lifetime,
 			"proof", payload.Proof,
-			"certificate", payload.Certificate,
-			"renewal", lh.renewal,
+			"certificate", cert,
 		)
 
-		return json.Marshal(payload)
+		res, err := lh.client.PostHostCertificateRenewEndpointWithResponse(
+			context.TODO(),
+			payload,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// ensure status code was 200 OK
+		if res.StatusCode() != http.StatusOK {
+			lh.logger.Debug("got unexpected response code from CA", "status", res.StatusCode(), "body", string(res.Body))
+			return nil, fmt.Errorf("bad status code: %d", res.StatusCode())
+		}
+
+		// verify certificate
+		if err := lh.verifycertificate(key, res.JSON200.Certificate); err != nil {
+			return nil, err
+		}
+
+		return res.JSON200, nil
 	}
 
-	payload := model.HostCertificateRequest{
-		PublicKey:  publicKey,
-		Lifetime:   &lifetime,
-		Proof:      proof,
-		Principals: lh.principals,
+	// generate payload
+	payload := api.HostCertificateRequest{
 		Identity:   id,
+		Lifetime:   &lifetime,
+		Principals: lh.principals,
+		Proof:      proof,
+		PublicKey:  publicKey,
 	}
 
+	lh.logger.Info("sending request to CA", "url", lh.config.CertificateAuthorityURL)
 	lh.logger.Debug("certificate request payload",
 		"public_key", payload.PublicKey,
 		"lifetime", *payload.Lifetime,
 		"proof", payload.Proof,
 		"principals", payload.Principals,
 		"identity", payload.Identity,
-		"renewal", lh.renewal,
 	)
 
-	return json.Marshal(payload)
-}
-
-func (lh *LoginHandler) apiPath() string {
-	if lh.renewal {
-		return "/api/v3/host/renew"
+	res, err := lh.client.PostHostCertificateRequestEndpointWithResponse(
+		context.TODO(),
+		&api.PostHostCertificateRequestEndpointParams{
+			Authorization: "Bearer " + access,
+		},
+		payload,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	return "/api/v3/host/certificate"
+	// ensure status code was 200 OK
+	if res.StatusCode() != http.StatusOK {
+		lh.logger.Debug("got unexpected response code from CA", "status", res.StatusCode(), "body", string(res.Body))
+		return nil, fmt.Errorf("bad status code: %d", res.StatusCode())
+	}
+
+	// verify certificate
+	if err := lh.verifycertificate(key, res.JSON200.Certificate); err != nil {
+		return nil, err
+	}
+
+	return res.JSON200, nil
+}
+
+func (lh *LoginHandler) verifycertificate(key ssh.Signer, cert []byte) error {
+	// parse the cert we got back
+	newCert, err := sshcert.ParseCert(cert)
+	if err != nil {
+		return fmt.Errorf("could not parse certificate from CA: %w", err)
+	}
+
+	// check its as we expect by comparing the subject key to our public key
+	if !bytes.Equal(newCert.Key.Marshal(), key.PublicKey().Marshal()) {
+		return fmt.Errorf("certficate from CA had different subject key than expected")
+	}
+
+	// check against CA
+	if ca := lh.config.CertificateAuthority(); ca != nil {
+		if !bytes.Equal(ca.Marshal(), newCert.SignatureKey.Marshal()) {
+			return fmt.Errorf("certficate was signed by an unknown CA")
+		}
+	}
+
+	return nil
 }
 
 func (lh *LoginHandler) getPublicKeyBytes(key ssh.Signer) ([]byte, error) {
