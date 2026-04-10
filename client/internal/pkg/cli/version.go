@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version"
 	"github.com/andrewheberle/simplecommand"
@@ -34,11 +33,15 @@ func (c *versionCommand) Init(cd *simplecobra.Commandeer) error {
 }
 
 func (c *versionCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
-	if c.json {
-		return json.NewEncoder(os.Stdout).Encode(versionJson{Name: cd.Root.Command.Name(), Version: version.Version()})
+	return showversion(cd.Root.Command.Name(), c.json)
+}
+
+func showversion(name string, asjson bool) error {
+	if asjson {
+		return json.NewEncoder(stdout).Encode(versionJson{Name: name, Version: version.Version()})
 	}
 
-	_, err := fmt.Printf("%s %s\n", cd.Root.Command.Name(), version.Version())
+	_, err := fmt.Fprintf(stdout, "%s %s\n", name, version.Version())
 
 	return err
 }
