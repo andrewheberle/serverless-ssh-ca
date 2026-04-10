@@ -28,7 +28,7 @@ func (c *versionCommand) Init(cd *simplecobra.Commandeer) error {
 	}
 
 	cmd := cd.CobraCommand
-	cmd.Flags().BoolVar(&c.json, "json", false, "Output version as JSON")
+	cmd.Flags().BoolVar(&c.json, "json", false, "Output as JSON")
 
 	return nil
 }

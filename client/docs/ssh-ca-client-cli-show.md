@@ -8,7 +8,7 @@ ssh-ca-client-cli-show - Show any existing private key, public key, certificate 
 ssh-ca-client-cli [global options] show [--certificate]
                                         [--private]
                                         [--public]
-                                        [--status]
+                                        [--status [--json]]
 ```
 
 ## Description
@@ -38,6 +38,11 @@ Display the users public key.
 `--status`
 Display general status.
 
+`--json`
+Display general status as JSON.
+
+This option is only valid with the `--status` option.
+
 ## Examples
 
 * Display the current private key in Open SSH format:
@@ -50,6 +55,12 @@ Display general status.
 
   ```sh
   ssh-ca-client-cli show --certificate
+  ```
+
+* Display the current status as JSON:
+
+  ```sh
+  ssh-ca-client-cli show --status --json
   ```
 
 ## ssh-ca-client-cli
