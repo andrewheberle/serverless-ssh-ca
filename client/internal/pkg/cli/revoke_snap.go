@@ -11,7 +11,5 @@ func (c *revokeCommand) Init(cd *simplecobra.Commandeer) error {
 		return err
 	}
 
-	cmd := cd.CobraCommand
-
 	return nil
 }
