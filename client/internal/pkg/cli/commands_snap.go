@@ -22,5 +22,8 @@ func commands() []simplecobra.Commander {
 		&versionCommand{
 			Command: simplecommand.New("version", "Show the current version of the ssh-ca-client-cli"),
 		},
+		&revokeCommand{
+			Command: simplecommand.New("revoke", "Revoke a certificate"),
+		},
 	}
 }
