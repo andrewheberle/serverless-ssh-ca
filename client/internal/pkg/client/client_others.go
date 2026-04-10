@@ -21,7 +21,7 @@ func (lh *LoginHandler) RunPageantProxy(ctx context.Context) error {
 // addedKey returns the SSH key to be added to the Agent
 // On non-Windows platforms this includes LifetimeSecs that aligns with
 // the certificate expiry time
-func addedKey(key interface{}, cert *ssh.Certificate) agent.AddedKey {
+func addedKey(key any, cert *ssh.Certificate) agent.AddedKey {
 	// work out lifetime
 	expiry := time.Unix(int64(cert.ValidBefore), 0)
 	lifetime := time.Until(expiry).Seconds()

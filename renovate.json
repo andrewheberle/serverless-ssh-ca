@@ -2,5 +2,18 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": [
 		"config:recommended"
+	],
+	"customManagers": [
+		{
+			"customType": "regex",
+			"managerFilePatterns": [
+				"**/oapi-codegen.yaml"
+			],
+			"matchStrings": [
+				"# yaml-language-server: \\$schema=https://raw.githubusercontent.com/oapi-codegen/oapi-codegen/(?<currentValue>[^/]+)/configuration-schema.json"
+			],
+			"depNameTemplate": "github.com/oapi-codegen/oapi-codegen/v2",
+			"datasourceTemplate": "go"
+		}
 	]
 }

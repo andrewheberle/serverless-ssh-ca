@@ -3,9 +3,11 @@ package krl_test
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"reflect"
 	"testing"
 
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/api"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/krl"
 	"golang.org/x/crypto/ssh"
 )
@@ -51,7 +53,59 @@ XVEZqGFoKDQf2bUJaTX2mSodUrjNrQvg==
 -----END SSH SIGNATURE-----`
 )
 
-func TestReadAndVerify(t *testing.T) {
+type mockClient struct {
+	krl []byte
+	sig string
+}
+
+func (c *mockClient) Do(req *http.Request) (*http.Response, error) {
+	if req.URL.String() != "https://ssh.example.com/api/v3/host/krl" {
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Header: http.Header{
+				"Content-Type": []string{"text/plain"},
+			},
+			Body: &mockBody{r: bytes.NewReader(make([]byte, 0))},
+		}, nil
+	}
+
+	b, err := json.Marshal(api.KeyRevocationListResponse{
+		Krl:       c.krl,
+		Signature: c.sig,
+	})
+	if err != nil {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Header: http.Header{
+				"Content-Type": []string{"text/plain"},
+			},
+			Body: &mockBody{r: bytes.NewReader(make([]byte, 0))},
+		}, nil
+
+	}
+
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: &mockBody{r: bytes.NewReader(b)},
+	}, nil
+}
+
+type mockBody struct {
+	r *bytes.Reader
+}
+
+func (b *mockBody) Read(p []byte) (n int, err error) {
+	return b.r.Read(p)
+}
+
+func (b *mockBody) Close() error {
+	return nil
+}
+
+func TestGetAndVerify(t *testing.T) {
 	pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(capublickey))
 	if err != nil {
 		panic(err)
@@ -85,12 +139,7 @@ func TestReadAndVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b, err := json.Marshal(krl.Response{Krl: tt.krldata, Signature: tt.signature})
-			if err != nil {
-				t.Fatalf("json.Marshal() failed: %s", err)
-			}
-
-			got, gotErr := krl.Read(bytes.NewReader(b))
+			got, gotErr := krl.Get("https://ssh.example.com/", "host", api.WithHTTPClient(&mockClient{krl: tt.krldata, sig: tt.signature}))
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("Read() failed: %v", gotErr)

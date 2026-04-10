@@ -2,12 +2,13 @@ package krl
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
-	"io"
+	"net/http"
 
-	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/model"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/api"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/client"
 	sshkrl "github.com/forfuncsake/krl"
 	"github.com/hiddeco/sshsig"
 	"golang.org/x/crypto/ssh"
@@ -15,7 +16,7 @@ import (
 
 const Namespace = "krl@com.github.serverless-ssh-ca.andrewheberle"
 
-type Response model.KeyRevocationListResponse
+type Response api.KeyRevocationListResponse
 
 var (
 	ErrNoPublicKey       = errors.New("no public key provided for signature verification")
@@ -23,19 +24,28 @@ var (
 	ErrUnexpectedSection = errors.New("encountered unexpected section type in krl")
 )
 
-func Read(reader io.Reader) (*Response, error) {
-	var payload Response
-
-	// set up decoder
-	dec := json.NewDecoder(reader)
-	dec.DisallowUnknownFields()
-
-	// decode json
-	if err := dec.Decode(&payload); err != nil {
+func Get(server string, certificatetype api.GetRevocationListEndpointParamsCertificateType, opts ...api.ClientOption) (*Response, error) {
+	if opts == nil {
+		opts = append(opts, api.WithHTTPClient(client.NewHttpClient()))
+	}
+	client, err := api.NewClientWithResponses(server, opts...)
+	if err != nil {
 		return nil, err
 	}
 
-	return &payload, nil
+	res, err := client.GetRevocationListEndpointWithResponse(context.TODO(), certificatetype)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("bad status code: %d", res.StatusCode())
+	}
+
+	return &Response{
+		Krl:       res.JSON200.Krl,
+		Signature: res.JSON200.Signature,
+	}, nil
 }
 
 func (r *Response) VerifyStrict(pub ssh.PublicKey) error {

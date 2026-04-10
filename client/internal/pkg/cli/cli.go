@@ -19,7 +19,8 @@ type rootCommand struct {
 }
 
 var (
-	ErrNoPrivateKey = errors.New("no private key found")
+	ErrCommandNotImplemented = errors.New("command not implemented")
+	ErrNoPrivateKey          = errors.New("no private key found")
 )
 
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {
