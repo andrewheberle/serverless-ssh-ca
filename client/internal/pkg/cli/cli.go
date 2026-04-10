@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
@@ -21,6 +23,9 @@ type rootCommand struct {
 var (
 	ErrCommandNotImplemented = errors.New("command not implemented")
 	ErrNoPrivateKey          = errors.New("no private key found")
+
+	// to allow output redirection for tests
+	stdout io.ReadWriter = os.Stdout
 )
 
 func (c *rootCommand) Init(cd *simplecobra.Commandeer) error {

@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
@@ -16,11 +18,23 @@ type showCommand struct {
 	public      bool
 	certificate bool
 	status      bool
+	json        bool
 
 	config *config.Config
 	logger *slog.Logger
 
 	*simplecommand.Command
+}
+
+type showStatusJson struct {
+	PrivateKey  string                     `json:"private_key,omitempty"`
+	Certificate *showStatusCertificateJson `json:"certificate,omitempty"`
+}
+
+type showStatusCertificateJson struct {
+	Status   string        `json:"status"`
+	Expiry   time.Time     `json:"valid_until"`
+	TimeLeft time.Duration `json:"time_left"`
 }
 
 func (c *showCommand) Init(cd *simplecobra.Commandeer) error {
@@ -33,10 +47,14 @@ func (c *showCommand) Init(cd *simplecobra.Commandeer) error {
 	cmd.Flags().BoolVar(&c.certificate, "certificate", false, "Display certificate if one exists")
 	cmd.Flags().BoolVar(&c.public, "public", false, "Display public key")
 	cmd.Flags().BoolVar(&c.status, "status", false, "Display status only")
+	cmd.Flags().BoolVar(&c.json, "json", false, "Output status as JSON")
 	cmd.MarkFlagsMutuallyExclusive("public", "private", "certificate")
 	cmd.MarkFlagsMutuallyExclusive("status", "private")
 	cmd.MarkFlagsMutuallyExclusive("status", "certificate")
 	cmd.MarkFlagsMutuallyExclusive("status", "public")
+	cmd.MarkFlagsMutuallyExclusive("json", "private")
+	cmd.MarkFlagsMutuallyExclusive("json", "certificate")
+	cmd.MarkFlagsMutuallyExclusive("json", "public")
 
 	return nil
 }
@@ -68,6 +86,12 @@ func (c *showCommand) PreRun(this, runner *simplecobra.Commandeer) error {
 func (c *showCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	if c.status {
 		if !c.config.HasPrivateKey() {
+			if c.json {
+				return json.NewEncoder(os.Stdout).Encode(showStatusJson{
+					PrivateKey: "missing",
+				})
+			}
+
 			fmt.Printf("Private Key:        missing\n")
 			fmt.Printf("Certificate:        N/A\n")
 			fmt.Printf("Certificate Status: N/A\n")
@@ -77,6 +101,12 @@ func (c *showCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args 
 		}
 
 		if !c.config.HasCertificate() {
+			if c.json {
+				return json.NewEncoder(os.Stdout).Encode(showStatusJson{
+					PrivateKey: "exists",
+				})
+			}
+
 			fmt.Printf("Private Key:        exists\n")
 			fmt.Printf("Certificate:        missing\n")
 			fmt.Printf("Certificate Status: N/A\n")
@@ -90,6 +120,18 @@ func (c *showCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args 
 			status = "expired"
 		}
 		expiry := c.config.CerificateExpiry()
+
+		if c.json {
+			return json.NewEncoder(os.Stdout).Encode(showStatusJson{
+				PrivateKey: "exists",
+				Certificate: &showStatusCertificateJson{
+					Status:   status,
+					Expiry:   expiry,
+					TimeLeft: time.Until(expiry),
+				},
+			})
+		}
+
 		fmt.Printf("Private Key:        exists\n")
 		fmt.Printf("Certificate:        exists\n")
 		fmt.Printf("Certificate Status: %s\n", status)
