@@ -405,32 +405,6 @@ func certPath(keypath string) string {
 	return filepath.Join(dir, fmt.Sprintf("%s-cert.pub", name))
 }
 
-type customTransport struct {
-	Transport http.RoundTripper
-	Headers   map[string]string
-}
-
-func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone the request to avoid modifying the original
-	newReq := req.Clone(req.Context())
-	if newReq.Header == nil {
-		newReq.Header = make(http.Header)
-	}
-	for key, value := range t.Headers {
-		newReq.Header.Set(key, value)
-	}
-
-	// Use the underlying transport to execute the request
-	return t.transport().RoundTrip(newReq)
-}
-
-func (t *customTransport) transport() http.RoundTripper {
-	if t.Transport != nil {
-		return t.Transport
-	}
-	return http.DefaultTransport
-}
-
 func (lh *LoginHandler) doSigningRequest(key ssh.Signer, cert []byte, access, id string) (*api.CertificateResponse, error) {
 	// get public key
 	publicKey, err := lh.getPublicKeyBytes(key)

@@ -34,7 +34,7 @@ func (lh *LoginHandler) RunPageantProxy(ctx context.Context) error {
 }
 
 // addedKey returns the SSH key to be added to the Agent
-func addedKey(key interface{}, cert *ssh.Certificate) agent.AddedKey {
+func addedKey(key any, cert *ssh.Certificate) agent.AddedKey {
 	return agent.AddedKey{
 		PrivateKey:  key,
 		Certificate: cert,

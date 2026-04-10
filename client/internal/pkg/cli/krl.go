@@ -20,7 +20,6 @@ type krlCommand struct {
 	force bool
 
 	config          *config.SystemConfig
-	krlUrl          string
 	logger          *slog.Logger
 	certificatetype api.GetRevocationListEndpointParamsCertificateType
 
