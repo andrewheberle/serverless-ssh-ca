@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/api"
@@ -42,8 +41,6 @@ func Get(server string, certificatetype api.GetRevocationListEndpointParamsCerti
 	if res.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("bad status code: %d", res.StatusCode())
 	}
-
-	slog.Info("response", "res", res)
 
 	return &Response{
 		Krl:       res.JSON200.Krl,
