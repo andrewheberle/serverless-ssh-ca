@@ -92,10 +92,6 @@ export class ProofOfPossession {
 			switch (true) {
 				case (err instanceof FingerprintFormatError):
 					throw new PossessionParseError("proof of possession fingerprint was an invalid format", err)
-				case (err instanceof DOMException):
-					if (err.name == "InvalidCharacterError") {
-						throw new PossessionParseError("proof of possession signature could not be parsed", err)
-					}
 				default:
 					throw err
 			}
