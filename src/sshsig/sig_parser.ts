@@ -22,11 +22,11 @@ export function parse(signature: DataView | string): Sig {
 
   const magic = reader.readBytes(6).toString();
   if (magic !== "SSHSIG") {
-    throw new Error(`Expected SSHSIG magic value but got: ${magic}`);
+    throw new Error("Expected SSHSIG magic value but got unexpected bytes");
   }
   const version = reader.readUint32();
   if (version !== 1) {
-    throw new Error(`Expected version 1 but got: ${version}`);
+    throw new Error("Expected version 1 but got unexpected version");
   }
   const raw_publickey = reader.peekString().bytes();
   const publickey = reader.readString();
