@@ -34,9 +34,6 @@ export function parse(signature: DataView | string): Sig {
   const pubkey = parsePubkey(pk_algo, publickey, raw_publickey);
   const namespace = reader.readString().toString();
   const reserved = reader.readString().bytes();
-	if (reserved.length !== 0) {
-    throw new Error("reserved field must be empty")
-  }
   const hash_algorithm = reader.readString().toString();
   const raw_signature = reader.readString();
   const sig_algo = raw_signature.readString().toString();
