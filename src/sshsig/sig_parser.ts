@@ -34,6 +34,9 @@ export function parse(signature: DataView | string): Sig {
   const pubkey = parsePubkey(pk_algo, publickey, raw_publickey);
   const namespace = reader.readString().toString();
   const reserved = reader.readString().bytes();
+	if (reserved.length !== 0) {
+    throw new Error("reserved field must be empty")
+  }
   const hash_algorithm = reader.readString().toString();
   const raw_signature = reader.readString();
   const sig_algo = raw_signature.readString().toString();
@@ -48,7 +51,13 @@ export function parse(signature: DataView | string): Sig {
     if (r[0] === 0x00 && r.length % 2 == 1) {
       r = r.slice(1);
     }
+		if (r.length === 0) {
+      throw new Error("invalid ECDSA signature component")
+    }
     let s = new Uint8Array(sig_bytes.readString().bytes());
+		if (s.length === 0) {
+      throw new Error("invalid ECDSA signature component")
+    }
     if (s[0] === 0x00 && s.length % 2 == 1) {
       s = s.slice(1);
     }
