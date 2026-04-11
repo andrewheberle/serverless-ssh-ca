@@ -48,11 +48,11 @@ export function parse(signature: DataView | string): Sig {
     sig_algo === "sk-ecdsa-sha2-nistp256@openssh.com"
   ) {
     let r = new Uint8Array(sig_bytes.readString().bytes());
+	  if (r.length === 0) {
+      throw new Error("invalid ECDSA signature component")
+    }
     if (r[0] === 0x00 && r.length % 2 == 1) {
       r = r.slice(1);
-    }
-		if (r.length === 0) {
-      throw new Error("invalid ECDSA signature component")
     }
     let s = new Uint8Array(sig_bytes.readString().bytes());
 		if (s.length === 0) {
