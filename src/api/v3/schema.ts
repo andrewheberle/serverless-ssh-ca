@@ -216,7 +216,7 @@ export const HostCertificateRenewEndpointSchema = {
 		"200": {
 			description: "SSH Host Certificate renewed successfully",
 			...contentJson(z.object({
-				certificate: z.string()
+				certificate: certificate
 			})
 				.openapi("Certificate Response")
 			),

@@ -22,11 +22,11 @@ export function parse(signature: DataView | string): Sig {
 
   const magic = reader.readBytes(6).toString();
   if (magic !== "SSHSIG") {
-    throw new Error(`Expected SSHSIG magic value but got: ${magic}`);
+    throw new Error("Expected SSHSIG magic value but got unexpected bytes");
   }
   const version = reader.readUint32();
   if (version !== 1) {
-    throw new Error(`Expected version 1 but got: ${version}`);
+    throw new Error("Expected version 1 but got unexpected version");
   }
   const raw_publickey = reader.peekString().bytes();
   const publickey = reader.readString();
@@ -45,10 +45,16 @@ export function parse(signature: DataView | string): Sig {
     sig_algo === "sk-ecdsa-sha2-nistp256@openssh.com"
   ) {
     let r = new Uint8Array(sig_bytes.readString().bytes());
+	  if (r.length === 0) {
+      throw new Error("invalid ECDSA signature component")
+    }
     if (r[0] === 0x00 && r.length % 2 == 1) {
       r = r.slice(1);
     }
     let s = new Uint8Array(sig_bytes.readString().bytes());
+		if (s.length === 0) {
+      throw new Error("invalid ECDSA signature component")
+    }
     if (s[0] === 0x00 && s.length % 2 == 1) {
       s = s.slice(1);
     }
