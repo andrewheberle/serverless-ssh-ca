@@ -22,7 +22,6 @@
 		"crons": [ "59 23 * * *" ],
 	},
 	"vars": {
-		"IS_PRODUCTION": "true",
 		"ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
 		"JWT_JWKS_URL": "https://idp.example.com/.well-known/jwks.json",
 		"JWT_AUD": "audience",
