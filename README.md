@@ -177,10 +177,10 @@ npm install
     "JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": "groups",
     // The lifetime of the issued SSH certificates
     "SSH_CERTIFICATE_LIFETIME": "24 hours",
-    // A comma seperated list of additional principals to add to the certificate
-    "SSH_CERTIFICATE_PRINCIPALS": "ssh-admin",
+    // A comma seperated list of additional principals to add to all issued user certificates
+    "SSH_CERTIFICATE_PRINCIPALS": "",
     // Whether to add the users own name as a valid principal
-    "SSH_CERTIFICATE_INCLUDE_USER": "false",
+    "SSH_CERTIFICATE_INCLUDE_SELF": "false",
     // The list of SSH extensions to add to the certificate as a comma seperated list
     "SSH_CERTIFICATE_EXTENSIONS": "permit-X11-forwarding,permit-agent-forwarding,permit-port-forwarding,permit-pty,permit-user-rc",
     // A comma seperated list of users who are permitted to request SSH host certificates based on the email claim from the OIDC IdP

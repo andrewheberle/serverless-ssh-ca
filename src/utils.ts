@@ -47,12 +47,12 @@ export const transformProofOfPossession = (val: string, ctx: z.core.$RefinementC
 	}
 }
 
-type ParsedAuthorizationHeader = {
+type AccessToken = {
 	email: string
 	sub: string
 }
 
-export const transformAuthorizationHeader = async (val: string, ctx: z.RefinementCtx): Promise<ParsedAuthorizationHeader | never> => {
+export const transformAuthorizationHeader = async (val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
 	// skip this when running locally
 	if (env.IS_PRODUCTION as string === "false") {
 		return {
@@ -160,17 +160,14 @@ export const identityPrincipals = (payload: CertificateRequestJWTPayload, claim?
 	return principals
 }
 
-type ParsedIdentity = {
+type IdentityToken = {
 	sub: string
 	principals: string[]
 }
 
-export const parseIdentity = async (jwt: string | undefined, claim?: string): Promise<ParsedIdentity> => {
+export const parseIdentity = async (jwt: string | undefined, claim?: string): Promise<IdentityToken> => {
 	if (jwt === undefined) {
-		return {
-			sub: "",
-			principals: []
-		}
+		throw new Error("missing identity token")
 	}
 
 	const aud = env.JWT_AUD === undefined || env.JWT_AUD as string === "" ? undefined : split(env.JWT_AUD as string)
@@ -181,6 +178,21 @@ export const parseIdentity = async (jwt: string | undefined, claim?: string): Pr
 	return {
 		sub: payload.sub,
 		principals: principals,
+	}
+}
+
+export const transformIdentityToken = async (val: string, ctx: z.RefinementCtx): Promise<IdentityToken | never> => {
+	try {
+		const identity = await parseIdentity(val, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+
+		return identity
+	} catch (err) {
+		ctx.issues.push({
+			code: "custom",
+			message: "problem parsing identity token",
+			input: val
+		})
+		return z.NEVER
 	}
 }
 
@@ -227,7 +239,7 @@ type ParsedCertificateRequest = {
 	proof: ProofOfPossession
 	public_key: Key
 	lifetime: number
-	identity: string
+	identity: IdentityToken
 	extensions: string[]
 }
 

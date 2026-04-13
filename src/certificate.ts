@@ -61,9 +61,7 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
 		: seconds(env.SSH_CERTIFICATE_LIFETIME)
 
 	// generate value for serial of certificate
-	const now = options?.now ?? Date.now()
-	const serial = Buffer.alloc(8)
-	serial.writeBigUInt64BE(BigInt(now))
+	const serial = generateSerial()
 
 	// set issuer of certificate based on ISSUER_DN
 	const issuer = identityFromDN(env.ISSUER_DN)
@@ -176,9 +174,7 @@ export async function createSignedHostCertificate(public_key: Key, options: Crea
 		: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME)
 
 	// generate value for serial of certificate
-	const unixTimestamp = Date.now()
-	const serial = Buffer.alloc(8)
-	serial.writeBigUInt64BE(BigInt(unixTimestamp))
+	const serial = generateSerial()
 
 	// set issuer of certificate based on ISSUER_DN
 	const issuer = identityFromDN(env.ISSUER_DN)
@@ -187,4 +183,9 @@ export async function createSignedHostCertificate(public_key: Key, options: Crea
 	const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
 
 	return certificate
+}
+
+const generateSerial = (): Buffer<ArrayBuffer> => {
+	const randomBytes = crypto.getRandomValues(new Uint8Array(8))
+	return Buffer.from(randomBytes)
 }
