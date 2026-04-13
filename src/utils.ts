@@ -53,14 +53,6 @@ type AccessToken = {
 }
 
 export const transformAuthorizationHeader = async (val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
-	// skip this when running locally
-	if (env.IS_PRODUCTION as string === "false") {
-		return {
-			email: "text@example.com",
-			sub: "test",
-		}
-	}
-
 	const jwt = val.replace("Bearer ", "")
 
 	if (jwt === "") {
