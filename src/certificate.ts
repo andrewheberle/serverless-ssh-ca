@@ -31,14 +31,14 @@ export class CertificateError extends Error {
 export type GenerateCertificateOptions = {
 	/**
 	 * @internal
-	 * Override the current timestamp used for the certificate serial number.
+	 * Override the certificate serial number.
 	 * Should only be set in tests.
 	 */
-	now?: number
+	serial?: bigint
 } & CreateCertificateOptions
 
 export const generateCertificate = (email: string, key: PrivateKey, public_key: Key, options?: GenerateCertificateOptions): Certificate => {
-	let { lifetime, principals, extensions } = options ?? {}
+	let { lifetime, principals, extensions, serial } = options ?? {}
 
 	// add identities
 	const identity = env.SSH_CERTIFICATE_INCLUDE_SELF as string === "true"
@@ -61,13 +61,13 @@ export const generateCertificate = (email: string, key: PrivateKey, public_key: 
 		: seconds(env.SSH_CERTIFICATE_LIFETIME)
 
 	// generate value for serial of certificate
-	const serial = generateSerial()
+	const s = generateSerial(serial)
 
 	// set issuer of certificate based on ISSUER_DN
 	const issuer = identityFromDN(env.ISSUER_DN)
 
 	// create certificate
-	const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
+	const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: s })
 
 	// ensure openssh info is included in certificate (should not occur)
 	if (certificate.signatures.openssh === undefined) {
@@ -185,7 +185,14 @@ export async function createSignedHostCertificate(public_key: Key, options: Crea
 	return certificate
 }
 
-const generateSerial = (): Buffer<ArrayBuffer> => {
+export const generateSerial = (serial?: bigint): Buffer<ArrayBuffer> => {
+	if (serial !== undefined) {
+		const s = Buffer.alloc(8)
+		s.writeBigUInt64BE(serial)
+
+		return s
+	}
+
 	const randomBytes = crypto.getRandomValues(new Uint8Array(8))
 	return Buffer.from(randomBytes)
 }
