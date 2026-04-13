@@ -1,6 +1,6 @@
 module github.com/andrewheberle/serverless-ssh-ca/client
 
-go 1.25.0
+go 1.26.2
 
 require (
 	codeberg.org/sdassow/atomic v1.2.1
@@ -26,6 +26,8 @@ require (
 	sigs.k8s.io/yaml v1.6.0
 )
 
+replace github.com/nfnt/resize => ./internal/pkg/resize
+
 require (
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
@@ -33,6 +35,7 @@ require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
+	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/esiqveland/notify v0.13.3 // indirect
 	github.com/getkin/kin-openapi v0.133.0 // indirect
