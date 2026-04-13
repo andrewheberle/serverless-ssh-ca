@@ -1,6 +1,6 @@
 module github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/resize
 
-go 1.26.2
+go 1.25.0
 
 require github.com/disintegration/imaging v1.6.2
 

@@ -42,7 +42,7 @@ func (i InterpolationFunction) resamplefilter() imaging.ResampleFilter {
 	return imaging.CatmullRom
 }
 
-// Resize re-implements the [github.com/nfnt/resize.Resize]
+// Resize re-implements [github.com/nfnt/resize.Resize]
 func Resize(width, height uint, img image.Image, interp InterpolationFunction) image.Image {
 	return imaging.Resize(img, int(width), int(height), interp.resamplefilter())
 }

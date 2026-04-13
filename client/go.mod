@@ -1,6 +1,6 @@
 module github.com/andrewheberle/serverless-ssh-ca/client
 
-go 1.26.2
+go 1.25.0
 
 require (
 	codeberg.org/sdassow/atomic v1.2.1
