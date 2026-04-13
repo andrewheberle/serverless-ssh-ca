@@ -74,7 +74,7 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -140,7 +140,7 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -203,7 +203,7 @@ class RevocationListEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -275,7 +275,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -338,7 +338,7 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -394,7 +394,7 @@ class RevokeCertificateEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}

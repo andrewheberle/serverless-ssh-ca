@@ -15,13 +15,6 @@ export const app = new Hono()
 // add error handling
 app.onError((err, c) => {
     if (err instanceof HTTPException) {
-        const message = err.message === "" ? "got HTTPException from router" : err.message
-        if (err.cause !== undefined) {
-            logger.error(message, "status", err.status, "cause", err.cause)
-        } else {
-            logger.error(message, "status", err.status)
-        }
-
         return err.getResponse()
     }
 
