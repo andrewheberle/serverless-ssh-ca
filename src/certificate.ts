@@ -7,193 +7,184 @@ import { split } from "./utils"
 const sshCertificateExtensions = split(env.SSH_CERTIFICATE_EXTENSIONS)
 
 export type CreateCertificateOptions = {
-    lifetime?: number
-    principals?: string[]
-    extensions?: string[]
+	lifetime?: number
+	principals?: string[]
+	extensions?: string[]
 }
 
 const DefaultCreateCertificateOptions: CreateCertificateOptions = {
-    lifetime: seconds(env.SSH_CERTIFICATE_LIFETIME),
-    principals: [],
-    extensions: sshCertificateExtensions
+	lifetime: seconds(env.SSH_CERTIFICATE_LIFETIME),
+	principals: [],
+	extensions: sshCertificateExtensions
 }
 
 export class CertificateError extends Error {
-    constructor(message: string) {
-    super(message)
-    this.name = "CertificateError"
+	constructor(message: string) {
+		super(message)
+		this.name = "CertificateError"
 
-    // This is necessary for proper stack trace in TypeScript
-    Object.setPrototypeOf(this, CertificateError.prototype)
-  }
+		// This is necessary for proper stack trace in TypeScript
+		Object.setPrototypeOf(this, CertificateError.prototype)
+	}
 }
 
 export type GenerateCertificateOptions = {
-    /**
-     * @internal
-     * Override the current timestamp used for the certificate serial number.
-     * Should only be set in tests.
-     */
-    now?: number
+	/**
+	 * @internal
+	 * Override the current timestamp used for the certificate serial number.
+	 * Should only be set in tests.
+	 */
+	now?: number
 } & CreateCertificateOptions
 
 export const generateCertificate = (email: string, key: PrivateKey, public_key: Key, options?: GenerateCertificateOptions): Certificate => {
-    let { lifetime, principals, extensions } = options ?? {}
+	let { lifetime, principals, extensions } = options ?? {}
 
-    // add identities
-    const identity = env.SSH_CERTIFICATE_INCLUDE_SELF as string === "true"
-        ? [identityForUser(email.split("@")[0])]
-        : []
-    if (principals !== undefined) {
-        for (const p of principals) {
-            identity.push(identityForUser(p))
-        }
-    }
-    if (env.SSH_CERTIFICATE_PRINCIPALS as string !== "") {
-        for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
-            identity.push(identityForUser(p))
-        }
-    }
+	// add identities
+	const identity = env.SSH_CERTIFICATE_INCLUDE_SELF as string === "true"
+		? [identityForUser(email.split("@")[0])]
+		: []
+	if (principals !== undefined) {
+		for (const p of principals) {
+			identity.push(identityForUser(p))
+		}
+	}
+	if (env.SSH_CERTIFICATE_PRINCIPALS as string !== "") {
+		for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
+			identity.push(identityForUser(p))
+		}
+	}
 
-    // lifetime is the smaller of what was provided in the options or the default
-    lifetime = lifetime !== undefined
-        ? Math.min(lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
-        : seconds(env.SSH_CERTIFICATE_LIFETIME)
+	// lifetime is the smaller of what was provided in the options or the default
+	lifetime = lifetime !== undefined
+		? Math.min(lifetime, seconds(env.SSH_CERTIFICATE_LIFETIME))
+		: seconds(env.SSH_CERTIFICATE_LIFETIME)
 
-    // generate value for serial of certificate
-    const now = options?.now ?? Date.now()
-    const serial = Buffer.alloc(8)
-    serial.writeBigUInt64BE(BigInt(now))
+	// generate value for serial of certificate
+	const now = options?.now ?? Date.now()
+	const serial = Buffer.alloc(8)
+	serial.writeBigUInt64BE(BigInt(now))
 
-    // set issuer of certificate based on ISSUER_DN
-    const issuer = identityFromDN(env.ISSUER_DN)
+	// set issuer of certificate based on ISSUER_DN
+	const issuer = identityFromDN(env.ISSUER_DN)
 
-    // create certificate
-    const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
+	// create certificate
+	const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
 
 	// ensure openssh info is included in certificate (should not occur)
 	if (certificate.signatures.openssh === undefined) {
 		throw new CertificateError("missing openssh information in certificate")
 	}
 
-    // add usage extensions
-    const sshextensions: SSHExtension[] = []
-    if (extensions !== undefined) {
-        // if extensions are provided in request, ensure they do not include extra extensions beyond the defaults
-        for (const ext of extensions) {
-            if (!sshCertificateExtensions.includes(ext)) {
-                throw new CertificateError(`${ext} is not allowed`)
-            }
+	// add usage extensions
+	const sshextensions: SSHExtension[] = []
+	if (extensions !== undefined) {
+		// if extensions are provided in request, ensure they do not include extra extensions beyond the defaults
+		for (const ext of extensions) {
+			if (!sshCertificateExtensions.includes(ext)) {
+				throw new CertificateError(`${ext} is not allowed`)
+			}
 
-            // add to list of allowed extensions
-            sshextensions.push({
-                critical: false,
-                name: ext,
-                data: Buffer.alloc(0)
-            })
-        }
-    } else {
-        // use defaults if not provided
-        sshCertificateExtensions.forEach((ext: string) => {
-            sshextensions.push({
-                critical: false,
-                name: ext,
-                data: Buffer.alloc(0)
-            })
-        })
+			// add to list of allowed extensions
+			sshextensions.push({
+				critical: false,
+				name: ext,
+				data: Buffer.alloc(0)
+			})
+		}
+	} else {
+		// use defaults if not provided
+		sshCertificateExtensions.forEach((ext: string) => {
+			sshextensions.push({
+				critical: false,
+				name: ext,
+				data: Buffer.alloc(0)
+			})
+		})
 
-    }
+	}
 
-    // add info to certificate
-    certificate.signatures = {
-        openssh: {
-            nonce: certificate.signatures.openssh.nonce,
-            keyId: email,
-            signature: certificate.signatures.openssh.signature,
-            exts: sshextensions
-        }
-    }
+	// add info to certificate
+	certificate.signatures = {
+		openssh: {
+			nonce: certificate.signatures.openssh.nonce,
+			keyId: email,
+			signature: certificate.signatures.openssh.signature,
+			exts: sshextensions
+		}
+	}
 
-    // re-sign after changes
-    certificate.signWith(key)
+	// re-sign after changes
+	certificate.signWith(key)
 
-    return certificate
+	return certificate
 }
 
 export async function createSignedCertificate(email: string, public_key: Key, options: CreateCertificateOptions = DefaultCreateCertificateOptions): Promise<Certificate> {
-    // grab private key from secret store
+	// grab private key from secret store
 	const secret = await env.PRIVATE_KEY.get()
 
 	// parse key
-    const key = parsePrivateKey(secret)
+	const key = parsePrivateKey(secret)
 
-    return generateCertificate(email, key, public_key, options)
+	return generateCertificate(email, key, public_key, options)
 }
 
 export type CreateHostCertificateOptions = {
-    lifetime?: number
-    principals?: string[]
-    subjects?: Identity[]
-    certificate?: Certificate
+	lifetime?: number
+	principals?: string[]
+	subjects?: Identity[]
 }
 
 const DefaultCreateHostertificateOptions: CreateHostCertificateOptions = {
-    lifetime: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME),
-    principals: [],
+	lifetime: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME),
+	principals: [],
 }
 
 export class BadIssuerError extends Error {
-    constructor(message: string) {
-    super(message)
-    this.name = "BadIssuerError"
+	constructor(message: string) {
+		super(message)
+		this.name = "BadIssuerError"
 
-    Object.setPrototypeOf(this, BadIssuerError.prototype)
-  }
+		Object.setPrototypeOf(this, BadIssuerError.prototype)
+	}
 }
 
 export async function createSignedHostCertificate(public_key: Key, options: CreateHostCertificateOptions = DefaultCreateHostertificateOptions): Promise<Certificate> {
-    // generate list of identities for host key
-    const identity: Identity[] = []
-    if (options.principals !== undefined) {
-        for (const p of options.principals) {
-            identity.push(identityForHost(p))
-        }
-    }
+	// generate list of identities for host key
+	const identity: Identity[] = []
+	if (options.principals !== undefined) {
+		for (const p of options.principals) {
+			identity.push(identityForHost(p))
+		}
+	}
 
-    // add any already provided subjects (for renewals only)
-    if (options.subjects !== undefined) {
-        identity.push(...options.subjects)
-    }
+	// add any already provided subjects (for renewals only)
+	if (options.subjects !== undefined) {
+		identity.push(...options.subjects)
+	}
 
-    // grab private key from secret store
+	// grab private key from secret store
 	const secret = await env.PRIVATE_KEY.get()
 
 	// parse private key
-    const key = parsePrivateKey(secret)
+	const key = parsePrivateKey(secret)
 
-    // check certificate was issued by us if provided (for renewals)
-    if (options.certificate !== undefined) {
-        const issuer = key.toPublic()
-        if (!options.certificate.isSignedByKey(issuer)) {
-            throw new BadIssuerError("the provided certificate was not signed by this CA")
-        }
-    }
+	// lifetime is the smaller of what was provided in the options or the default
+	const lifetime = options.lifetime !== undefined
+		? Math.min(options.lifetime, seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+		: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME)
 
-    // lifetime is the smaller of what was provided in the options or the default
-    const lifetime = options.lifetime !== undefined
-        ? Math.min(options.lifetime, seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-        : seconds(env.SSH_HOST_CERTIFICATE_LIFETIME)
+	// generate value for serial of certificate
+	const unixTimestamp = Date.now()
+	const serial = Buffer.alloc(8)
+	serial.writeBigUInt64BE(BigInt(unixTimestamp))
 
-    // generate value for serial of certificate
-    const unixTimestamp = Date.now()
-    const serial = Buffer.alloc(8)
-    serial.writeBigUInt64BE(BigInt(unixTimestamp))
+	// set issuer of certificate based on ISSUER_DN
+	const issuer = identityFromDN(env.ISSUER_DN)
 
-    // set issuer of certificate based on ISSUER_DN
-    const issuer = identityFromDN(env.ISSUER_DN)
+	// create certificate
+	const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
 
-    // create certificate
-    const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
-
-    return certificate
+	return certificate
 }

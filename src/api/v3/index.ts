@@ -33,7 +33,6 @@ import {
 import {
 	CertificateType,
 	getRevocationList,
-	isRevoked,
 	recordCertificate,
 	RevocationStatus,
 	revocationStatus,
@@ -63,7 +62,7 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
 		try {
 			const pub = await getPublic()
 
-			return c.text(`${pub}\n`)
+			return c.text(`${pub.toString("ssh").trim()}\n`)
 		} catch (err) {
 			switch (true) {
 				case (err instanceof KeyParseError):
@@ -294,12 +293,6 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 				"serial", serial,
 			),
 		)
-
-		// ensure certificate presented for renewal process is not revoked
-		if (await isRevoked(serial)) {
-			l.error("attempt to renew using revoked certificate")
-			throw new ForbiddenException("current certificate is revoked")
-		}
 
 		// use smaller of the current certificate lifetime and the requested lifetime
 		const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
