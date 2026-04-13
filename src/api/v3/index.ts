@@ -33,7 +33,6 @@ import {
 import {
 	CertificateType,
 	getRevocationList,
-	isRevoked,
 	recordCertificate,
 	RevocationStatus,
 	revocationStatus,
@@ -63,7 +62,7 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
 		try {
 			const pub = await getPublic()
 
-			return c.text(`${pub}\n`)
+			return c.text(`${pub.toString("ssh").trim()}\n`)
 		} catch (err) {
 			switch (true) {
 				case (err instanceof KeyParseError):
@@ -75,7 +74,7 @@ class CaPublicKeyEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -89,23 +88,27 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
 		const data = await this.getValidatedData<typeof this.schema>()
 
 		const l = logger.with(
-			...group("request", "type", "user", "action", "request"),
-			...group("auth_token", "email", data.headers.Authorization.email, "sub", data.headers.Authorization.sub),
+			...group("request",
+				"type", "user",
+				"action", "request",
+			),
+			...group("auth_token",
+				"email", data.headers.Authorization.email,
+				"sub", data.headers.Authorization.sub,
+			),
+			...group("id_token",
+				"sub", data.body.identity.sub,
+			),
 		)
 
-		const identity = await parseIdentity(data.body.identity, c.env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
-		if (identity.sub !== data.headers["Authorization"].sub) {
-			l.error("token subjects did not match",
-				...group("id_token",
-					"sub", identity.sub,
-				),
-			)
+		if (data.body.identity.sub !== data.headers["Authorization"].sub) {
+			l.error("token subjects did not match")
 			throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
 		}
 
 		const opts: CreateCertificateOptions = {
 			lifetime: data.body.lifetime,
-			principals: identity.principals,
+			principals: data.body.identity.principals,
 			extensions: data.body.extensions,
 		}
 
@@ -137,7 +140,7 @@ class UserCertificateRequestEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -200,7 +203,7 @@ class RevocationListEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -222,20 +225,19 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 				"email", data.headers.Authorization.email,
 				"sub", data.headers.Authorization.sub,
 			),
+			...group("id_token",
+				"sub", data.body.identity.sub,
+			),
 		)
 
-		const identity = await parseIdentity(data.body.identity, c.env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES_CLAIM)
-		if (identity.sub !== data.headers.Authorization.sub) {
-			l.error("token subjects did not match",
-				...group("id_token",
-					"sub", identity.sub,
-				),
-			)
-			throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
+		// check id and access token are for the same user
+		if (data.body.identity.sub !== data.headers.Authorization.sub) {
+			l.error("token subjects did not match")
+			throw new ForbiddenException("possible token substitution as subjects for authentication and identity tokens did not match")
 		}
 
 		// check user can issue host certificates
-		if (!split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !identity.principals.some((p: string) => split(env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
+		if (!split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !data.body.identity.principals.some((p: string) => split(env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
 			l.error("unauthorized host certificate request")
 			throw new UnauthorizedException("User not allowed to issue host certificates")
 		}
@@ -273,7 +275,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -294,12 +296,6 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 				"serial", serial,
 			),
 		)
-
-		// ensure certificate presented for renewal process is not revoked
-		if (await isRevoked(serial)) {
-			l.error("attempt to renew using revoked certificate")
-			throw new ForbiddenException("current certificate is revoked")
-		}
 
 		// use smaller of the current certificate lifetime and the requested lifetime
 		const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
@@ -342,7 +338,7 @@ class HostCertificateRenewEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}
@@ -398,7 +394,7 @@ class RevokeCertificateEndpoint extends OpenAPIRoute {
 				default:
 					// otherwise throw as InternalServerErrorException
 					l.error("unhandled error", "error", err)
-					throw new InternalServerErrorException(`${err}`)
+					throw new InternalServerErrorException("internal server error")
 			}
 		}
 	}

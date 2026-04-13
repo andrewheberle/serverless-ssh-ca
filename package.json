@@ -25,7 +25,7 @@
 				"description": "The lifetime of the issued SSH certificates in human readable form (ie '24 hours'), although the client may request a shorter duration"
 			},
 			"SSH_CERTIFICATE_PRINCIPALS": {
-				"description": "A comma seperated list of additional principals to add to the SSH certificate"
+				"description": "A comma seperated list of additional principals to add to all issued user certificates"
 			},
 			"SSH_CERTIFICATE_INCLUDE_SELF": {
 				"description": "Whether to add the users own name as a valid principal (based on the part before the @ symbol in the JWT email claim)"
