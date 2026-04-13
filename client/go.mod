@@ -26,6 +26,8 @@ require (
 	sigs.k8s.io/yaml v1.6.0
 )
 
+replace github.com/nfnt/resize => ./internal/pkg/resize
+
 require (
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
@@ -41,6 +43,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
+	github.com/gohugoio/gift v0.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackmordaunt/icns/v3 v3.0.1 // indirect
