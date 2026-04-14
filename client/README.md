@@ -37,8 +37,8 @@ available from the GitHub Releases page or you may add the APT repository to
 your system as follows:
 
 ```sh
-curl -fsSL https://packages.hebs.net.au/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/serverless-ssh-ca.gpg
-echo "deb [signed-by=/usr/share/keyrings/serverless-ssh-ca.gpg] https://packages.hebs.net.au stable main" | sudo tee /etc/apt/sources.list.d/serverless-ssh-ca.list
+curl -fsSL https://packages.hebs.net.au/serverless-ssh-ca/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/serverless-ssh-ca.gpg
+echo "deb [signed-by=/usr/share/keyrings/serverless-ssh-ca.gpg] https://packages.hebs.net.au/serverless-ssh-ca stable main" | sudo tee /etc/apt/sources.list.d/serverless-ssh-ca.list
 sudo apt-get update
 sudo apt-get install serverless-ssh-ca
 ```
