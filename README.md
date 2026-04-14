@@ -186,7 +186,7 @@ npm install
     // The lifetime of issued Host SSH certificates in human readable form (ie "45 days"), although the client may request a shorter duration
     "SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
     // The maximum time skew allowed for certificate requests
-    "CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
+    "CERTIFICATE_REQUEST_TIME_SKEW_MAX": "90 seconds",
 	// Set this to "debug" to enable more logging
 	"LOG_LEVEL": "info"
 },
