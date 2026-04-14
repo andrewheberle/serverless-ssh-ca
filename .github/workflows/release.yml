@@ -161,6 +161,8 @@ jobs:
             --sign C725E94C4DAFEA05 \
             --codename stable \
             --component main \
+            --prefix serverless-ssh-ca \
+            --visibility nil \
             {}
         env:
           # R2 does not support CRC32 checksums introduced in AWS SDK
@@ -169,7 +171,7 @@ jobs:
       - name: Upload public key to apt repo
         run: |
           gpg --armor --export C725E94C4DAFEA05 > pubkey.gpg
-          aws s3 cp pubkey.gpg s3://packages/pubkey.gpg \
+          aws s3 cp pubkey.gpg s3://packages/serverless-ssh-ca/pubkey.gpg \
             --endpoint-url https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com \
             --region auto
         env:
