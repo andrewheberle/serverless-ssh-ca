@@ -53,6 +53,9 @@
 			},
 			"DB_CERTIFICATE_RETENTION": {
 				"description": "The period of time to retain issued certificates in the database (ie '1 year' or 'infinite' to never purge the database)"
+			},
+			"LOG_LEVEL": {
+				"description": "Set this to debug to enable additional Worker logging"
 			}
 		}
 	},
