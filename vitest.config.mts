@@ -23,6 +23,7 @@ export default defineConfig(async () => {
 				miniflare: {
 					compatibilityFlags: ["experimental", "nodejs_compat"],
 					bindings: {
+						"ISSUER_DN": "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
 						"SSH_CERTIFICATE_PRINCIPALS": "",
 						"SSH_CERTIFICATE_INCLUDE_SELF": "false",
 						"TEST_MIGRATIONS": migrations

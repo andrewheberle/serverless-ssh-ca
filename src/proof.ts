@@ -4,6 +4,7 @@ import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseKey } 
 import { verify } from "./sshsig"
 import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
+import { Logger, LogLevel } from "@andrewheberle/ts-slog"
 
 const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 
@@ -37,9 +38,11 @@ export class ProofOfPossession {
 	readonly fingerprint: Fingerprint
 	readonly signature: Sig
 	readonly signaturePubkey: Key
+	readonly logger: Logger
 	private readonly data: string
 
-	constructor(proof: string, from?: number) {
+	constructor(proof: string, options?: { from?: number, logger?: Logger }) {
+		this.logger = options?.logger !== undefined ? options.logger : new Logger({ minLevel: LogLevel.None })
 		const parts = proof.split(".")
 		if (parts.length !== 3) {
 			throw new PossessionParseError("invalid proof of possession format")
@@ -53,7 +56,7 @@ export class ProofOfPossession {
 			throw new PossessionParseError("timestamp was not a number")
 		}
 
-		const now = from !== undefined ? from : Date.now()
+		const now = options?.from !== undefined ? options?.from : Date.now()
 		const age = now - timestamp
 		const skew = ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)
 		if (age > skew) {
@@ -115,17 +118,24 @@ export class ProofOfPossession {
 	matches(...keys: Key[]): boolean
 
 	matches(...keys: Key[]): boolean {
-		for (const key of keys) {
-			// confirm proof of possession fingerprint matches keys
-			if (!this.fingerprint.matches(key))
-				return false
+		try {
+			for (const key of keys) {
+				// confirm proof of possession fingerprint matches keys
+				this.logger.debug("this.fingerprint.matches()", "fingerprint", this.fingerprint.toString("base64"), "key", key.toString("ssh"))
+				if (!this.fingerprint.matches(key))
+					return false
 
-			// also confirm key used to sign proof of possession matches
-			if (!this.signaturePubkey.fingerprint().matches(key))
-				return false
+				// also confirm key used to sign proof of possession matches
+				this.logger.debug("this.signaturePubkey.fingerprint().matches()", "signaturePubkey", this.signaturePubkey.fingerprint().toString("base64"), "key", key.toString("ssh"))
+				if (!this.signaturePubkey.fingerprint().matches(key))
+					return false
+			}
+
+			return true
+		} catch (err) {
+			this.logger.error("error in matches()", "error", err)
+			throw err
 		}
-
-		return true
 	}
 }
 
@@ -138,13 +148,18 @@ export class HostProofOfPossession extends ProofOfPossession {
 			throw new Error("must verify both public key and certificate")
 		}
 
-		for (const key of keys) {
-			if (!this.fingerprint.matches(key))
-				return false
-			if (!this.signaturePubkey.fingerprint().matches(key))
-            	return false
-		}
+		try {
+			for (const key of keys) {
+				if (!this.fingerprint.matches(key))
+					return false
+				if (!this.signaturePubkey.fingerprint().matches(key))
+					return false
+			}
 
-		return true
+			return true
+		} catch (err) {
+			this.logger.error("error in matches()", "error", err)
+			throw err
+		}
 	}
 }

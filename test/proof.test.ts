@@ -111,10 +111,10 @@ describe("ProofOfPossession", async () => {
     for (const tt of tests) {
         it(tt.name, async () => {
             if (tt.wantErr !== undefined) {
-                expect(() => new ProofOfPossession(`${tt.data}.${tt.sig}`, tt.from))
+                expect(() => new ProofOfPossession(`${tt.data}.${tt.sig}`, { from: tt.from }))
                     .toThrow(tt.wantErr)
             } else {
-                const nonce = new ProofOfPossession(`${tt.data}.${tt.sig}`, tt.from)
+                const nonce = new ProofOfPossession(`${tt.data}.${tt.sig}`, { from: tt.from })
 
                 // verify timestamp and signature
                 expect(nonce.timestamp).toBe(timestamp)

@@ -20,7 +20,7 @@ export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) 
 
 export const transformProofOfPossession = (val: string, ctx: z.core.$RefinementCtx<string>): ProofOfPossession | never => {
 	try {
-		const proof = new ProofOfPossession(val)
+		const proof = new ProofOfPossession(val, { logger: logger })
 
 		return proof
 	} catch (err) {
@@ -282,7 +282,7 @@ export const refineLegacyCertificateRequest = async (val: LegacyParsedCertificat
 
 export const transformHostProofOfPossession = (val: string, ctx: z.RefinementCtx): HostProofOfPossession | never => {
 	try {
-		return new HostProofOfPossession(val)
+		return new HostProofOfPossession(val, { logger: logger })
 	} catch (err) {
 		if (err instanceof PossessionParseError) {
 			return fatalIssue(ctx, err.message, val)
@@ -310,7 +310,7 @@ export const refineHostCertificateRequest = async (val: ParsedHostCertificateReq
 
 	try {
 		// check proof of possession fingerprint matches public key
-		l.debug("checking val.proof.matches()")
+		l.debug("checking val.proof.matches()", "public_key", val.public_key.toString("ssh"))
 		if (!val.proof.matches(val.public_key)) {
 			l.warn("proof of possession fingerprint did not match public_key")
 			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
