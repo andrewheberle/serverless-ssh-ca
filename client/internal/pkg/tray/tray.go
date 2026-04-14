@@ -171,6 +171,25 @@ func (app *Application) setState() {
 		if app.client.HasPrivateKey() {
 			// have a private key
 			app.state = stateKeyOK
+
+			// if we have a certificate but it's expired on start, try to refresh
+			if app.client.HasCertificate() {
+				if !app.client.CertificateValid() {
+					if err := app.refresh(); err == nil {
+						app.state = stateCertificateOK
+						app.logger.Info("refresh of certificate succeeded")
+						app.notify("Cerificate Refreshed", "The current certificate was successfully refreshed", okIcon)
+						app.setState()
+						break
+					} else {
+						app.state = stateCertificateExpired
+						app.logger.Info("refresh of certificate failed", "error", err)
+						app.notify("Cerificate Expired", "The current certificate has expired and must be manually renewed", warningIcon)
+						app.setState()
+						break
+					}
+				}
+			}
 		} else {
 			// no private key
 			app.state = stateKeyMissing
