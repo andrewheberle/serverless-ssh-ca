@@ -187,6 +187,8 @@ npm install
     "SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
     // The maximum time skew allowed for certificate requests
     "CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
+	// Set this to "debug" to enable more logging
+	"LOG_LEVEL": "info"
 },
 ```
 

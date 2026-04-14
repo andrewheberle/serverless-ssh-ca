@@ -37,7 +37,8 @@
 		"SSH_HOST_CERTIFICATE_ALLOWED_ROLES_CLAIM": "groups",
 		"SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
 		"CERTIFICATE_REQUEST_TIME_SKEW_MAX": "5 minutes",
-		"DB_CERTIFICATE_RETENTION": "1 year"
+		"DB_CERTIFICATE_RETENTION": "1 year",
+		"LOG_LEVEL": "info"
 	},
 	"secrets_store_secrets": [
 		{

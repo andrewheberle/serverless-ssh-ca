@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers"
 import { JWTPayload } from "jose"
 
 // this is the JSON payload of a certificate request

@@ -4,11 +4,9 @@ import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificat
 import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
-import { Logger } from "@andrewheberle/ts-slog"
 import { HostProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof"
 import { isRevoked } from "./db"
-
-const logger = new Logger()
+import { logger } from "./logger"
 
 export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) => {
 	ctx.issues.push({
@@ -306,21 +304,31 @@ type ParsedHostCertificateRequest = {
 } & HostCertificateRequest
 
 export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
+	const l = logger.with("in", "refineHostCertificateRequest")
+
+	l.debug("started")
+
 	try {
 		// check proof of possession fingerprint matches public key
+		l.debug("checking val.proof.matches()")
 		if (!val.proof.matches(val.public_key)) {
+			l.warn("proof of possession fingerprint did not match public_key")
 			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
 		}
 
 		// verify proof of possession signature
+		l.debug("await val.proof.verify()")
 		const verified = await val.proof.verify()
 		if (!verified) {
+			l.warn("proof of possession signature validation failed")
 			return fatalIssue(ctx, "proof of possession signature validation failed", val)
 		}
 
+		l.debug("done")
+
 		return z.NEVER
 	} catch (err) {
-		logger.error("proof of possession verification unhandled error", "in", "refineHostCertificateRequest", "error", err)
+		l.error("proof of possession verification unhandled error", "error", err)
 		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
 	}
 }

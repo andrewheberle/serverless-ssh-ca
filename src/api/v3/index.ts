@@ -1,4 +1,4 @@
-import { group, Logger } from "@andrewheberle/ts-slog"
+import { group } from "@andrewheberle/ts-slog"
 import {
 	ApiException,
 	ConflictException,
@@ -23,7 +23,6 @@ import {
 } from "../../certificate"
 import {
 	getPublic,
-	parseIdentity,
 	split,
 } from "../../utils"
 import {
@@ -47,8 +46,7 @@ import {
 	RevokeCertificateEndpointSchema,
 	UserCertificateRequestEndpointSchema,
 } from "./schema"
-
-const logger = new Logger()
+import { logger } from "../../logger"
 
 export const api = fromHono(new Hono())
 

@@ -2,10 +2,8 @@ import { fromHono } from "chanfana"
 import { Hono, type Context } from "hono"
 import { api as apiv2 } from "./api/v2"
 import { api as apiv3 } from "./api/v3"
-import { Logger } from "@andrewheberle/ts-slog"
 import { HTTPException } from "hono/http-exception"
-
-const logger = new Logger()
+import { logger } from "./logger"
 
 export type CFArgs = [Env, ExecutionContext]
 export type AppContext = Context<{ Bindings: Env }>
