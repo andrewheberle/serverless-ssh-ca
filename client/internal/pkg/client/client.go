@@ -13,12 +13,12 @@ import (
 	"net/url"
 	"os"
 	"runtime"
-	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/api"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
+	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/proof"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
@@ -58,9 +58,8 @@ type LoginHandler struct {
 }
 
 const (
-	DefaultLifetime    = time.Hour * 24
-	UserAgent          = "Serverless-SSH-CA-Client"
-	SignatureNamespace = "file"
+	DefaultLifetime = time.Hour * 24
+	UserAgent       = "Serverless-SSH-CA-Client"
 )
 
 var (
@@ -680,15 +679,7 @@ func (lh *LoginHandler) CertificateAuthorityURL() string {
 }
 
 func GenerateUserAgent(name string) string {
-	version := "Unknown"
-
-	// get version if available
-	info, ok := debug.ReadBuildInfo()
-	if ok {
-		version = info.Main.Version
-	}
-
-	return fmt.Sprintf("%s/%s (%s-%s)", name, version, runtime.GOOS, runtime.GOARCH)
+	return fmt.Sprintf("%s/%s (%s-%s)", name, version.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
 func clearBytes(b []byte) {
