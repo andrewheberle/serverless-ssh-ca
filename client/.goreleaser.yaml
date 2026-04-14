@@ -103,12 +103,19 @@ nfpms:
   - ids:
       - cli
       - gui
+    homepage: https://github.com/andrewheberle/serverless-ssh-ca
     maintainer: Andrew Heberle <andrew.heberle@gmail.com>
+    description: |-
+      The graphical and CLI client-side component of a Serverless SSH CA
+      that handles requesting and renewing user and/or host certificates for SSH
+      authentication.
+    license: Apache 2.0
     formats:
       - deb
     contents:
       - src: systemd/
         dst: /usr/lib/systemd/system
+    mtime: "{{ .CommitDate }}"
 
 sboms:
   - id: package
