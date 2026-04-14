@@ -248,7 +248,7 @@ class HostCertificateRequestEndpoint extends OpenAPIRoute {
 		try {
 			const certificate = await createSignedHostCertificate(data.body.public_key, opts)
 			const response: CertificateSignerResponse = {
-				certificate: certificate.toBuffer("openssh").toString("base64")
+				certificate: btoa(certificate.toString("openssh"))
 			}
 
 			try {

@@ -5,7 +5,7 @@ import {
 	transformAuthorizationHeader,
 	transformProofOfPossession,
 	transformPublicKey,
-	transformHostProofOfPossession,
+	transformRenewalProofOfPossession,
 	refineHostCertificateRequest,
 	transformCertificate,
 	refineHostCertificateRenewal,
@@ -163,7 +163,7 @@ export const HostCertificateRequestEndpointSchema = {
 			z.object({
 				public_key: publicKey,
 				proof: proofOfPossession
-					.transform(transformHostProofOfPossession),
+					.transform(transformProofOfPossession),
 				identity: identityToken,
 				principals: z.array(z.string()).min(1)
 					.meta({ description: "List of principals to include on the issued certificate" }),
@@ -203,7 +203,7 @@ export const HostCertificateRenewEndpointSchema = {
 					.meta({ description: "SSH certificate to renew" }),
 				public_key: publicKey,
 				proof: proofOfPossession
-					.transform(transformHostProofOfPossession),
+					.transform(transformRenewalProofOfPossession),
 				lifetime: z.int()
 					.min(seconds("24 hours"))
 					.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))

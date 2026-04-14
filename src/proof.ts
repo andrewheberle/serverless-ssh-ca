@@ -4,7 +4,7 @@ import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseKey } 
 import { verify } from "./sshsig"
 import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
-import { Logger, LogLevel } from "@andrewheberle/ts-slog"
+import { group, Logger, LogLevel } from "@andrewheberle/ts-slog"
 
 const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 
@@ -91,6 +91,14 @@ export class ProofOfPossession {
 			if (!this.fingerprint.matches(this.signaturePubkey)) {
 				throw new PossessionParseError("proof of possession fingerprint does not match signature public key")
 			}
+
+			this.logger.debug("constructor completed",
+				...group("this",
+					"timestamp", this.timestamp,
+					"fingerprint", this.fingerprint.toString("base64"),
+					"signaturePubkey.fingerprint()", this.signaturePubkey.fingerprint().toString("base64"),
+				),
+			)
 		} catch (err) {
 			switch (true) {
 				case (err instanceof FingerprintFormatError):
@@ -118,47 +126,62 @@ export class ProofOfPossession {
 	matches(...keys: Key[]): boolean
 
 	matches(...keys: Key[]): boolean {
+		this.logger.debug("matches() called", "in", "ProofOfPossession", "keys", keys.length)
 		try {
 			for (const key of keys) {
 				// confirm proof of possession fingerprint matches keys
-				this.logger.debug("this.fingerprint.matches()", "fingerprint", this.fingerprint.toString("base64"), "key", key.toString("ssh"))
+				this.logger.debug("this.fingerprint.matches()", "in", "ProofOfPossession", "fingerprint", this.fingerprint.toString("base64"), "key", key.toString("ssh"))
 				if (!this.fingerprint.matches(key))
 					return false
 
 				// also confirm key used to sign proof of possession matches
-				this.logger.debug("this.signaturePubkey.fingerprint().matches()", "signaturePubkey", this.signaturePubkey.fingerprint().toString("base64"), "key", key.toString("ssh"))
+				this.logger.debug("this.signaturePubkey.fingerprint().matches()", "in", "ProofOfPossession", "signaturePubkey", this.signaturePubkey.fingerprint().toString("base64"), "key", key.toString("ssh"))
 				if (!this.signaturePubkey.fingerprint().matches(key))
 					return false
 			}
-
+			this.logger.debug("matches() completed", "in", "ProofOfPossession", "keys", keys.length)
 			return true
 		} catch (err) {
-			this.logger.error("error in matches()", "error", err)
+			this.logger.error("matches() error", "in", "ProofOfPossession", "error", err)
 			throw err
 		}
 	}
 }
 
-export class HostProofOfPossession extends ProofOfPossession {
+export class PossessionMatchError extends Error {
+	constructor(message: string, cause?: unknown) {
+		super(message)
+		this.name = "PossessionMatchError"
+		this.cause = cause
+
+		// This is necessary for proper stack trace in TypeScript
+		Object.setPrototypeOf(this, PossessionMatchError.prototype)
+	}
+}
+
+export class RenewalProofOfPossession extends ProofOfPossession {
 	matches(key: Key): never
 	matches(...keys: Key[]): boolean
 
 	matches(...keys: Key[]): boolean {
+		this.logger.debug("matches() called", "in", "RenewalProofOfPossession", "keys", keys.length)
 		if (keys.length === 1) {
-			throw new Error("must verify both public key and certificate")
+			throw new PossessionMatchError("must verify both public key and certificate")
 		}
 
 		try {
 			for (const key of keys) {
+				this.logger.debug("this.fingerprint.matches()", "in", "RenewalProofOfPossession", "fingerprint", this.fingerprint.toString("base64"), "key", key.toString("ssh"))
 				if (!this.fingerprint.matches(key))
 					return false
+				this.logger.debug("this.signaturePubkey.fingerprint().matches()", "in", "RenewalProofOfPossession", "signaturePubkey", this.signaturePubkey.fingerprint().toString("base64"), "key", key.toString("ssh"))
 				if (!this.signaturePubkey.fingerprint().matches(key))
 					return false
 			}
-
+			this.logger.debug("matches() completed", "in", "RenewalProofOfPossession", "keys", keys.length)
 			return true
 		} catch (err) {
-			this.logger.error("error in matches()", "error", err)
+			this.logger.error("error in matches()", "in", "RenewalProofOfPossession", "error", err)
 			throw err
 		}
 	}

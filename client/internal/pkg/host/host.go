@@ -350,12 +350,6 @@ func (lh *LoginHandler) Callback(w http.ResponseWriter, r *http.Request) {
 func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 	errs := make([]error, 0)
 
-	// extract id_token from token (this is not verified here as it is up to the caller to verify)
-	rawIDToken, ok := token.Extra("id_token").(string)
-	if !ok {
-		return fmt.Errorf("no id_token found")
-	}
-
 	for n, k := range lh.keys {
 		logger := lh.logger.With("keypath", k.keypath, "format", k.key.PublicKey().Type(), "key", n+1, "keys", len(lh.keys))
 
@@ -369,7 +363,7 @@ func (lh *LoginHandler) doLogin(token *oauth2.Token) error {
 			}
 		}
 
-		csr, err := lh.doSigningRequest(k.key, k.certBytes, token.AccessToken, rawIDToken)
+		csr, err := lh.doSigningRequest(k.key, k.certBytes, token)
 		if err != nil {
 			logger.Warn("error completing signing request", "error", err)
 			errs = append(errs, err)
@@ -405,7 +399,7 @@ func certPath(keypath string) string {
 	return filepath.Join(dir, fmt.Sprintf("%s-cert.pub", name))
 }
 
-func (lh *LoginHandler) doSigningRequest(key ssh.Signer, cert []byte, access, id string) (*api.CertificateResponse, error) {
+func (lh *LoginHandler) doSigningRequest(key ssh.Signer, cert []byte, token *oauth2.Token) (*api.CertificateResponse, error) {
 	// get public key
 	publicKey, err := lh.getPublicKeyBytes(key)
 	if err != nil {
@@ -459,6 +453,12 @@ func (lh *LoginHandler) doSigningRequest(key ssh.Signer, cert []byte, access, id
 		return res.JSON200, nil
 	}
 
+	// extract id_token from token (this is not verified here as it is up to the caller to verify)
+	id, ok := token.Extra("id_token").(string)
+	if !ok {
+		return nil, fmt.Errorf("no id_token found")
+	}
+
 	// generate payload
 	payload := api.HostCertificateRequest{
 		Identity:   id,
@@ -480,7 +480,7 @@ func (lh *LoginHandler) doSigningRequest(key ssh.Signer, cert []byte, access, id
 	res, err := lh.client.PostHostCertificateRequestEndpointWithResponse(
 		context.TODO(),
 		&api.PostHostCertificateRequestEndpointParams{
-			Authorization: "Bearer " + access,
+			Authorization: "Bearer " + token.AccessToken,
 		},
 		payload,
 	)

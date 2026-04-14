@@ -29,7 +29,7 @@ import {
     split,
     transformAuthorizationHeader,
     transformCertificate,
-    transformHostProofOfPossession,
+    transformRenewalProofOfPossession,
     transformProofOfPossession,
     transformPublicKey
 } from "../utils"
@@ -283,7 +283,7 @@ class HostCertificateRenewEndpointV2 extends OpenAPIRoute {
                         .transform(transformPublicKey)
                         .describe("SSH public key of certificate to be renewed"),
                     nonce: z.string()
-                        .transform(transformHostProofOfPossession)
+                        .transform(transformRenewalProofOfPossession)
                         .describe("Proof of possession comprising of ${timestamp}.${keyfingerprint}.${format}:${signature}"),
                     lifetime: z.number()
                         .min(seconds("24 hours"))

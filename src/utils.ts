@@ -4,7 +4,7 @@ import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificat
 import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
-import { HostProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof"
+import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof"
 import { isRevoked } from "./db"
 import { logger } from "./logger"
 
@@ -280,15 +280,15 @@ export const refineLegacyCertificateRequest = async (val: LegacyParsedCertificat
 	}
 }
 
-export const transformHostProofOfPossession = (val: string, ctx: z.RefinementCtx): HostProofOfPossession | never => {
+export const transformRenewalProofOfPossession = (val: string, ctx: z.RefinementCtx): RenewalProofOfPossession | never => {
 	try {
-		return new HostProofOfPossession(val, { logger: logger })
+		return new RenewalProofOfPossession(val, { logger: logger })
 	} catch (err) {
 		if (err instanceof PossessionParseError) {
 			return fatalIssue(ctx, err.message, val)
 		}
 
-		logger.error("proof of possession verification unhandled error", "in", "transformHostProofOfPossession", "error", err)
+		logger.error("proof of possession verification unhandled error", "in", "transformRenewalProofOfPossession", "error", err)
 		return fatalIssue(ctx, "proof of possession transform unhandled error", val)
 	}
 }
@@ -359,7 +359,7 @@ export const refineLegacyHostCertificateRequest = async (val: LegacyParsedHostCe
 
 type ParsedHostCertificateRenewal = {
 	certificate: Certificate
-	proof: HostProofOfPossession
+	proof: RenewalProofOfPossession
 } & HostCertificateRequest
 
 export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
