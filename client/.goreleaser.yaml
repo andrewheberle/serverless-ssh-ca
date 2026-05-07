@@ -38,7 +38,7 @@ builds:
     ldflags:
       - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
       - '{{ if eq .Os "windows" }}-H=windowsgui{{ end }}'
-  - id: snap
+  - id: snapgui
     env:
       - CGO_ENABLED=0
     flags:
@@ -50,7 +50,23 @@ builds:
       - arm64
     goos:
       - linux
-    main: ./...
+    main: ./cmd/ssh-ca-client
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
+  - id: snapcli
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    tags:
+      - snap
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - linux
+    main: ./cmd/ssh-ca-client
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w -X github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version.version={{ .Version }} -X main.Date={{ .CommitDate }}
@@ -127,7 +143,8 @@ sboms:
 snapcrafts:
   - id: snap
     ids:
-      - snap
+      - snapgui
+      - snapcli
     name: ssh-ca-client
     title: Serverless SSH CA Client
     publish: false
