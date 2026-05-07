@@ -16,13 +16,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andrewheberle/opener"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/api"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/config"
 	"github.com/andrewheberle/serverless-ssh-ca/client/internal/pkg/version"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/proof"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshcert"
 	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/sshkey"
-	"github.com/andrewheberle/serverless-ssh-ca/client/pkg/util"
 	"github.com/andrewheberle/sshagent"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gorilla/securecookie"
@@ -632,7 +632,7 @@ func (lh *LoginHandler) executeLogin(ctx context.Context, addr string) error {
 
 	// at this point do interactive login flow
 	loginUrl := fmt.Sprintf("http://%s/auth/login", addr)
-	if err := util.OpenUrl(loginUrl); err != nil {
+	if err := opener.OpenUrl(loginUrl); err != nil {
 		lh.logger.Error("could not open browser, please visit URL manually", "url", loginUrl)
 	}
 

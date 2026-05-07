@@ -6,6 +6,7 @@ require (
 	codeberg.org/sdassow/atomic v1.2.1
 	fyne.io/systray v1.12.0
 	github.com/allan-simon/go-singleinstance v0.0.0-20210120080615-d0997106ab37
+	github.com/andrewheberle/opener v1.0.2
 	github.com/andrewheberle/simplecommand v0.5.1
 	github.com/andrewheberle/sshagent v1.0.0
 	github.com/bep/simplecobra v0.7.0
