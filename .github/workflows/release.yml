@@ -40,7 +40,7 @@ jobs:
           go generate ./...
           git diff --exit-code -- . || (echo "Generated code is out of date. Please run 'go generate ./...' and commit the changes." && exit 1)
         working-directory: ./client
-      - uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
       - name: Install Snapcraft
         uses: samuelmeuli/action-snapcraft@fceeb3c308e76f3487e72ef608618de625fb7fe8 # v3.0.1
