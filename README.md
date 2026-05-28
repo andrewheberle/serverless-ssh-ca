@@ -9,8 +9,9 @@ to provide signed certificates for SSH users and hosts running on Cloudflare Wor
 
 ## Architecture
 
-The solution comprises of the CA running as a Worker, a Go based client and
-a third party OIDC IdP.
+The solution comprises of the CA running as a Worker, a Go based client
+(found [here](https://github.com/andrewheberle/ssh-ca-client])) and a third
+party OIDC IdP.
 
 The IdP may be any OIDC compatible service that returns a JWT with at least
 an `email` claim in the OIDC access token, however at this time only
@@ -247,68 +248,9 @@ The `openid` and `email` scopes are required, with enabling of refresh tokens
 
 ### Client
 
-The client requires a configuration file that defines the details of the OIDC
-IdP and where to find the SSH CA as follows:
+Please visit the client repository for further information:
 
-```yaml
-issuer: OIDC Issuer
-client_id: OIDC Client ID
-scopes: ["openid", "email", "profile"]
-redirect_url: http://localhost:3000/auth/callback
-ca_url: https://ssh-ca.example.com/
-# Providing the public key of the CA is optional but recommended so the response can be verified
-trusted_ca: ecdsa-sha2-nistp256 ....
-```
-
-The default location of this configuration file is `$HOME/.ssh-serverless-ca/config.yml`
-however this can be overridden using the `--config` command line option.
-
-#### Installation
-
-Please download the client for your OS from the releases page.
-
-#### Usage
-
-Assuming a local SSH agent is running, the client can be started as follows:
-
-```sh
-# generate a SSH private key
-ssh-ca-client-cli generate
-
-# perform a login to the IdP and request a signed certificate
-ssh-ca-client-cli login
-
-# issue host keys
-ssh-ca-client-cli host
-```
-
-This should automatically start a web browser to initiate the OIDC login flow,
-if not you may manually visit `http://localhost:3000/auth/login` to start this
-process.
-
-If provided by the OIDC IdP the refresh token will be saved for subsequent
-`ssh-ca-client login` invocations and an attempt will be made to obtain a new
-auth token using the saved refresh token.
-
-#### Key, Token and Certificate Storage
-
-The users private key, the most recently issued certificate and the OIDC
-refresh token (if available) are written to a user specific configuration file
-for subsequent use.
-
-Sensitive material such as the SSH private key and OIDC refresh token are
-encrypted on Windows using the Data Protection API (DPAPI) so the values are
-only decryptable by the same user that originally encrypted it.
-
-Although access to the config file by another user is possible, the values
-cannot be read (assuming DPAPI is secure).
-
-On Linux a random key is generated and saved in the users `login` keyring
-which is then used to encrypt this sensitive material using AES-GCM encryption.
-
-On other platforms, this is not the case and this data is simply stored as
-BASE64 encoded strings, so security is less than ideal and filesystem
-permissions must be used to prevent unauthorised access.
+https://github.com/andrewheberle/ssh-ca-client
 
 ### SSH Endpoints
 
