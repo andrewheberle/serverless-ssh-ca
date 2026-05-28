@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"target": "es2024",
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"declaration": true,
+		"isolatedModules": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"types": ["@cloudflare/workers-types"]
+	},
+	"exclude": ["tests", "dist"],
+	"include": ["src/**/*.ts"]
+}

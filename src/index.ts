@@ -1,9 +1,3 @@
-import { dbCleanup } from "./db"
-import { app } from "./router"
+import app from "../packages/serverless-ssh-ca/dist"
 
-export default {
-    fetch: app.fetch,
-    async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-        ctx.waitUntil(dbCleanup())
-    },
-} satisfies ExportedHandler<Env>
+export default app
