@@ -129,8 +129,14 @@ export const identityPrincipals = (env: SshCaBindings, payload: CertificateReque
 		claim = env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM
 	}
 
-	const p = payload[claim]
 	const l = logger(env)
+
+	if (claim === "__proto__" || claim === "prototype" || claim === "constructor") {
+ 		l.warn("invalid principals claim configured", "claim", claim)
+ 		return []
+ 	}
+ 	const p = payload[claim]
+
 	if (p === undefined) {
 		l.warn("claim was missing despite being set in CA config", "claim", claim)
 		return []
@@ -141,13 +147,9 @@ export const identityPrincipals = (env: SshCaBindings, payload: CertificateReque
 		return []
 	}
 
-	// make sure its always a string[]
-	const principals = typeof p === "string" ? [p] : p
-
-	// replace any spaces with underscores
-	principals.forEach((value, index, array) => {
-		array[index] = value.replaceAll(" ", "_")
-	})
+	// make sure its always a string[] and replace any spaces with underscores
+	const principals = (typeof p === "string" ? [p] : p)
+ 		.map((value) => value.replaceAll(" ", "_"))
 
 	l.info("identity token included principals", "principals", principals)
 
