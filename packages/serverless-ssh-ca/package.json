@@ -1,6 +1,6 @@
 {
 	"name": "@andrewheberle/serverless-ssh-ca",
-	"version": "0.17.4",
+	"version": "0.17.5",
 	"description": "A serverless SSH CA built on Cloudflare Workers",
 	"type": "module",
 	"main": "dist/index.js",
@@ -50,6 +50,10 @@
 	"author": "Andrew Heberle",
 	"license": "Apache-2.0",
 	"release-it": {
-		"git": false
+		"git": false,
+		"npm": {
+			"skipChecks": true,
+			"ignoreVersion": true
+		}
 	}
 }
