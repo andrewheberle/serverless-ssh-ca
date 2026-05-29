@@ -4,7 +4,6 @@ export default defineConfig(async () => {
 	return {
 		test: {
 			coverage: {
-				provider: "istanbul",
 				include: ["src/**/*.ts"]
 			}
 		}
