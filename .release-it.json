@@ -10,7 +10,9 @@
 		"after:bump": "npx auto-changelog -p"
 	},
 	"github": {
-		"release": true
+		"autoGenerate": true,
+		"release": true,
+		"releaseName": "v${version}"
 	},
 	"npm": {
 		"publish": true,
