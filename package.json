@@ -49,14 +49,5 @@
 		"url": "https://github.com/andrewheberle/serverless-ssh-ca/issues"
 	},
 	"author": "Andrew Heberle",
-	"license": "Apache-2.0",
-	"release-it": {
-		"git": {
-			"tag": false
-		},
-		"npm": {
-			"skipChecks": true,
-			"ignoreVersion": true
-		}
-	}
+	"license": "Apache-2.0"
 }
