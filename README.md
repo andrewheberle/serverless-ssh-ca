@@ -30,8 +30,8 @@ See the following respositories for additional information:
 
 | Repostitory | Details |
 |---|---|
-| https://github.com/andrewheberle/ssh-ca-client | Contains client code for issuing user and host certificates |
-| https://github.com/andrewheberle/severless-ssh-ca-template | Contains a template repository for deployment to Cloudflare Workers |
+| [https://github.com/andrewheberle/ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client) | Contains client code for issuing user and host certificates |
+| [https://github.com/andrewheberle/serverless-ssh-ca-template](https://github.com/andrewheberle/serverless-ssh-ca-template) | Contains a template repository for deployment to Cloudflare Workers |
 
 ## Architecture
 
