@@ -25,3 +25,25 @@ export type SSHExtension = {
     name: string;
     data: Buffer<ArrayBuffer>
 }
+
+export interface SshCaBindings {
+    DB: D1Database
+    DB_CERTIFICATE_RETENTION: string
+    PRIVATE_KEY: SecretsStoreSecret
+    SSH_CERTIFICATE_EXTENSIONS: string
+    SSH_CERTIFICATE_LIFETIME: string
+    SSH_CERTIFICATE_INCLUDE_SELF: string
+    SSH_CERTIFICATE_PRINCIPALS: string
+    SSH_HOST_CERTIFICATE_LIFETIME: string
+    SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: string
+    SSH_HOST_CERTIFICATE_ALLOWED_ROLES: string
+    ISSUER_DN: string
+	JWT_JWKS_URL: string
+	JWT_AUD: string
+	JWT_ISSUER: string
+	JWT_ALGORITHMS: string
+	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: string
+	SSH_HOST_CERTIFICATE_ALLOWED_ROLES_CLAIM: string
+	CERTIFICATE_REQUEST_TIME_SKEW_MAX: string
+	LOG_LEVEL: string
+}

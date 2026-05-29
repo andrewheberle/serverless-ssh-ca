@@ -114,11 +114,11 @@ describe("ProofOfPossession", async () => {
                 expect(() => new ProofOfPossession(`${tt.data}.${tt.sig}`, { from: tt.from }))
                     .toThrow(tt.wantErr)
             } else {
-                const nonce = new ProofOfPossession(`${tt.data}.${tt.sig}`, { from: tt.from })
+                const proof = new ProofOfPossession(`${tt.data}.${tt.sig}`, { from: tt.from })
 
                 // verify timestamp and signature
-                expect(nonce.timestamp).toBe(timestamp)
-                expect(await nonce.verify(tt.namespace)).toBe(tt.want)
+                expect(proof.timestamp).toBe(timestamp)
+                expect(await proof.verify(tt.namespace)).toBe(tt.want)
 
                 // check matches for keys
                 if (tt.matches !== undefined) {
@@ -126,7 +126,7 @@ describe("ProofOfPossession", async () => {
                         return parseKey(k)
                     })
 
-                    expect(nonce.matches(...keys)).toBe(tt.wantMatches !== undefined ? tt.wantMatches : false)
+                    expect(proof.matches(...keys)).toBe(tt.wantMatches !== undefined ? tt.wantMatches : false)
                 }
             }
         })

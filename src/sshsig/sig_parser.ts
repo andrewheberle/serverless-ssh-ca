@@ -58,7 +58,7 @@ export function parse(signature: DataView | string): Sig {
     if (s[0] === 0x00 && s.length % 2 == 1) {
       s = s.slice(1);
     }
-    bytes = new Uint8Array([...r, ...s]);
+    bytes = new Uint8Array([...r, ...s]).buffer as ArrayBuffer;
   } else {
     bytes = sig_bytes.bytes();
   }

@@ -5,7 +5,7 @@ import { Writer } from "./writer";
 export async function verify(
   subtle: SubtleCrypto,
   signature: Sig,
-  signed_data: Uint8Array,
+  signed_data: Uint8Array<ArrayBuffer>,
 ) {
   //https://nodejs.org/api/webcrypto.html#subtleimportkeyformat-keydata-algorithm-extractable-keyusages
   // for 'RSASSA-PKCS1-v1_5' only spki, pkcs8 and jwk are supported

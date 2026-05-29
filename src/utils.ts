@@ -1,12 +1,13 @@
-import { env } from "cloudflare:workers"
+import type { SshCaBindings } from "./types"
 import { JWKInvalid, JWKSInvalid, JWSInvalid, JWTClaimValidationFailed, JWTInvalid } from "jose/errors"
 import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificate, parseKey, parsePrivateKey, PrivateKey } from "sshpk"
 import z from "zod"
 import { verifyJWT } from "./verify"
 import { CertificateRequestJWTPayload } from "./types"
 import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof"
-import { isRevoked } from "./db"
+import type { isRevoked as IsRevokedFn } from "./db"
 import { logger } from "./logger"
+import { ms } from "itty-time"
 
 export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) => {
 	ctx.issues.push({
@@ -18,13 +19,14 @@ export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) 
 	return z.NEVER
 }
 
-export const transformProofOfPossession = (val: string, ctx: z.core.$RefinementCtx<string>): ProofOfPossession | never => {
+export const transformProofOfPossession = (env: SshCaBindings, val: string, ctx: z.core.$RefinementCtx<string>): ProofOfPossession | never => {
+	const l = logger(env)
 	try {
-		const proof = new ProofOfPossession(val, { logger: logger })
+		const proof = new ProofOfPossession(val, { logger: l, skew: ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX) })
 
 		return proof
 	} catch (err) {
-		logger.error("proof of possession parsing error", "error", err)
+		l.error("proof of possession parsing error", "error", err)
 		switch (true) {
 			case (err instanceof PossessionParseError):
 				ctx.issues.push({
@@ -50,8 +52,9 @@ type AccessToken = {
 	sub: string
 }
 
-export const transformAuthorizationHeader = async (val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
+export const transformAuthorizationHeader = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
 	const jwt = val.replace("Bearer ", "")
+	const l = logger(env)
 
 	if (jwt === "") {
 		return fatalIssue(ctx, "request did not contain a JWT", val)
@@ -59,7 +62,7 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
 
 	try {
 		// verify jwt
-		const { payload } = await verifyJWT(jwt)
+		const { payload } = await verifyJWT(env, jwt)
 
 		if (payload.email === undefined) {
 			return fatalIssue(ctx, "JWT was verified but was missing required email claim", val)
@@ -82,7 +85,7 @@ export const transformAuthorizationHeader = async (val: string, ctx: z.Refinemen
 			case (err instanceof JWTClaimValidationFailed):
 				return fatalIssue(ctx, "claim validtion of the JWT failed", val)
 			default:
-				logger.error("unhandled access token validation error", "in", "transformAuthorizationHeader", "error", err)
+				l.error("unhandled access token validation error", "in", "transformAuthorizationHeader", "error", err)
 				return fatalIssue(ctx, "unhandled access token validation error", val)
 		}
 	}
@@ -121,31 +124,34 @@ export const transformPublicKey = (val: string | Buffer<ArrayBufferLike>, ctx: z
 	}
 }
 
-export const identityPrincipals = (payload: CertificateRequestJWTPayload, claim?: string): string[] => {
+export const identityPrincipals = (env: SshCaBindings, payload: CertificateRequestJWTPayload, claim?: string): string[] => {
 	if (claim === undefined) {
 		claim = env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM
 	}
 
-	const p = payload[claim]
+	const l = logger(env)
+
+	if (claim === "__proto__" || claim === "prototype" || claim === "constructor") {
+ 		l.warn("invalid principals claim configured", "claim", claim)
+ 		return []
+ 	}
+ 	const p = payload[claim]
+
 	if (p === undefined) {
-		logger.warn("claim was missing despite being set in CA config", "claim", claim)
+		l.warn("claim was missing despite being set in CA config", "claim", claim)
 		return []
 	}
 
 	if (p === "") {
-		logger.warn("claim was present but was an empty string", "claim", claim)
+		l.warn("claim was present but was an empty string", "claim", claim)
 		return []
 	}
 
-	// make sure its always a string[]
-	const principals = typeof p === "string" ? [p] : p
+	// make sure its always a string[] and replace any spaces with underscores
+	const principals = (typeof p === "string" ? [p] : p)
+ 		.map((value) => value.replaceAll(" ", "_"))
 
-	// replace any spaces with underscores
-	principals.forEach((value, index, array) => {
-		array[index] = value.replaceAll(" ", "_")
-	})
-
-	logger.info("identity token included principals", "principals", principals)
+	l.info("identity token included principals", "principals", principals)
 
 	return principals
 }
@@ -155,15 +161,15 @@ type IdentityToken = {
 	principals: string[]
 }
 
-export const parseIdentity = async (jwt: string | undefined, claim?: string): Promise<IdentityToken> => {
+export const parseIdentity = async (env: SshCaBindings, jwt: string | undefined, claim?: string): Promise<IdentityToken> => {
 	if (jwt === undefined) {
 		throw new Error("missing identity token")
 	}
 
 	const aud = env.JWT_AUD === undefined || env.JWT_AUD as string === "" ? undefined : split(env.JWT_AUD as string)
-	const { payload } = await verifyJWT(jwt, { aud: aud })
+	const { payload } = await verifyJWT(env, jwt, { aud: aud })
 
-	const principals = identityPrincipals(payload, claim)
+	const principals = identityPrincipals(env, payload, claim)
 
 	return {
 		sub: payload.sub,
@@ -171,9 +177,9 @@ export const parseIdentity = async (jwt: string | undefined, claim?: string): Pr
 	}
 }
 
-export const transformIdentityToken = async (val: string, ctx: z.RefinementCtx): Promise<IdentityToken | never> => {
+export const transformIdentityToken = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<IdentityToken | never> => {
 	try {
-		const identity = await parseIdentity(val, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+		const identity = await parseIdentity(env, val, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
 
 		return identity
 	} catch (err) {
@@ -233,7 +239,8 @@ type ParsedCertificateRequest = {
 	extensions: string[]
 }
 
-export const refineCertificateRequest = async (val: ParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
+export const refineCertificateRequest = async (env: SshCaBindings, val: ParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
+	const l = logger(env)
 	try {
 		// check proof of possession fingerprint matches public key
 		if (!val.proof.matches(val.public_key)) {
@@ -248,47 +255,21 @@ export const refineCertificateRequest = async (val: ParsedCertificateRequest, ct
 
 		return z.NEVER
 	} catch (err) {
-		logger.error("proof of possession verification unhandled error", "in", "refineCertificateRequest", "error", err)
+		l.error("proof of possession verification unhandled error", "in", "refineCertificateRequest", "error", err)
 		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
 	}
 }
 
-type LegacyParsedCertificateRequest = {
-	nonce: ProofOfPossession
-	public_key: Key
-	lifetime: number
-	identity: string
-	extensions: string[]
-}
-
-export const refineLegacyCertificateRequest = async (val: LegacyParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
+export const transformRenewalProofOfPossession = (env: SshCaBindings, val: string, ctx: z.RefinementCtx): RenewalProofOfPossession | never => {
+	const l = logger(env)
 	try {
-		// check proof of possession fingerprint matches public key
-		if (!val.nonce.matches(val.public_key)) {
-			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
-		}
-
-		// verify proof of possession signature
-		const verified = await val.nonce.verify("file")
-		if (!verified) {
-			return fatalIssue(ctx, "proof of possession signature validation failed", val)
-		}
-
-		return z.NEVER
-	} catch (err) {
-		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
-	}
-}
-
-export const transformRenewalProofOfPossession = (val: string, ctx: z.RefinementCtx): RenewalProofOfPossession | never => {
-	try {
-		return new RenewalProofOfPossession(val, { logger: logger })
+		return new RenewalProofOfPossession(val, { logger: l, skew: ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX) })
 	} catch (err) {
 		if (err instanceof PossessionParseError) {
 			return fatalIssue(ctx, err.message, val)
 		}
 
-		logger.error("proof of possession verification unhandled error", "in", "transformRenewalProofOfPossession", "error", err)
+		l.error("proof of possession verification unhandled error", "in", "transformRenewalProofOfPossession", "error", err)
 		return fatalIssue(ctx, "proof of possession transform unhandled error", val)
 	}
 }
@@ -303,8 +284,8 @@ type ParsedHostCertificateRequest = {
 	proof: ProofOfPossession
 } & HostCertificateRequest
 
-export const refineHostCertificateRequest = async (val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
-	const l = logger.with("in", "refineHostCertificateRequest")
+export const refineHostCertificateRequest = async (env: SshCaBindings, val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
+	const l = logger(env).with("in", "refineHostCertificateRequest")
 
 	l.debug("started")
 
@@ -333,39 +314,16 @@ export const refineHostCertificateRequest = async (val: ParsedHostCertificateReq
 	}
 }
 
-type LegacyParsedHostCertificateRequest = {
-	principals: string[]
-	nonce: ProofOfPossession
-} & HostCertificateRequest
-
-export const refineLegacyHostCertificateRequest = async (val: LegacyParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
-	try {
-		// check proof of possession fingerprint matches public key
-		if (!val.nonce.matches(val.public_key)) {
-			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
-		}
-
-		// verify proof of possession signature
-		const verified = await val.nonce.verify("file")
-		if (!verified) {
-			return fatalIssue(ctx, "proof of possession signature validation failed", val)
-		}
-
-		return z.NEVER
-	} catch (err) {
-		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
-	}
-}
-
 type ParsedHostCertificateRenewal = {
 	certificate: Certificate
 	proof: RenewalProofOfPossession
 } & HostCertificateRequest
 
-export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
+export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked: typeof IsRevokedFn, val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
+	const l = logger(env)
 	try {
 		// ensure certificate is signed by CA
-		const issuer = await getPublic()
+		const issuer = await getPublic(env)
 		if (!val.certificate.isSignedByKey(issuer)) {
 			return fatalIssue(ctx, "the provided certificate was not signed by this CA", val)
 		}
@@ -377,7 +335,7 @@ export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRen
 
 		// ensure certificate presented for renewal is not revoked
 		const serial = val.certificate.serial.readBigUInt64BE(0)
-		if (await isRevoked(serial)) {
+		if (await isRevoked(env, serial)) {
 			return fatalIssue(ctx, "the provided certificate is revoked", val)
 		}
 
@@ -394,7 +352,7 @@ export const refineHostCertificateRenewal = async (val: ParsedHostCertificateRen
 
 		return z.NEVER
 	} catch (err) {
-		logger.error("proof of possession verification unhandled error", "in", "refineHostCertificateRenewal", "error", err)
+		l.error("proof of possession verification unhandled error", "in", "refineHostCertificateRenewal", "error", err)
 		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
 	}
 }
@@ -405,7 +363,8 @@ type ParsedRevokeCertificate = {
 	proof: ProofOfPossession
 }
 
-export const refineRevokeCertificate = async (val: ParsedRevokeCertificate, ctx: z.RefinementCtx): Promise<never> => {
+export const refineRevokeCertificate = async (env: SshCaBindings, val: ParsedRevokeCertificate, ctx: z.RefinementCtx): Promise<never> => {
+	const l = logger(env)
 	try {
 		// check proof of possession fingerprint matches public key
 		if (!val.proof.matches(val.public_key)) {
@@ -420,36 +379,7 @@ export const refineRevokeCertificate = async (val: ParsedRevokeCertificate, ctx:
 
 		return z.NEVER
 	} catch (err) {
-		logger.error("proof of possession verification unhandled error", "in", "refineRevokeCertificate", "error", err)
-		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
-	}
-}
-
-type LegacyParsedHostCertificateRenewal = {
-	certificate: Certificate
-	nonce: ProofOfPossession
-} & HostCertificateRequest
-
-export const refineLegacyHostCertificateRenewal = async (val: LegacyParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
-	try {
-		// check certificate is not expired
-		if (val.certificate.isExpired()) {
-			return fatalIssue(ctx, "certificate is expired", val)
-		}
-
-		// check proof of possession fingerprint matches public key and certificate subject key
-		if (!val.nonce.matches(val.public_key, val.certificate.subjectKey)) {
-			return fatalIssue(ctx, "proof of possession fingerprints did not match public_key and/or certificate", val)
-		}
-
-		// verify proof of possession signature
-		const verified = await val.nonce.verify("file")
-		if (!verified) {
-			return fatalIssue(ctx, "proof of possession signature validation failed", val)
-		}
-
-		return z.NEVER
-	} catch (err) {
+		l.error("proof of possession verification unhandled error", "in", "refineRevokeCertificate", "error", err)
 		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
 	}
 }
@@ -462,7 +392,7 @@ export const split = (v: string): string[] => {
 	return v.split(",")
 }
 
-export const getPublic = async (key?: PrivateKey): Promise<Key> => {
+export const getPublic = async (env: SshCaBindings, key?: PrivateKey): Promise<Key> => {
 	if (key === undefined) {
 		// grab private key from secret store
 		const secret = await env.PRIVATE_KEY.get()

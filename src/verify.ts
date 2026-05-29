@@ -1,13 +1,13 @@
 import { createRemoteJWKSet, jwtVerify } from "jose"
 import { CertificateRequestJWTPayload } from "./types"
-import { env } from "cloudflare:workers"
+import type { SshCaBindings } from "./types"
 import { split } from "./utils"
 
 type VerifyOptions = {
 	aud?: string | string[]
 }
 
-export const verifyJWT = async (jwt: string, opts: VerifyOptions = {}) => {
+export const verifyJWT = async (env: SshCaBindings, jwt: string, opts: VerifyOptions = {}) => {
     const JWKS = createRemoteJWKSet(new URL(env.JWT_JWKS_URL))
 
 	if (opts.aud !== undefined) {
