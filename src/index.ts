@@ -1,3 +1,3 @@
-import app from "../packages/serverless-ssh-ca/dist"
+import app from "@andrewheberle/serverless-ssh-ca"
 
 export default app
