@@ -42,8 +42,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/andrewheberle/serverless-ssh-ca.git",
-		"directory": "packages/ssh-ca"
+		"url": "git+https://github.com/andrewheberle/serverless-ssh-ca.git"
 	},
 	"homepage": "https://github.com/andrewheberle/serverless-ssh-ca#readme",
 	"bugs": {
