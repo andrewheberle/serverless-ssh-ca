@@ -1,4 +1,5 @@
 import z from "zod"
+import type { SshCaBindings } from "../../types"
 import {
 	split,
 	refineCertificateRequest,
@@ -21,8 +22,8 @@ import {
 	UnauthorizedException,
 	UnprocessableEntityException,
 } from "chanfana"
-import { env } from "cloudflare:workers"
 import { seconds } from "itty-time"
+import { isRevoked } from "../../db"
 
 const openapiStringByte = z.base64()
 	.transform((v) => {
@@ -48,27 +49,33 @@ const publicKey = openapiStringByte
 		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
 	})
 
-const identityToken = z.string()
-	.meta({
-		description: "Identity Token JWT from OIDC IdP",
-		example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
-	})
-	.transform(transformIdentityToken)
+const createIdentityTokenSchema = (env: SshCaBindings) => (
+	z.string()
+		.meta({
+			description: "Identity Token JWT from OIDC IdP",
+			example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
+		})
+		.transform((val, ctx) => transformIdentityToken(env, val, ctx))
+)
 
-const accessToken = z.string()
+const createAccessTokenSchema = (env: SshCaBindings) => (
+	z.string()
 	.meta({
 		description: "Access Token JWT from OIDC IdP",
 		example: "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
 	})
 	.startsWith("Bearer ")
-	.transform(transformAuthorizationHeader)
+	.transform((val, ctx) => transformAuthorizationHeader(env, val, ctx))
+)
 
 const krl = openapiStringByte
 	.meta({ description: "Key Revocation List" })
 
-const HeaderSchema = z.object({
-	"Authorization": accessToken
-})
+const createHeaderSchema = (env: SshCaBindings) => (
+	z.object({
+		"Authorization": createAccessTokenSchema(env)
+	})
+)
 
 const certificate = openapiStringByte
 	.meta({ description: "Issued Certificate" })
@@ -87,20 +94,16 @@ export const CaPublicKeyEndpointSchema = {
 	}
 }
 
-export const UserCertificateRequestEndpointSchema = {
-	security: [
-		{
-			oidcAuth: []
-		}
-	],
+export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
+	security: [{ oidcAuth: [] }],
 	request: {
-		headers: HeaderSchema,
+		headers: createHeaderSchema(env),
 		body: contentJson(
 			z.object({
 				public_key: publicKey,
 				proof: proofOfPossession
-					.transform(transformProofOfPossession),
-				identity: identityToken,
+					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
+				identity: createIdentityTokenSchema(env),
 				extensions: z.array(z.string())
 					.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
 					.meta({ description: "Extensions to include in the issued SSH certificate" }),
@@ -110,7 +113,7 @@ export const UserCertificateRequestEndpointSchema = {
 					.default(seconds(env.SSH_CERTIFICATE_LIFETIME))
 					.meta({ description: "Lifetime of issued SSH certificate" }),
 			})
-				.superRefine(refineCertificateRequest)
+				.superRefine((val, ctx) => refineCertificateRequest(env, val, ctx))
 				.openapi("User Certificate Request")
 		)
 	},
@@ -129,9 +132,9 @@ export const UserCertificateRequestEndpointSchema = {
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
 	}
-}
+})
 
-export const RevocationListEndpointSchema = {
+export const createRevocationListEndpointSchema = (env: SshCaBindings) => ({
 	request: {
 		params: z.object({
 			certificateType: z.enum(["user", "host"])
@@ -149,22 +152,18 @@ export const RevocationListEndpointSchema = {
 		},
 		...InternalServerErrorException.schema(),
 	}
-}
+})
 
-export const HostCertificateRequestEndpointSchema = {
-	security: [
-		{
-			oidcAuth: []
-		}
-	],
+export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
+	security: [{ oidcAuth: [] }],
 	request: {
-		headers: HeaderSchema,
+		headers: createHeaderSchema(env),
 		body: contentJson(
 			z.object({
 				public_key: publicKey,
 				proof: proofOfPossession
-					.transform(transformProofOfPossession),
-				identity: identityToken,
+					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
+				identity: createIdentityTokenSchema(env),
 				principals: z.array(z.string()).min(1)
 					.meta({ description: "List of principals to include on the issued certificate" }),
 				lifetime: z.int()
@@ -173,7 +172,7 @@ export const HostCertificateRequestEndpointSchema = {
 					.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 					.meta({ description: "Lifetime of issued Host SSH certificate" }),
 			})
-				.superRefine(refineHostCertificateRequest)
+				.superRefine((val, ctx) => refineHostCertificateRequest(env, val, ctx))
 				.openapi("Host Certificate Request")
 		)
 	},
@@ -192,9 +191,9 @@ export const HostCertificateRequestEndpointSchema = {
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
 	}
-}
+})
 
-export const HostCertificateRenewEndpointSchema = {
+export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => ({
 	request: {
 		body: contentJson(
 			z.object({
@@ -203,14 +202,14 @@ export const HostCertificateRenewEndpointSchema = {
 					.meta({ description: "SSH certificate to renew" }),
 				public_key: publicKey,
 				proof: proofOfPossession
-					.transform(transformRenewalProofOfPossession),
+					.transform((val, ctx) => transformRenewalProofOfPossession(env, val, ctx)),
 				lifetime: z.int()
 					.min(seconds("24 hours"))
 					.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 					.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 					.meta({ description: "Lifetime of renewed Host SSH certificate" }),
 			})
-				.superRefine(refineHostCertificateRenewal)
+				.superRefine((val, ctx) => refineHostCertificateRenewal(env, isRevoked, val, ctx))
 				.openapi("Host Certificate Renew")
 		)
 	},
@@ -229,9 +228,9 @@ export const HostCertificateRenewEndpointSchema = {
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
 	}
-}
+})
 
-export const RevokeCertificateEndpointSchema = {
+export const createRevokeCertificateEndpointSchema = (env: SshCaBindings) => ({
 	request: {
 		params: z.object({
 			certificateType: z.enum(["user", "host"])
@@ -242,10 +241,10 @@ export const RevokeCertificateEndpointSchema = {
 					.meta({ description: "Serial number of certificate to revoke" }),
 				public_key: publicKey,
 				proof: proofOfPossession
-					.transform(transformProofOfPossession),
+					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
 			})
 				.openapi("Certificate Revocation")
-				.superRefine(refineRevokeCertificate)
+				.superRefine((val, ctx) => refineRevokeCertificate(env, val, ctx))
 		)
 	},
 	responses: {
@@ -264,4 +263,4 @@ export const RevokeCertificateEndpointSchema = {
 		...InternalServerErrorException.schema(),
 		...ConflictException.schema()
 	}
-}
+})

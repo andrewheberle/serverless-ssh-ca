@@ -1,82 +1,30 @@
 {
-	"name": "serverless-ssh-ca",
-	"version": "0.17.4",
-	"private": true,
-	"cloudflare": {
-		"bindings": {
-			"ISSUER_DN": {
-				"description": "This is the issuer name for your SSH certificate authority"
-			},
-			"JWT_JWKS_URL": {
-				"description": "This is the URL for the JWKS so the CA can verify the JWT provided by the client"
-			},
-			"JWT_AUD": {
-				"description": "The expected audience (AUD) of the JWT. May be a comma seperated list, a single string or a blank string to disable validating the AUD claim of the JWT"
-			},
-			"JWT_ISSUER": {
-				"description": "The issuer of the JWT access and identity tokens provided by the client"
-			},
-			"JWT_ALGORITHMS": {
-				"description": "The supported JWT algorithms as a comma seperated list"
-			},
-			"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": {
-				"description": "The OIDC 'group' claim that contains additional SSH principals to add to the certificate. If ommitted only the default claims (via 'SSH_CERTIFICATE_PRINCIPALS' and 'SSH_CERTIFICATE_INCLUDE_SELF') are added"
-			},
-			"SSH_CERTIFICATE_LIFETIME": {
-				"description": "The lifetime of the issued SSH certificates in human readable form (ie '24 hours'), although the client may request a shorter duration"
-			},
-			"SSH_CERTIFICATE_PRINCIPALS": {
-				"description": "A comma seperated list of additional principals to add to all issued user certificates"
-			},
-			"SSH_CERTIFICATE_INCLUDE_SELF": {
-				"description": "Whether to add the users own name as a valid principal (based on the part before the @ symbol in the JWT email claim)"
-			},
-			"SSH_CERTIFICATE_EXTENSIONS": {
-				"description": "A comma serverless list of SSH extensions to add to the certificate, although the client may request a smaller list"
-			},
-			"SSH_HOST_CERTIFICATE_LIFETIME": {
-				"description": "The lifetime of issued Host SSH certificates in human readable form (ie '45 days'), although the client may request a shorter duration"
-			},
-			"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": {
-				"description": "A comma seperated list of users who are permitted to request SSH host certificates based on the email claim from the OIDC IdP"
-			},
-			"SSH_HOST_CERTIFICATE_ALLOWED_ROLES": {
-				"description": "A comma seperated list of roles who are permitted to request SSH host certificates based on the role claim from the OIDC IdP"
-			},
-			"SSH_HOST_CERTIFICATE_ALLOWED_ROLES_CLAIM": {
-				"description": "The claim that contains the roles who are permitted to request SSH host certificates"
-			},
-			"PRIVATE_KEY": {
-				"description": "The ECDSA private key to use in OpenSSH format"
-			},
-			"CERTIFICATE_REQUEST_TIME_SKEW_MAX": {
-				"description": "The maximum time offset/skew allowed for certificate requests from a client in human readable form (ie '5 minutes')"
-			},
-			"DB_CERTIFICATE_RETENTION": {
-				"description": "The period of time to retain issued certificates in the database (ie '1 year' or 'infinite' to never purge the database)"
-			},
-			"LOG_LEVEL": {
-				"description": "Set this to debug to enable additional Worker logging"
-			}
+	"name": "@andrewheberle/serverless-ssh-ca",
+	"version": "0.17.5",
+	"description": "A serverless SSH CA built on Cloudflare Workers",
+	"type": "module",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
 		}
 	},
 	"scripts": {
-		"build": "wrangler deploy --dry-run --outdir dist",
-		"deploy": "npm-run-all migrations:apply:deploy wrangler:deploy",
-		"dev": "npm-run-all migrations:apply:dev wrangler:dev",
-		"cf-typegen": "wrangler types",
+		"build": "tsc",
 		"coverage": "vitest run --coverage",
-		"migrations:apply:dev": "wrangler d1 migrations apply DB --local",
-		"migrations:apply:deploy": "wrangler d1 migrations apply DB --remote",
 		"test": "vitest run",
-		"wrangler:dev": "wrangler dev",
-		"wrangler:deploy": "wrangler deploy",
-		"release": "npm run release --workspaces && release-it"
+		"test:watch": "vitest",
+		"prepublishOnly": "npm run build",
+		"release": "release-it"
 	},
 	"dependencies": {
-		"@andrewheberle/serverless-ssh-ca": "^0.17.4",
 		"@andrewheberle/ts-slog": "^1.3.0",
 		"@cloudflare/actors": "^0.0.1-beta.6",
+		"@cloudflare/workers-types": "^4.20260528.1",
 		"chanfana": "^3.0.0",
 		"hono": "^4.10.6",
 		"itty-time": "^2.0.2",
@@ -85,29 +33,27 @@
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.16.0",
-		"@release-it/bumper": "^7.0.5",
 		"@types/sshpk": "^1.17.4",
-		"@vitest/coverage-istanbul": "^4.1.1",
-		"npm-run-all2": "^8.0.0",
+		"@vitest/coverage-istanbul": "^4.1.7",
 		"release-it": "^20.0.1",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.0",
-		"vitest": "^4.1.1",
-		"wrangler": "^4.73.0"
+		"vitest": "^4.1.7"
 	},
-	"workspaces": [
-		"packages/serverless-ssh-ca"
-	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/andrewheberle/serverless-ssh-ca.git",
+		"directory": "packages/ssh-ca"
+	},
+	"homepage": "https://github.com/andrewheberle/serverless-ssh-ca#readme",
+	"bugs": {
+		"url": "https://github.com/andrewheberle/serverless-ssh-ca/issues"
+	},
+	"author": "Andrew Heberle",
+	"license": "Apache-2.0",
 	"release-it": {
-		"git": {
-			"requireCleanWorkingDir": false
-		},
-		"github": {
-			"release": true
-		},
 		"npm": {
-			"publish": false,
+			"skipChecks": true,
 			"ignoreVersion": true
 		}
 	}

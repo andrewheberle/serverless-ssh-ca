@@ -134,7 +134,10 @@ export function convertPublicKey(publickey: Pubkey): {
     pk_algo === "ssh-ed25519" || pk_algo === "sk-ssh-ed25519@openssh.com"
   ) {
     return {
-      keyData: publickey.key.buffer,
+      keyData: publickey.key.buffer.slice(
+        publickey.key.byteOffset,
+        publickey.key.byteOffset + publickey.key.byteLength
+      ) as ArrayBuffer,
       format: "raw",
     };
   } else if (
@@ -156,8 +159,7 @@ export function convertPublicKey(publickey: Pubkey): {
       crv = "P-256";
     } else if (pk_algo === "ecdsa-sha2-nistp384") {
       crv = "P-384";
-    }
-    {
+    } else {
       crv = "P-521";
     }
     return {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { identityPrincipals, split } from "../src/utils"
-import { env } from "cloudflare:workers"
+import { env } from "./env"
 
 describe("split", () => {
     it ("with empty string", () => {
@@ -21,32 +21,32 @@ describe("split", () => {
 
 describe("identityPrincipals", () => {
     it ("no principals claim", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user"})
+        const result = identityPrincipals(env, {email: "user@example.com", sub: "user"})
         expect(result).toStrictEqual([])
     })
 
     it ("empty string principals claim", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ""}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: ""}, "groups")
         expect(result).toStrictEqual([])
     })
 
     it ("empty array principals claim", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: []}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: []}, "groups")
         expect(result).toStrictEqual([])
     })
 
     it ("principals claim as string", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: "foo"}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: "foo"}, "groups")
         expect(result).toStrictEqual(["foo"])
     })
 
     it ("principals claim as array", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ["foo"]}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: ["foo"]}, "groups")
         expect(result).toStrictEqual(["foo"])
     })
 
     it ("principals claim as array with two items", () => {
-        const result = identityPrincipals({email: "user@example.com", sub: "user", groups: ["foo", "bar"]}, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
+        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: ["foo", "bar"]}, "groups")
         expect(result).toStrictEqual(["foo", "bar"])
     })
 })

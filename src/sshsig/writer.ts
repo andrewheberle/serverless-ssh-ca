@@ -43,7 +43,7 @@ export class Writer {
     // instead of calling `writeByte` in each iteration
     this.addResize(uint8bytes.length);
     for (let i = 0; i < uint8bytes.length; i++) {
-      this.view.setUint8(this.pos++, uint8bytes[i]);
+      this.view.setUint8(this.pos++, uint8bytes[i]!);
     }
   }
   writeByte(byte: number) {

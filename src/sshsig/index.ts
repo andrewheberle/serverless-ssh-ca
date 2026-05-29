@@ -37,6 +37,11 @@ export async function verify(
 
   if (typeof signed_data === "string") {
     signed_data = new TextEncoder().encode(signed_data);
+  } else {
+    signed_data = new Uint8Array(signed_data.buffer.slice(
+      signed_data.byteOffset,
+      signed_data.byteOffset + signed_data.byteLength
+    ) as ArrayBuffer)
   }
-  return await rawVerify(subtle, signature, signed_data);
+  return await rawVerify(subtle, signature, signed_data as Uint8Array<ArrayBuffer>);
 }

@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers"
 import { ms } from "itty-time"
 import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseKey } from "sshpk"
 import { verify } from "./sshsig"
@@ -41,7 +40,7 @@ export class ProofOfPossession {
 	readonly logger: Logger
 	private readonly data: string
 
-	constructor(proof: string, options?: { from?: number, logger?: Logger }) {
+constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: number }) {
 		this.logger = options?.logger !== undefined ? options.logger : new Logger({ minLevel: LogLevel.None })
 		const parts = proof.split(".")
 		if (parts.length !== 3) {
@@ -51,14 +50,14 @@ export class ProofOfPossession {
 		const [timestampStr, fingerprintString, signatureBase64] = parts
 
 		// verify timestamp
-		const timestamp: number = parseInt(timestampStr, 10)
+		const timestamp: number = parseInt(timestampStr!, 10)
 		if (isNaN(timestamp)) {
 			throw new PossessionParseError("timestamp was not a number")
 		}
 
 		const now = options?.from !== undefined ? options?.from : Date.now()
 		const age = now - timestamp
-		const skew = ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)
+		const skew = options?.skew !== undefined ? options.skew : ms("90 seconds")
 		if (age > skew) {
 			throw new PossessionParseError("timestamp too old")
 		}
@@ -67,13 +66,13 @@ export class ProofOfPossession {
 		}
 		try {
 			// parse fingerprint
-			const fingerprint = parseFingerprint(fingerprintString)
+			const fingerprint = parseFingerprint(fingerprintString!)
 			if (fingerprint === undefined) {
 				throw new PossessionParseError("fingerprint did not parse")
 			}
 
 			// convert siganture from base64
-			const signature = Buffer.from(signatureBase64, "base64").toString()
+			const signature = Buffer.from(signatureBase64!, "base64").toString()
 
 			// set values
 			this.timestamp = timestamp
@@ -160,10 +159,10 @@ export class PossessionMatchError extends Error {
 }
 
 export class RenewalProofOfPossession extends ProofOfPossession {
-	matches(key: Key): never
-	matches(...keys: Key[]): boolean
+	override matches(key: Key): never
+	override matches(...keys: Key[]): boolean
 
-	matches(...keys: Key[]): boolean {
+	override matches(...keys: Key[]): boolean {
 		this.logger.debug("matches() called", "in", "RenewalProofOfPossession", "keys", keys.length)
 		if (keys.length === 1) {
 			throw new PossessionMatchError("must verify both public key and certificate")

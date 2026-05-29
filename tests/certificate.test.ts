@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest"
 import { generateCertificate, generateSerial } from "../src/certificate"
 import { seconds } from "itty-time"
 import { split } from "../src/utils"
-import { env } from "cloudflare:workers"
+import { env } from "./env"
 import { Format, Identity, identityForUser, PrivateKey } from "sshpk"
 
 const rsaCAKey = rsaPrivateKey()
@@ -30,7 +30,7 @@ type Tests = {
 
 const tests: Tests[] = [
     {
-        name: "RSA CA",
+        name: "RSA CA - will fail on Workers runtime",
         email: "test@example.com",
         useridenties: [
             "testuser",
@@ -39,7 +39,6 @@ const tests: Tests[] = [
         ],
         serial: generateSerial().readBigUInt64BE(0),
         caKey: rsaCAKey,
-        wantErr: "Failed to parse private key"
     },
     {
         name: "ECDSA CA",
@@ -68,8 +67,8 @@ const tests: Tests[] = [
 for (const tt of tests) {
     describe(`generateCertificate (${tt.name})`, async () => {
         if (tt.wantErr === undefined) {
-            it("handle RSA user key", () => {
-                const certificate = generateCertificate(tt.email, tt.caKey, userRsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
+            it(`${tt.name}: handle RSA user key`, () => {
+                const certificate = generateCertificate(env, tt.email, tt.caKey, userRsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
 
                 // check its signed by the CA
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -101,8 +100,8 @@ for (const tt of tests) {
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 
-            it("handle ECDSA user key", () => {
-                const certificate = generateCertificate(tt.email, tt.caKey, userEcdsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
+            it(`${tt.name}: handle ECDSA user key`, () => {
+                const certificate = generateCertificate(env, tt.email, tt.caKey, userEcdsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
 
                 // check its signed by the CA
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -134,8 +133,8 @@ for (const tt of tests) {
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 
-            it("handle ED25519 user key", () => {
-                const certificate = generateCertificate(tt.email, tt.caKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
+            it(`${tt.name}: handle ED25519 user key`, () => {
+                const certificate = generateCertificate(env, tt.email, tt.caKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
 
                 // check its signed by the CA
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -167,8 +166,8 @@ for (const tt of tests) {
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 
-            it("user key with less extensions", () => {
-                const certificate = generateCertificate(tt.email, tt.caKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["permit-user-rc"], serial: tt.serial})
+            it(`${tt.name}: user key with less extensions`, () => {
+                const certificate = generateCertificate(env, tt.email, tt.caKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["permit-user-rc"], serial: tt.serial})
 
                 // check its signed by the CA
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -200,33 +199,33 @@ for (const tt of tests) {
                 expect(lifetime).toBe(seconds(lifetimeString))
             })
 
-            it("user key with extra extensions", () => {
-                expect(() => generateCertificate(tt.email, tt.caKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
+            it(`${tt.name}: user key with extra extensions`, () => {
+                expect(() => generateCertificate(env, tt.email, tt.caKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
                     .toThrow("no-touch-required is not allowed")
             })
         } else {
-            it("handle RSA user key", () => {
-                expect(() => generateCertificate(tt.email, rsaCAKey, userRsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
+            it(`${tt.name}: handle RSA user key`, () => {
+                expect(() => generateCertificate(env, tt.email, rsaCAKey, userRsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
                     .toThrow("Failed to parse private key")
             })
 
-            it("handle ECDSA user key", () => {
-                expect(() => generateCertificate(tt.email, rsaCAKey, userEcdsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
+            it(`${tt.name}: handle ECDSA user key`, () => {
+                expect(() => generateCertificate(env, tt.email, rsaCAKey, userEcdsaKey.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
                     .toThrow("Failed to parse private key")
             })
 
-            it("handle ED25519 user key", () => {
-                expect(() => generateCertificate(tt.email, rsaCAKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
+            it(`${tt.name}: handle ED25519 user key`, () => {
+                expect(() => generateCertificate(env, tt.email, rsaCAKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
                     .toThrow("Failed to parse private key")
             })
 
-            it("user key with less extensions", () => {
-                expect(() => generateCertificate(tt.email, rsaCAKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["permit-user-rc"], serial: tt.serial }))
+            it(`${tt.name}: user key with less extensions`, () => {
+                expect(() => generateCertificate(env, tt.email, rsaCAKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["permit-user-rc"], serial: tt.serial }))
                     .toThrow("Failed to parse private key")
             })
 
-            it("user key with extra extensions", () => {
-                expect(() => generateCertificate(tt.email, rsaCAKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
+            it(`${tt.name}: user key with extra extensions`, () => {
+                expect(() => generateCertificate(env, tt.email, rsaCAKey, userEd25519Key.toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
                     .toThrow("Failed to parse private key")
             })
         }

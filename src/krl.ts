@@ -39,7 +39,7 @@ function encodeString(value: Uint8Array | string): Uint8Array {
 }
 
 /** Concatenate an arbitrary number of Uint8Arrays into one. */
-function concat(...parts: Uint8Array[]): Uint8Array {
+function concat(...parts: Uint8Array[]): Uint8Array<ArrayBuffer> {
     const total = parts.reduce((n, p) => n + p.length, 0)
     const out = new Uint8Array(total)
     let offset = 0
@@ -97,7 +97,7 @@ const HASH_ALGORITHM = "sha512"
  * PEM string → raw DER bytes (strips header/footer and decodes base64).
  * Works for both PKCS8 ("-----BEGIN PRIVATE KEY-----") and any other PEM type.
  */
-function pemToDer(pem: string): Uint8Array {
+function pemToDer(pem: string): Uint8Array<ArrayBuffer> {
     const lines = pem
         .trim()
         .split("\n")
@@ -195,7 +195,7 @@ function p1363ToSshEcdsaSig(
         while (start < n.length - 1 && n[start] === 0) start++
         const trimmed = n.slice(start)
         const padded =
-            trimmed[0] & 0x80 ? concat(new Uint8Array([0x00]), trimmed) : trimmed
+            trimmed[0]! & 0x80 ? concat(new Uint8Array([0x00]), trimmed) : trimmed
         return encodeString(padded)
     }
 

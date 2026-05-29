@@ -21,7 +21,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
-
       - name: git config
         run: |
           git config user.name "${GITHUB_ACTOR}"
