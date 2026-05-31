@@ -21,14 +21,14 @@ describe("user certificate schema", () => {
             expect(result.success).toBe(false)
         })
 
-        it("should fail with non-Bearer token header", () => {
+        it("should fail with without correct prefix", () => {
             const result = userCertificateEndpoint.request.headers.safeParse({
                 Authorization: "Basic foo"
             })
             expect(result.success).toBe(false)
         })
 
-        it("should fail with empty Bearer token", () => {
+        it("should fail with empty value after prefix", () => {
             const result = userCertificateEndpoint.request.headers.safeParse({
                 Authorization: "Bearer "
             })
