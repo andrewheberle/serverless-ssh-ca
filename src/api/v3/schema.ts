@@ -59,13 +59,16 @@ const createIdentityTokenSchema = (env: SshCaBindings) => (
 )
 
 const createAccessTokenSchema = (env: SshCaBindings) => (
-	z.string()
-	.meta({
-		description: "Access Token JWT from OIDC IdP",
-		example: "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
-	})
-	.startsWith("Bearer ")
-	.transform((val, ctx) => transformAuthorizationHeader(env, val, ctx))
+    z.string()
+        .meta({
+            description: "Access Token JWT from OIDC IdP",
+            example: "Bearer eyJ..."
+        })
+        .refine((val) => val.startsWith("Bearer ") && val.length > 7, {
+            error: "Authorization header must be a Bearer token",
+			abort: true
+        })
+        .transform((val, ctx) => transformAuthorizationHeader(env, val, ctx))
 )
 
 const krl = openapiStringByte

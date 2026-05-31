@@ -1,12 +1,14 @@
 import type { SshCaBindings } from "../src/types"
 
+const port = parseInt(process.env.OIDC_PORT ?? "4567")
+
 export const makeEnv = (overrides: Partial<SshCaBindings> = {}): SshCaBindings => ({
     DB: null as unknown as D1Database,
     PRIVATE_KEY: null as unknown as SecretsStoreSecret,
     ISSUER_DN: "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
-    JWT_JWKS_URL: "https://idp.example.com/.well-known/jwks.json",
-    JWT_AUD: "audience",
-    JWT_ISSUER: "https://idp.example.com",
+    JWT_JWKS_URL: `http://localhost:${port}/jwks`,
+    JWT_AUD: process.env.JWT_AUD ?? "audience",
+    JWT_ISSUER: `http://localhost:${port}`,
     JWT_ALGORITHMS: "RS256",
     JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: "groups",
     SSH_CERTIFICATE_LIFETIME: "24 hours",
