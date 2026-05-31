@@ -14,14 +14,14 @@ describe("user certificate schema", () => {
             expect(result.success).toBe(false)
         })
 
-        it("should fail with missing Authorization header", () => {
+        it("should fail with missing header", () => {
             const result = userCertificateEndpoint.request.headers.safeParse({
                 Authorization: undefined
             })
             expect(result.success).toBe(false)
         })
 
-        it("should fail with non-Bearer Authorization header", () => {
+        it("should fail with non-Bearer token header", () => {
             const result = userCertificateEndpoint.request.headers.safeParse({
                 Authorization: "Basic foo"
             })
