@@ -1,4 +1,3 @@
-import { tryWhile } from "@cloudflare/actors"
 import { Certificate, Format, Identity } from "sshpk"
 import { logger } from "./logger"
 import type { SshCaBindings } from "./types"
@@ -20,6 +19,24 @@ export type CertificateRecord = {
 	certificate_type: CertificateType
 	public_key: string | null
 }
+
+export const tryWhile = async <T>(
+    fn: () => Promise<T>,
+    shouldRetry: (err: unknown, nextAttempt: number) => boolean,
+): Promise<T> => {
+    let attempt = 1
+    while (true) {
+        try {
+            return await fn()
+        } catch (err) {
+            if (!shouldRetry(err, attempt + 1)) {
+                throw err
+            }
+            attempt++
+        }
+    }
+}
+
 
 export const runStatement = async <T = Record<string, unknown>>(stmt: D1PreparedStatement) => {
 	return await tryWhile(async () => {
