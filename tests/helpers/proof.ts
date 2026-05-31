@@ -1,10 +1,9 @@
-import { execSync, spawnSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import { writeFileSync, readFileSync, unlinkSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { parseKey, PrivateKey } from "sshpk"
-
-const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
+import { PrivateKey } from "sshpk"
+import { Namespace } from "../../src/proof"
 
 export const generateProof = (key: PrivateKey): string => {
     const timestamp = Date.now()

@@ -5,7 +5,7 @@ import { parse } from "./sshsig/sig_parser"
 import { Sig } from "./sshsig/sig"
 import { group, Logger, LogLevel } from "@andrewheberle/ts-slog"
 
-const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
+export const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 
 export class PossessionParseError extends Error {
 	constructor(message: string, cause?: unknown) {
