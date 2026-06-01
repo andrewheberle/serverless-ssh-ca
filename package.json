@@ -1,59 +1,39 @@
 {
-	"name": "@andrewheberle/serverless-ssh-ca",
-	"version": "0.17.13",
-	"description": "A serverless SSH CA built on Cloudflare Workers",
-	"type": "module",
-	"types": "./dist/index.d.ts",
-	"files": [
-		"dist",
-		"src"
-	],
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		}
-	},
-	"scripts": {
-		"build": "tsc",
-		"coverage": "vitest run --coverage",
-		"test": "vitest run",
-		"test:watch": "vitest",
-		"test:workers": "npm run build && npm run test -w packages/workers-integration",
-		"prepublishOnly": "npm run build",
-		"release": "release-it"
-	},
-	"dependencies": {
-		"@andrewheberle/ts-slog": "^1.3.0",
-		"@cloudflare/workers-types": "^4.20260528.1",
-		"chanfana": "^3.0.0",
-		"hono": "^4.10.6",
-		"itty-time": "^2.0.2",
-		"jose": "^6.0.12",
-		"workers-qb": "^1.14.0",
-		"sshpk": "^1.18.0",
-		"zod": "^4.0.0"
-	},
-	"devDependencies": {
-		"@types/sshpk": "^1.17.4",
-		"@vitest/coverage-v8": "^4.1.7",
-		"auto-changelog": "^2.5.1",
-		"release-it": "^20.0.1",
-		"tsx": "^4.21.0",
-		"typescript": "^6.0.0",
-		"vitest": "^4.1.7"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/andrewheberle/serverless-ssh-ca.git"
-	},
-	"homepage": "https://github.com/andrewheberle/serverless-ssh-ca#readme",
-	"bugs": {
-		"url": "https://github.com/andrewheberle/serverless-ssh-ca/issues"
-	},
+	"private": true,
 	"workspaces": [
 		"packages/*"
 	],
-	"author": "Andrew Heberle",
-	"license": "Apache-2.0"
+	"scripts": {
+		"test": "npm run test -w packages/core",
+		"test:workers": "npm run build -w packages/core && npm run test -w packages/workers-integration",
+		"release": "npm run release --workspaces && release-it"
+	},
+	"devDependencies": {
+		"auto-changelog": "^2.5.1",
+		"release-it": "^20.0.1"
+	},
+	"release-it": {
+		"git": {
+			"requiredBranch": "main",
+			"commitMessage": "chore(release): v${version}",
+			"tagName": "v${version}"
+		},
+		"github": {
+			"autoGenerate": true,
+			"release": true,
+			"releaseName": "v${version}"
+		},
+		"hooks": {
+			"hooks": {
+				"before:init": [
+					"npm run test",
+					"npm run test:workers"
+				]
+			},
+			"after:bump": "npx auto-changelog -p"
+		},
+		"npm": {
+			"publish": false
+		}
+	}
 }

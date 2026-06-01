@@ -29,13 +29,20 @@ export type DatabaseSchema = {
 const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 	const l = logger(env)
 
-	const qb = new D1QB<DatabaseSchema>(env.DB)
-	const migrationBuilder = qb.migrations({ migrations })
-	const appliedMigrations = await migrationBuilder.apply()
+	try {
+		l.info("connecting to database")
 
-	l.info("applied database migrations", "migrations", appliedMigrations.length)
+		const qb = new D1QB<DatabaseSchema>(env.DB)
+		const migrationBuilder = qb.migrations({ migrations })
+		const appliedMigrations = await migrationBuilder.apply()
 
-	return qb
+		l.info("applied database migrations", "migrations", appliedMigrations.length, "migration_names", appliedMigrations.map(m => m.name))
+
+		return qb
+	} catch (err) {
+		l.error("error connecting to database", "error", err)
+		throw err
+	}
 }
 
 export const dbCleanup = async (env: SshCaBindings) => {

@@ -3,10 +3,12 @@
 	"private": true,
 	"scripts": {
 		"cf-typegen": "wrangler types",
-		"test": "vitest run"
+		"dev": "wrangler dev",
+		"test": "vitest run",
+		"release": "release-it"
 	},
 	"dependencies": {
-		"@andrewheberle/serverless-ssh-ca": "*"
+		"@andrewheberle/serverless-ssh-ca": "0.17.13"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.16.0",
