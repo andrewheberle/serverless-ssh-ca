@@ -1,15 +1,17 @@
 {
 	"private": true,
 	"workspaces": [
-		"packages/*"
+		"packages/core",
+		"packages/workers-integration"
 	],
 	"scripts": {
 		"build": "npm run build --workspaces --if-present",
 		"coverage": "npm run coverage --workspaces --if-present",
-		"test": "npm run test --workspaces --if-present && npm run test:workers",
-		"test:workers": "npm run build && npm run test:workers --workspaces --if-present",
+		"test": "npm run test --workspaces --if-present",
+		"test:workers": "npm run test:workers --workspaces --if-present",
 		"dev": "npm run build && npm run dev --workspaces --if-present",
 		"release": "npm run release --workspaces --if-present && release-it",
+		"release:ci": "npm run release:ci --workspaces --if-present && release-it --ci",
 		"release:dryrun": "npm run release:dryrun --workspaces --if-present && release-it --dry-run"
 	},
 	"devDependencies": {
@@ -30,12 +32,8 @@
 			"releaseName": "v${version}"
 		},
 		"hooks": {
-			"before:init": [
-				"npm run test",
-				"npm run test:workers"
-			]
-		},
-		"after:bump": "npx auto-changelog -p"
+			"after:bump": "npx auto-changelog -p"
+		}
 	},
 	"npm": {
 		"publish": false
