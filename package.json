@@ -19,6 +19,7 @@
 		"coverage": "vitest run --coverage",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"test:workers": "npm run build && npm run test -w packages/workers-integration",
 		"prepublishOnly": "npm run build",
 		"release": "release-it"
 	},
@@ -50,6 +51,9 @@
 	"bugs": {
 		"url": "https://github.com/andrewheberle/serverless-ssh-ca/issues"
 	},
+	"workspaces": [
+		"packages/*"
+	],
 	"author": "Andrew Heberle",
 	"license": "Apache-2.0"
 }
