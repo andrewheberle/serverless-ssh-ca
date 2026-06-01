@@ -1,0 +1,261 @@
+## @andrewheberle/serverless-ssh-ca
+
+This is the package that implements the SSH CA functionality which can be deployed
+to Cloudflare as a working solution using the "Deploy to Cloudflare" button below:
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca-template)
+
+To use the package in your own Worker manually (assuming you have the requried
+bindings in place), the following code in `src/index.ts` (your Worker's main
+file) will work:
+
+```ts
+import app from "@andrewheberle/serverless-ssh-ca"
+
+export default app
+```
+
+This package **only** works with Cloudflare Workers and there are no plans to make
+this a generic solution at this time.
+
+See the following respositories for additional information:
+
+
+| Repostitory | Details |
+|---|---|
+| [https://github.com/andrewheberle/ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client) | Contains client code for issuing user and host certificates |
+| [https://github.com/andrewheberle/serverless-ssh-ca-template](https://github.com/andrewheberle/serverless-ssh-ca-template) | Contains a template repository for deployment to Cloudflare Workers |
+
+## Architecture
+
+The solution comprises of the CA running as a Worker, a Go based client
+(found [here](https://github.com/andrewheberle/ssh-ca-client])) and a third
+party OIDC IdP.
+
+The IdP may be any OIDC compatible service that returns a JWT with at least
+an `email` claim in the OIDC access token, however at this time only
+Cloudflare Access has been tested.
+
+### User Certificates
+
+The flow to obtain a User SSH certificate using the CLI version is as follows:
+
+1. The user initiates `ssh-ca-client-cli login`
+2. If required a new SSH key is generated and the a browser is opened to
+   visit `http://localhost:3000/auth/login`
+3. The client redirects the user to the configured IdP
+4. The IdP returns the user to the callback URL (default
+   `http://localhost:3000/auth/callback`)
+5. The client uses the JWT from the IdP as `Authorization: Bearer <TOKEN>`
+   in a `POST` request containing the users SSH public key to the CA's
+   `/api/v3/user/certificate` endpoint
+6. The CA verifies the incoming JWT and assuming it is valid and verified, will
+   respond with a signed certificate based on the provided public key
+7. The client saves the certificate and adds the SSH private key and
+   certificate to the local SSH Agent.
+
+This flow is shown below once the user executes `ssh-ca-client-cli login`:
+
+```mermaid
+sequenceDiagram
+    User->>Client: GET /auth/login
+    activate Client
+    Client-->>User: Redirect to IdP
+    deactivate Client
+    activate User
+    User->>IdP: OIDC authentication flow
+    deactivate User
+    activate IdP
+    IdP-->>User: Redirect to Client
+    deactivate IdP
+    activate User
+    User->>Client: Completes OIDC redirect
+    deactivate User
+    activate Client
+    activate Client
+    Client-->>User: Auth flow completed
+    deactivate Client
+    Client->>CA: POST /api/v3/user/certificate
+    deactivate Client
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>SSH Agent: Add key and certificate to Agent
+    deactivate Client
+```
+
+If a refresh token is available, the process looks like this when running
+`ssh-ca-client-cli login`:
+
+```mermaid
+sequenceDiagram
+    Client->>IdP: Request authentication token
+    activate IdP
+    IdP-->>Client: Token returned
+    deactivate IdP
+    activate Client
+    Client->>CA: POST /api/v3/user/certificate
+    deactivate Client
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>SSH Agent: Add key and certificate to Agent
+    deactivate Client
+```
+
+If the process to request a new authentication token fails using the refresh
+token, the standard authentication process is followed which requires user
+interaction.
+
+### Host Certificates
+
+#### Initial Request
+
+The process to request an intitial Host certificate is similar to obtaining
+a User certificate once `ssh-ca-client-cli host` is run, however instead of
+adding the obtained certificate to a SSH Agent, it is written to
+`<KEYPATH>-cert.pub` instead:
+
+```mermaid
+sequenceDiagram
+    User->>Client: GET /auth/login
+    activate Client
+    Client-->>User: Redirect to IdP
+    deactivate Client
+    activate User
+    User->>IdP: OIDC authentication flow
+    deactivate User
+    activate IdP
+    IdP-->>User: Redirect to Client
+    deactivate IdP
+    activate User
+    User->>Client: Completes OIDC redirect
+    deactivate User
+    activate Client
+    activate Client
+    Client-->>User: Auth flow completed
+    deactivate Client
+    Client->>CA: POST /api/v3/host/certificate
+    deactivate Client
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>Writes Certificate: Certificate written to disk
+    deactivate Client
+```
+
+#### Renewals
+
+Renewals are done using the existing certificate and will succeed if:
+
+1. The certificate is not expired
+2. It was issued by the CA
+3. The public key used to obtain the certificate is the same as the one
+currently presented
+
+This means the OIDC authentication flow is not required in this case as shown
+below when `ssh-ca-client-cli host --renew` is run:
+
+```mermaid
+sequenceDiagram
+    Client->>CA: POST /api/v3/host/renew
+    activate CA
+    CA-->>Client: Signed certificate
+    deactivate CA
+    activate Client
+    Client->>Writes Certificate: Certificate written to disk
+    deactivate Client
+```
+
+## Configuration
+
+### Identity Provider
+
+This example shows the configuration in Cloudflare Access, however other
+OIDC IdP's should be generally equivalent:
+
+![Basic OIDC Settings](images/oidc-example_01.png)
+
+The `Redirect URL` must match the configured value in the client.
+
+Transfer the IdP settings as follows:
+
+![IdP Settings](images/oidc-example_02.png)
+
+The `openid` and `email` scopes are required, with enabling of refresh tokens
+(the `offline_access` scope) being optional, but recommended.
+
+### Client
+
+Please visit the client repository for further information:
+
+https://github.com/andrewheberle/ssh-ca-client
+
+### SSH Endpoints
+
+#### Host Configuration
+
+For systems to allow SSH login using certificates the following configuration
+changes must be made:
+
+```ssh
+PubkeyAuthentication yes
+TrustedUserCAKeys /etc/ssh/ca.pub
+AuthorizedPrincipalsFile /etc/ssh/principals.d/%u
+# Uncomment the following lines to enable host certificates
+# HostCertificate /etc/ssh/ssh_host_rsa_key-cert.pub
+# HostCertificate /etc/ssh/ssh_host_ecdsa_key-cert.pub
+# HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub
+```
+
+The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be
+retrieved as follows:
+
+```sh
+curl https://ssh-ca.example.com/api/v3/ca | sudo tee /etc/ssh/ca.pub
+```
+
+The `/etc/ssh/principals.d` directory should contain a file corresponding to
+a local user that contains a list of principals that should be allowed
+login.
+
+Using the principals list in `SSH_CERTIFICATE_PRINCIPALS` above, the
+following file named `/etc/ssh/principals.d/admin` would allow login
+as the SSH user `admin` for the bearer of an issued (and valid) certificate:
+
+```
+ssh-admin
+```
+
+#### Client Configuration
+
+In order for a client to trust a certificate presented by a host the following
+configuration must be added to `/etc/ssh/ssh_known_hosts` (system wide) or
+`~/.ssh/known_hosts` (user specific):
+
+```
+@cert-authority *.example.com ecdsa-sha2-nistp256 ....
+```
+
+The format of the above file is documented in the `ssh(1)` man page however
+the important items of note is the `*.example.com` above tells `ssh` that the
+CA public key (ie `ecdsa-sha2-nistp256 ....`) is trusted for all hosts, that
+match `*.example.com`.
+
+This will need adjusting depending on your environment along with the actual
+SSH CA public key which can be retrieved as follows:
+
+```sh
+curl https://ssh-ca.example.com/api/v3/ca
+```
+
+Once the above configuration is completed and host certificates are in place
+clients will not require "trust on first use" (TOFU) as the certificate will be
+verified as being signed by the configured SSH CA.
+
+# Attributions
+
+The icons used by the client are made by Freepik from [www.flaticon.com](https://www.flaticon.com).
