@@ -4,6 +4,8 @@
 		"packages/*"
 	],
 	"scripts": {
+		"build": "npm run build -w packages/core",
+		"coverage": "npm run coverage -w packages/core",
 		"test": "npm run test -w packages/core",
 		"test:workers": "npm run build -w packages/core && npm run test -w packages/workers-integration",
 		"release": "npm run release --workspaces && release-it"
