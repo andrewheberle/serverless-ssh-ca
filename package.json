@@ -9,6 +9,7 @@
 		"release": "npm run release --workspaces && release-it"
 	},
 	"devDependencies": {
+		"@release-it/bumper": "^7.0.6",
 		"auto-changelog": "^2.5.1",
 		"release-it": "^20.0.1"
 	},
@@ -16,7 +17,8 @@
 		"git": {
 			"requiredBranch": "main",
 			"commitMessage": "chore(release): v${version}",
-			"tagName": "v${version}"
+			"tagName": "v${version}",
+			"requireCleanWorkingDir": false
 		},
 		"github": {
 			"autoGenerate": true,

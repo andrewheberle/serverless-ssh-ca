@@ -56,6 +56,7 @@
 	"author": "Andrew Heberle",
 	"license": "Apache-2.0",
 	"release-it": {
+		"git": false,
 		"npm": {
 			"publish": true,
 			"skipChecks": true
