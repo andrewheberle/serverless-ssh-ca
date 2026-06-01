@@ -12,6 +12,8 @@
 		"esModuleInterop": true,
 		"noUncheckedIndexedAccess": true,
 		"noImplicitOverride": true,
+		"sourceMap": true,
+		"declarationMap": true,
 		"types": ["@cloudflare/workers-types"]
 	},
 	"exclude": ["tests", "dist"],
