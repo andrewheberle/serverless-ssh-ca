@@ -5,10 +5,11 @@
 		"cf-typegen": "wrangler types",
 		"dev": "wrangler dev",
 		"test": "vitest run",
-		"release": "release-it"
+		"release": "true",
+		"release:dryrun": "true"
 	},
 	"dependencies": {
-		"@andrewheberle/serverless-ssh-ca": "0.17.13"
+		"@andrewheberle/serverless-ssh-ca": "*"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.16.0",
@@ -20,7 +21,7 @@
 	"release-it": {
 		"git": false,
 		"npm": {
-			"skipChecks": true
+			"publish": false
 		}
 	}
 }
