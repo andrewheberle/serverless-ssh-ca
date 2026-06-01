@@ -53,6 +53,10 @@ type AccessToken = {
 }
 
 export const transformAuthorizationHeader = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
+	if (!val.startsWith("Bearer ") || val.length <= 7) {
+		return fatalIssue(ctx, "authorization header must be a Bearer token", val)
+	}
+
 	const jwt = val.replace("Bearer ", "")
 	const l = logger(env)
 

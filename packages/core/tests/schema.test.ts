@@ -1,38 +1,106 @@
 import { describe, it, expect } from "vitest"
-import { createUserCertificateRequestEndpointSchema } from "../src/api/v3/schema"
+import { createAccessTokenSchema, createIdentityTokenSchema, createUserCertificateRequestEndpointSchema } from "../src/api/v3/schema"
 import { makeEnv } from "./env"
-import { ZodError } from "zod"
+import { getAccessToken, getIdentityToken } from "./helpers/token"
 
 const env = makeEnv()
 
+describe("access token schema", () => {
+	const accessTokenSchema = createAccessTokenSchema(env)
+
+	it("should fail when blank", async () => {
+		const result = await accessTokenSchema.safeParseAsync("")
+		expect(result.success).toBe(false)
+	})
+
+	it("should fail without correct prefix", async () => {
+		const result = await accessTokenSchema.safeParseAsync("Basic foo")
+		expect(result.success).toBe(false)
+	})
+
+	it("should fail with invalid token", async () => {
+		const result = await accessTokenSchema.safeParseAsync("Bearer foo")
+		expect(result.success).toBe(false)
+	})
+
+	it("should pass with valid token", async () => {
+		const token = await getAccessToken({
+			sub: "1234567890",
+			email: "user123@example.com"
+		})
+
+		const result = await accessTokenSchema.safeParseAsync(token)
+
+		expect(result.success).toBe(true)
+	})
+})
+
+describe("identity token schema", () => {
+	const identityTokenSchema = createIdentityTokenSchema(env)
+
+	it("should fail when blank", async () => {
+		const result = await identityTokenSchema.safeParseAsync("")
+		expect(result.success).toBe(false)
+	})
+
+	it("should fail with invalid token", async () => {
+		const result = await identityTokenSchema.safeParseAsync("foo")
+		expect(result.success).toBe(false)
+	})
+
+	it("should pass with valid token", async () => {
+		const token = await getIdentityToken({
+			sub: "1234567890",
+			email: "user123@example.com"
+		})
+
+		const result = await identityTokenSchema.safeParseAsync(token)
+
+		expect(result.success).toBe(true)
+	})
+})
+
 describe("user certificate schema", () => {
-    const userCertificateEndpoint = createUserCertificateRequestEndpointSchema(env)
+	const userCertificateEndpoint = createUserCertificateRequestEndpointSchema(env)
 
-    describe("headers", () => {
-        it("should fail with no headers", () => {
-            const result = userCertificateEndpoint.request.headers.safeParse({})
-            expect(result.success).toBe(false)
-        })
+	describe("headers", () => {
+		it("should fail with no headers", async () => {
+			const result = await userCertificateEndpoint.request.headers.safeParseAsync({})
+			expect(result.success).toBe(false)
+		})
 
-        it("should fail with missing header", () => {
-            const result = userCertificateEndpoint.request.headers.safeParse({
-                Authorization: undefined
-            })
-            expect(result.success).toBe(false)
-        })
+		it("should fail with missing header", async () => {
+			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
+				Authorization: undefined
+			})
+			expect(result.success).toBe(false)
+		})
 
-        it("should fail with without correct prefix", () => {
-            const result = userCertificateEndpoint.request.headers.safeParse({
-                Authorization: "Basic foo"
-            })
-            expect(result.success).toBe(false)
-        })
+		it("should fail with without correct prefix", async () => {
+			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
+				Authorization: "Basic foo"
+			})
+			expect(result.success).toBe(false)
+		})
 
-        it("should fail with empty value after prefix", () => {
-            const result = userCertificateEndpoint.request.headers.safeParse({
-                Authorization: "Bearer "
-            })
-            expect(result.success).toBe(false)
-        })
-    })
+		it("should fail with empty value after prefix", async () => {
+			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
+				Authorization: "Bearer "
+			})
+			expect(result.success).toBe(false)
+		})
+
+		it("should pass with valid token", async () => {
+			const token = await getAccessToken({
+				sub: "1234567890",
+				email: "user123@example.com"
+			})
+
+			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
+				Authorization: token
+			})
+
+			expect(result.success).toBe(true)
+		})
+	})
 })
