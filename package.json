@@ -5,7 +5,8 @@
 	"type": "module",
 	"types": "./dist/index.d.ts",
 	"files": [
-		"dist"
+		"dist",
+		"src"
 	],
 	"exports": {
 		".": {
@@ -23,12 +24,12 @@
 	},
 	"dependencies": {
 		"@andrewheberle/ts-slog": "^1.3.0",
-		"@cloudflare/actors": "^0.0.1-beta.6",
 		"@cloudflare/workers-types": "^4.20260528.1",
 		"chanfana": "^3.0.0",
 		"hono": "^4.10.6",
 		"itty-time": "^2.0.2",
 		"jose": "^6.0.12",
+		"workers-qb": "^1.14.0",
 		"sshpk": "^1.18.0",
 		"zod": "^4.0.0"
 	},
