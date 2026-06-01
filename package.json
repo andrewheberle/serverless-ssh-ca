@@ -4,13 +4,13 @@
 		"packages/*"
 	],
 	"scripts": {
-		"build": "npm run build -w packages/core",
-		"coverage": "npm run coverage -w packages/core",
-		"test": "npm run test -w packages/core && npm run test:workers",
-		"test:workers": "npm run build -w packages/core && npm run test -w packages/workers-integration",
-		"dev": "npm run build && npm run dev -w packages/workers-integration",
-		"release": "npm run release --workspaces && release-it",
-		"release:dryrun": "npm run release:dryrun --workspaces && release-it --dry-run"
+		"build": "npm run build --workspaces --if-present",
+		"coverage": "npm run coverage --workspaces --if-present",
+		"test": "npm run test --workspaces --if-present && npm run test:workers",
+		"test:workers": "npm run build && npm run test:workers --workspaces --if-present",
+		"dev": "npm run build && npm run dev --workspaces --if-present",
+		"release": "npm run release --workspaces --if-present && release-it",
+		"release:dryrun": "npm run release:dryrun --workspaces --if-present && release-it --dry-run"
 	},
 	"devDependencies": {
 		"@release-it/bumper": "^7.0.6",

@@ -4,9 +4,7 @@
 	"scripts": {
 		"cf-typegen": "wrangler types",
 		"dev": "wrangler dev",
-		"test": "vitest run",
-		"release": "true",
-		"release:dryrun": "true"
+		"test:workers": "vitest run"
 	},
 	"dependencies": {
 		"@andrewheberle/serverless-ssh-ca": "*"
