@@ -49,7 +49,7 @@ const publicKey = openapiStringByte
 		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
 	})
 
-const createIdentityTokenSchema = (env: SshCaBindings) => (
+export const createIdentityTokenSchema = (env: SshCaBindings) => (
 	z.string()
 		.meta({
 			description: "Identity Token JWT from OIDC IdP",
@@ -58,15 +58,11 @@ const createIdentityTokenSchema = (env: SshCaBindings) => (
 		.transform((val, ctx) => transformIdentityToken(env, val, ctx))
 )
 
-const createAccessTokenSchema = (env: SshCaBindings) => (
+export const createAccessTokenSchema = (env: SshCaBindings) => (
     z.string()
         .meta({
             description: "Access Token JWT from OIDC IdP",
-            example: "Bearer eyJ..."
-        })
-        .refine((val) => val.startsWith("Bearer ") && val.length > 7, {
-            error: "Authorization header must be a Bearer token",
-			abort: true
+          	example: "Bearer eyJ..."
         })
         .transform((val, ctx) => transformAuthorizationHeader(env, val, ctx))
 )
