@@ -190,7 +190,7 @@ The `openid` and `email` scopes are required, with enabling of refresh tokens
 
 ### Client
 
-Please visit the client repository for further information:
+Please visit the ssh-ca-client repository for further information:
 
 https://github.com/andrewheberle/ssh-ca-client
 
@@ -255,7 +255,3 @@ curl https://ssh-ca.example.com/api/v3/ca
 Once the above configuration is completed and host certificates are in place
 clients will not require "trust on first use" (TOFU) as the certificate will be
 verified as being signed by the configured SSH CA.
-
-# Attributions
-
-The icons used by the client are made by Freepik from [www.flaticon.com](https://www.flaticon.com).
