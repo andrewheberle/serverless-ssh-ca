@@ -235,7 +235,7 @@ export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => 
 	}
 })
 
-export revokeCertificateEndpointBodySchema = (env: SshCaBindings) => (
+export const revokeCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 			serial: z.bigint()
 				.meta({ description: "Serial number of certificate to revoke" }),
