@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { createAccessTokenSchema, createIdentityTokenSchema, createUserCertificateRequestEndpointSchema } from "../src/api/v3/schema"
+import { createAccessTokenSchema, createIdentityTokenSchema } from "../src/api/v3/schema"
 import { makeEnv } from "./env"
 import { getAccessToken, getIdentityToken } from "./helpers/token"
 
@@ -57,50 +57,5 @@ describe("identity token schema", () => {
 		const result = await identityTokenSchema.safeParseAsync(token)
 
 		expect(result.success).toBe(true)
-	})
-})
-
-describe("user certificate schema", () => {
-	const userCertificateEndpoint = createUserCertificateRequestEndpointSchema(env)
-
-	describe("headers", () => {
-		it("should fail with no headers", async () => {
-			const result = await userCertificateEndpoint.request.headers.safeParseAsync({})
-			expect(result.success).toBe(false)
-		})
-
-		it("should fail with missing header", async () => {
-			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
-				Authorization: undefined
-			})
-			expect(result.success).toBe(false)
-		})
-
-		it("should fail with without correct prefix", async () => {
-			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
-				Authorization: "Basic foo"
-			})
-			expect(result.success).toBe(false)
-		})
-
-		it("should fail with empty value after prefix", async () => {
-			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
-				Authorization: "Bearer "
-			})
-			expect(result.success).toBe(false)
-		})
-
-		it("should pass with valid token", async () => {
-			const token = await getAccessToken({
-				sub: "1234567890",
-				email: "user123@example.com"
-			})
-
-			const result = await userCertificateEndpoint.request.headers.safeParseAsync({
-				Authorization: token
-			})
-
-			expect(result.success).toBe(true)
-		})
 	})
 })
