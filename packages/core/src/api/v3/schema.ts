@@ -59,18 +59,18 @@ export const createIdentityTokenSchema = (env: SshCaBindings) => (
 )
 
 export const createAccessTokenSchema = (env: SshCaBindings) => (
-    z.string()
-        .meta({
-            description: "Access Token JWT from OIDC IdP",
-          	example: "Bearer eyJ..."
-        })
-        .transform((val, ctx) => transformAuthorizationHeader(env, val, ctx))
+	z.string()
+		.meta({
+			description: "Access Token JWT from OIDC IdP",
+			example: "Bearer eyJ..."
+		})
+		.transform((val, ctx) => transformAuthorizationHeader(env, val, ctx))
 )
 
 const krl = openapiStringByte
 	.meta({ description: "Key Revocation List" })
 
-const createHeaderSchema = (env: SshCaBindings) => (
+export const createHeaderSchema = (env: SshCaBindings) => (
 	z.object({
 		"Authorization": createAccessTokenSchema(env)
 	})
@@ -93,28 +93,30 @@ export const CaPublicKeyEndpointSchema = {
 	}
 }
 
+export const userCertificateRequestEndpointBodySchema = (env: SshCaBindings) => (
+	z.object({
+		public_key: publicKey,
+		proof: proofOfPossession
+			.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
+		identity: createIdentityTokenSchema(env),
+		extensions: z.array(z.string())
+			.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
+			.meta({ description: "Extensions to include in the issued SSH certificate" }),
+		lifetime: z.int()
+			.min(seconds("5 minutes"))
+			.max(seconds(env.SSH_CERTIFICATE_LIFETIME))
+			.default(seconds(env.SSH_CERTIFICATE_LIFETIME))
+			.meta({ description: "Lifetime of issued SSH certificate" }),
+	})
+		.superRefine((val, ctx) => refineCertificateRequest(env, val, ctx))
+		.openapi("User Certificate Request")
+)
+
 export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
 	security: [{ oidcAuth: [] }],
 	request: {
 		headers: createHeaderSchema(env),
-		body: contentJson(
-			z.object({
-				public_key: publicKey,
-				proof: proofOfPossession
-					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
-				identity: createIdentityTokenSchema(env),
-				extensions: z.array(z.string())
-					.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
-					.meta({ description: "Extensions to include in the issued SSH certificate" }),
-				lifetime: z.int()
-					.min(seconds("5 minutes"))
-					.max(seconds(env.SSH_CERTIFICATE_LIFETIME))
-					.default(seconds(env.SSH_CERTIFICATE_LIFETIME))
-					.meta({ description: "Lifetime of issued SSH certificate" }),
-			})
-				.superRefine((val, ctx) => refineCertificateRequest(env, val, ctx))
-				.openapi("User Certificate Request")
-		)
+		body: contentJson(userCertificateRequestEndpointBodySchema(env)),
 	},
 	responses: {
 		"200": {

@@ -17,7 +17,6 @@ const userEcdsaKey = userEcdsaPrivateKey()
 const userEd25519Key = userEd25519PrivateKey()
 
 const lifetimeString = "24 hours"
-const now = Date.now()
 
 type Tests = {
     name: string
