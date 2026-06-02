@@ -196,7 +196,7 @@ export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) =
 	}
 })
 
-export const hostCertificateRenewEndpointBodySchema = (env: SshCaBinding) => (
+export const hostCertificateRenewEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 			certificate: openapiStringByte
 				.transform(transformCertificate)
