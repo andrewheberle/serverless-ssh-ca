@@ -1,6 +1,6 @@
-import { parsePrivateKey, PrivateKey } from "sshpk"
+import { parsePrivateKey, type PrivateKey } from "sshpk"
 
-export const privateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
+const caKey = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn
 NhAAAAAwEAAQAAAQEAxVUxhFMC9ReLWeAD7sB1vx9FzjKuT05M0zxL8HwacmPrOGIdOJOX
 t2bddyhl01xMpVAlNPObRANLb2dJs0vcj58XjXkm8frHHQUi/ik/M/rn1r+6VFRJ0RPe5x
@@ -29,11 +29,7 @@ W+WwGewGfW4N+BkAAAAAAQID
 -----END OPENSSH PRIVATE KEY-----
 `
 
-export const privateKey = (): PrivateKey => {
-    return parsePrivateKey(privateKeyString)
-}
-
-const userPrivateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
+const userKey = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
 NhAAAAAwEAAQAAAYEAsqfaoTuKDTQWqUUrpuDEKxPQlwium9PMZ4+6PlnnbBw6PhppEpAH
 56rLKp8XRQCfwhA57aWeiFyV6/hdw0xjVV85D859KgB8ap7m9K1tXAXGyTYMiZgGOebt0v
@@ -73,6 +69,44 @@ BgykW3gJMGJTDPvQAAABB1c2VyQGV4YW1wbGUuY29tAQ==
 -----END OPENSSH PRIVATE KEY-----
 `
 
-export const userPrivateKey = (): PrivateKey => {
-    return parsePrivateKey(userPrivateKeyString)
+const hostKey = `-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn
+NhAAAAAwEAAQAAAQEAtDPf8Nx3XU+W88S/Jrtxyq1vs2CsEDzVYdjgKsOJm+DfOuB/q2M4
+9JBjkhqNtlL/mJV/v8dORRqGoh1udjNsZaNrD3Pk65TT/LF8B2yTvDAYwmo5AnEDpmdyE/
+bNi97skduaITiP2seY+hajlqQsHSJzON7ELK4d4msGp+lyEim5t23uXB6M2VfZI+0Q6Nk1
+zB94G8O3o9mOvZUhCEM/r2fc8393UKCcS+m1JADvovCNCAzgzqHeJVaLpfIDkQ2iKzJ83C
+A2m0X48x92HKgFJQkPEA1j+2D+T2uL7G5algMVkmm6V95cXG8TPU5i0wgtB5U+S/pGlGoP
+FIwXNLsd7QAAA7inS1Czp0tQswAAAAdzc2gtcnNhAAABAQC0M9/w3HddT5bzxL8mu3HKrW
++zYKwQPNVh2OAqw4mb4N864H+rYzj0kGOSGo22Uv+YlX+/x05FGoaiHW52M2xlo2sPc+Tr
+lNP8sXwHbJO8MBjCajkCcQOmZ3IT9s2L3uyR25ohOI/ax5j6FqOWpCwdInM43sQsrh3iaw
+an6XISKbm3be5cHozZV9kj7RDo2TXMH3gbw7ej2Y69lSEIQz+vZ9zzf3dQoJxL6bUkAO+i
+8I0IDODOod4lVoul8gORDaIrMnzcIDabRfjzH3YcqAUlCQ8QDWP7YP5Pa4vsblqWAxWSab
+pX3lxcbxM9TmLTCC0HlT5L+kaUag8UjBc0ux3tAAAAAwEAAQAAAP8OE/9q0c6Be7ZPVQ+Z
+9wrsyp/vY54NprME8eyRarVVeDv4XZGb0iSg9qbQw0JO/Cz7vrI8SVXUED50a9g1Y88UIb
+A7hNJdlUL6euM1sUXZbeiBR8ssZafjWDGRXbaxNrlEq+NetQyICw/oedxN6IWJwSc/SigJ
+VZEAH1xlwdcnk/ld0VRo7SbLBU2AMM9twTLtaaUbJssNGQ5Xh3Ya//pgB76kpdMkBdFTaC
+/R6BhsCoDyHUH3SVhpEqhehVl40a2b1Vg7WN4GVCB2oQtjhGvrm7SE7zt5UVdwSNH5DIdc
+LZzqv1k8O3+InVlNYOYAGRNfEuVWqCCWOU8nuemwSQEAAACAOAuRkH32aTaBhgLhH+bIi7
+oygZ2na8Oce50agG+HCPT4HNCUlecNrvitXqEagKJiL3waXYLjJ5mkEg6BixPsNFxcoJPu
+FkF+S3NozyJp+Dpf6tR1MneU4K1HpcAJcJ9me06nHtw2EB6gXloP0Mwf0jfvMegcp1dHTv
+HoiIA6pdkAAACBANppgbDLwhyNVWFEhKVFu61QDZ+Hd9kQiUQuTTNLDfekSYpMU49pnh2G
+WReH0JcdjqY94GvN8mX0CRzRKx3YkKA8X0AVF44o3ulHw6I3sR5yyz9+2PXu3wnESZpaAY
+hsKAEnGydw0Y4sK0UC5AqS69+a1nu4k9an3qh4aAQYSVf9AAAAgQDTNvzt2eINfQE9/34K
+G+JMjddR8IBb+xu4IWQMBBqc18/9O7+ENcMHHEoN58sHg6LaKKnaYB6vRYyPkn2ynLsWDq
+1vJJQwfLHr7nu6EPlUS3XN72rPOKq3qYUH4OZmhzUGZrGTH50EYgVPSrSTZo6HatTwf4bg
+AaZU9UmamejosQAAAAABAgME
+-----END OPENSSH PRIVATE KEY-----
+`
+
+export const key = {
+    ca(): PrivateKey {
+        return parsePrivateKey(caKey)
+    },
+    host(): PrivateKey {
+        return parsePrivateKey(hostKey)
+    },
+    user(): PrivateKey {
+        return parsePrivateKey(userKey)
+    },
+
 }

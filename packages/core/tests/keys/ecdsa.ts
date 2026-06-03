@@ -1,6 +1,6 @@
-import { parsePrivateKey, PrivateKey } from "sshpk"
+import { parsePrivateKey, type PrivateKey } from "sshpk"
 
-export const privateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
+const caKey  = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
 1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQTrh5Brsk2pEY/l1HUv9iB633qsuPzf
 GxVbZUi7LXKitJua4v4mZEpuQfCGXa2ZYJtIIDXm+m3YdLkbAYBElWcSAAAAmJLgDFCS4A
@@ -10,11 +10,7 @@ IAAAAgenwTB1kprsmfs3e2PWGfZ4JDi+d5PTEMg6Rf3WgLZ+sAAAAA
 -----END OPENSSH PRIVATE KEY-----
 `
 
-export const privateKey = (): PrivateKey => {
-    return parsePrivateKey(privateKeyString)
-}
-
-const userPrivateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
+const userKey = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
 1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQRjKUibbX9CLbTQlXNvE81xUdQ9Mbzt
 56eu1c3gELG3WbJKw3GI0pcCehzw5k6V2lNJRGl/S+GIXP3An9THvRU5AAAAsFq3EABatx
@@ -25,6 +21,25 @@ ZS5jb20BAgMEBQYH
 -----END OPENSSH PRIVATE KEY-----
 `
 
-export const userPrivateKey = (): PrivateKey => {
-    return parsePrivateKey(userPrivateKeyString)
+const hostKey = `-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
+1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQS5VBwIhM9+lrL71VrX+5MSaG31HTha
+lwX3ZLX8Xvesiz+GRQQi5sSCgs29LK5EbpxO90TNZ26lXmouFQz0pPVkAAAAoJ5WQLOeVk
+CzAAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLlUHAiEz36WsvvV
+Wtf7kxJobfUdOFqXBfdktfxe96yLP4ZFBCLmxIKCzb0srkRunE73RM1nbqVeai4VDPSk9W
+QAAAAhANuVGDONB+pmASf7pjOLISf7nTFf4Sy2JJ2bIkLdcpFEAAAAAAECAwQFBgc=
+-----END OPENSSH PRIVATE KEY-----
+`
+
+export const key = {
+    ca(): PrivateKey {
+        return parsePrivateKey(caKey)
+    },
+    host(): PrivateKey {
+        return parsePrivateKey(hostKey)
+    },
+    user(): PrivateKey {
+        return parsePrivateKey(userKey)
+    },
+
 }

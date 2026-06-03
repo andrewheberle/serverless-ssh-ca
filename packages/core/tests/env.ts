@@ -20,7 +20,7 @@ export const makeEnv = (overrides: Partial<SshCaBindings> = {}): SshCaBindings =
     SSH_HOST_CERTIFICATE_LIFETIME: "30 days",
     CERTIFICATE_REQUEST_TIME_SKEW_MAX: "90 seconds",
     DB_CERTIFICATE_RETENTION: "1 year",
-    LOG_LEVEL: "info",
+    LOG_LEVEL: "none",
     ...overrides
 })
 
