@@ -177,13 +177,13 @@ sequenceDiagram
 This example shows the configuration in Cloudflare Access, however other
 OIDC IdP's should be generally equivalent:
 
-![Basic OIDC Settings](images/oidc-example_01.png)
+![Basic OIDC Settings](docs/images/oidc-example_01.png)
 
 The `Redirect URL` must match the configured value in the client.
 
 Transfer the IdP settings as follows:
 
-![IdP Settings](images/oidc-example_02.png)
+![IdP Settings](docs/images/oidc-example_02.png)
 
 The `openid` and `email` scopes are required, with enabling of refresh tokens
 (the `offline_access` scope) being optional, but recommended.

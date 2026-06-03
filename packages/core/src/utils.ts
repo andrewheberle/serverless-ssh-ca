@@ -135,10 +135,6 @@ export const identityPrincipals = (env: SshCaBindings, payload: CertificateReque
 
 	const l = logger(env)
 
-	if (claim === "__proto__" || claim === "prototype" || claim === "constructor") {
- 		l.warn("invalid principals claim configured", "claim", claim)
- 		return []
- 	}
  	const p = payload[claim]
 
 	if (p === undefined) {
@@ -170,8 +166,8 @@ export const parseIdentity = async (env: SshCaBindings, jwt: string | undefined,
 		throw new Error("missing identity token")
 	}
 
-	const aud = env.JWT_AUD === undefined || env.JWT_AUD as string === "" ? undefined : split(env.JWT_AUD as string)
-	const { payload } = await verifyJWT(env, jwt, { aud: aud })
+	const aud = split(env.JWT_AUD)
+	const { payload } = await verifyJWT(env, jwt, { aud: aud.length === 0 ? undefined : aud })
 
 	const principals = identityPrincipals(env, payload, claim)
 
@@ -388,12 +384,14 @@ export const refineRevokeCertificate = async (env: SshCaBindings, val: ParsedRev
 	}
 }
 
-export const split = (v: string): string[] => {
-	if (v === "" || v === undefined) {
-		return []
-	}
-
-	return v.split(",")
+export const split = (v?: string | string[]): string[] => {
+	return v === undefined
+		? []
+		: typeof v === "string"
+			? v === ""
+				? []
+				: v.split(",")
+			: v
 }
 
 export const getPublic = async (env: SshCaBindings, key?: PrivateKey): Promise<Key> => {

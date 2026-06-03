@@ -17,6 +17,31 @@ describe("split", () => {
         const result = split("first,second")
         expect(result).toStrictEqual(["first", "second"])
     })
+
+    it ("nothing", () => {
+        const result = split()
+        expect(result).toStrictEqual([])
+    })
+
+    it ("undefined", () => {
+        const result = split(undefined)
+        expect(result).toStrictEqual([])
+    })
+
+    it ("empty array", () => {
+        const result = split([])
+        expect(result).toStrictEqual([])
+    })
+
+    it ("one item array", () => {
+        const result = split(["first"])
+        expect(result).toStrictEqual(["first"])
+    })
+
+    it ("two item array", () => {
+        const result = split(["first", "second"])
+        expect(result).toStrictEqual(["first", "second"])
+    })
 })
 
 describe("identityPrincipals", () => {

@@ -41,7 +41,12 @@ export const generateCertificate = (env: SshCaBindings, email: string, key: Priv
 	let { lifetime, principals, extensions, serial } = options ?? {}
 
 	// add identities
-	const identity = env.SSH_CERTIFICATE_INCLUDE_SELF as string === "true"
+	const includeSelf = env.SSH_CERTIFICATE_INCLUDE_SELF === undefined
+		? false
+		: typeof env.SSH_CERTIFICATE_INCLUDE_SELF === "string"
+			? env.SSH_CERTIFICATE_INCLUDE_SELF === "true"
+			: env.SSH_CERTIFICATE_INCLUDE_SELF
+	const identity = includeSelf
 		? [identityForUser(email.split("@")[0]!)]
 		: []
 	if (principals !== undefined) {
@@ -49,11 +54,11 @@ export const generateCertificate = (env: SshCaBindings, email: string, key: Priv
 			identity.push(identityForUser(p))
 		}
 	}
-	if (env.SSH_CERTIFICATE_PRINCIPALS as string !== "") {
-		for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
-			identity.push(identityForUser(p))
-		}
+
+	for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
+		identity.push(identityForUser(p))
 	}
+	
 
 	// lifetime is the smaller of what was provided in the options or the default
 	lifetime = lifetime !== undefined

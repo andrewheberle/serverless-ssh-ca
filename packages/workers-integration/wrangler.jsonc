@@ -34,7 +34,6 @@
 		"SSH_CERTIFICATE_EXTENSIONS": "permit-X11-forwarding,permit-agent-forwarding,permit-port-forwarding,permit-pty,permit-user-rc",
 		"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": "",
 		"SSH_HOST_CERTIFICATE_ALLOWED_ROLES": "",
-		"SSH_HOST_CERTIFICATE_ALLOWED_ROLES_CLAIM": "groups",
 		"SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
 		"CERTIFICATE_REQUEST_TIME_SKEW_MAX": "90 seconds",
 		"DB_CERTIFICATE_RETENTION": "1 year",
