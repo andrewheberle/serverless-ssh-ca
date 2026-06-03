@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { createHeaderSchema, userCertificateRequestEndpointBodySchema } from "../src/api/v3/schema"
 import { makeEnv } from "./env"
 import { getAccessToken, getIdentityToken } from "./helpers/token"
-import { userPrivateKey } from "./keys/ecdsa"
+import { key as ecdsaKey } from "./keys/ecdsa"
 import { generateProof } from "./helpers/proof"
 import { seconds } from "itty-time"
 
@@ -73,7 +73,7 @@ describe("user certificate schema", () => {
 			sub: "1234567890",
 			email: "user123@example.com"
 		})
-		const key = userPrivateKey()
+		const key = ecdsaKey.user()
 		const publicKey = Buffer.from(key.toPublic().toString("ssh")).toString("base64")
 		const proof = generateProof(key)
 

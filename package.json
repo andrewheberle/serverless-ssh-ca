@@ -7,13 +7,15 @@
 	],
 	"scripts": {
 		"build": "npm run build --workspaces --if-present",
+		"cf-typegen": "npm run cf-typegen --workspaces --if-present",
 		"coverage": "npm run coverage --workspaces --if-present",
-		"test": "npm run test --workspaces --if-present",
-		"test:workers": "npm run test:workers --workspaces --if-present",
 		"dev": "npm run build && npm run dev --workspaces --if-present",
 		"release": "npm run release --workspaces --if-present && release-it",
 		"release:ci": "npm run release:ci --workspaces --if-present && release-it --ci",
-		"release:dryrun": "npm run release:dryrun --workspaces --if-present && release-it --dry-run"
+		"release:dryrun": "npm run release:dryrun --workspaces --if-present && release-it --dry-run",
+		"schema": "npm run schema --workspaces --if-present",
+		"test": "npm run test --workspaces --if-present",
+		"test:workers": "npm run test:workers --workspaces --if-present"
 	},
 	"devDependencies": {
 		"@release-it/bumper": "^7.0.6",

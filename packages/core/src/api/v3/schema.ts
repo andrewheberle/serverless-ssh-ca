@@ -155,12 +155,8 @@ export const createRevocationListEndpointSchema = (env: SshCaBindings) => ({
 	}
 })
 
-export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
-	security: [{ oidcAuth: [] }],
-	request: {
-		headers: createHeaderSchema(env),
-		body: contentJson(
-			z.object({
+export const hostCertificateRequestEndpointBodySchema = (env: SshCaBindings) => (
+	z.object({
 				public_key: publicKey,
 				proof: proofOfPossession
 					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
@@ -175,7 +171,13 @@ export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) =
 			})
 				.superRefine((val, ctx) => refineHostCertificateRequest(env, val, ctx))
 				.openapi("Host Certificate Request")
-		)
+)
+
+export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
+	security: [{ oidcAuth: [] }],
+	request: {
+		headers: createHeaderSchema(env),
+		body: contentJson(hostCertificateRequestEndpointBodySchema(env))
 	},
 	responses: {
 		"200": {
@@ -194,25 +196,27 @@ export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) =
 	}
 })
 
+export const hostCertificateRenewEndpointBodySchema = (env: SshCaBindings) => (
+	z.object({
+			certificate: openapiStringByte
+				.transform(transformCertificate)
+				.meta({ description: "SSH certificate to renew" }),
+			public_key: publicKey,
+			proof: proofOfPossession
+				.transform((val, ctx) => transformRenewalProofOfPossession(env, val, ctx)),
+			lifetime: z.int()
+				.min(seconds("24 hours"))
+				.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+				.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+				.meta({ description: "Lifetime of renewed Host SSH certificate" }),
+		})
+			.superRefine((val, ctx) => refineHostCertificateRenewal(env, isRevoked, val, ctx))
+			.openapi("Host Certificate Renew")
+)
+
 export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => ({
 	request: {
-		body: contentJson(
-			z.object({
-				certificate: openapiStringByte
-					.transform(transformCertificate)
-					.meta({ description: "SSH certificate to renew" }),
-				public_key: publicKey,
-				proof: proofOfPossession
-					.transform((val, ctx) => transformRenewalProofOfPossession(env, val, ctx)),
-				lifetime: z.int()
-					.min(seconds("24 hours"))
-					.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-					.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-					.meta({ description: "Lifetime of renewed Host SSH certificate" }),
-			})
-				.superRefine((val, ctx) => refineHostCertificateRenewal(env, isRevoked, val, ctx))
-				.openapi("Host Certificate Renew")
-		)
+		body: contentJson(hostCertificateRenewEndpointBodySchema(env))
 	},
 	responses: {
 		"200": {
@@ -231,22 +235,24 @@ export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => 
 	}
 })
 
+export const revokeCertificateEndpointBodySchema = (env: SshCaBindings) => (
+	z.object({
+			serial: z.bigint()
+				.meta({ description: "Serial number of certificate to revoke" }),
+			public_key: publicKey,
+			proof: proofOfPossession
+				.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
+		})
+			.openapi("Certificate Revocation")
+			.superRefine((val, ctx) => refineRevokeCertificate(env, val, ctx))
+)
+
 export const createRevokeCertificateEndpointSchema = (env: SshCaBindings) => ({
 	request: {
 		params: z.object({
 			certificateType: z.enum(["user", "host"])
 		}),
-		body: contentJson(
-			z.object({
-				serial: z.bigint()
-					.meta({ description: "Serial number of certificate to revoke" }),
-				public_key: publicKey,
-				proof: proofOfPossession
-					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
-			})
-				.openapi("Certificate Revocation")
-				.superRefine((val, ctx) => refineRevokeCertificate(env, val, ctx))
-		)
+		body: contentJson(revokeCertificateEndpointBodySchema(env))
 	},
 	responses: {
 		"200": {
