@@ -1,6 +1,6 @@
 {
 	"private": true,
-	"version": "0.17.16",
+	"version": "0.17.17",
 	"workspaces": [
 		"packages/core",
 		"packages/workers-integration"
