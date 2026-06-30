@@ -49,8 +49,11 @@ jobs:
           upload-artifact: false
       - uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: packages/core/schema.json
+          subject-path: sbom.spdx.json
           sbom-path: sbom.spdx.json
+      - uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: packages/core/schema.json
       - run: npm run release:ci:${{ inputs.release }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
