@@ -182,7 +182,7 @@ export const transformIdentityToken = async (env: SshCaBindings, val: string, ct
 		const identity = await parseIdentity(env, val, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
 
 		return identity
-	} catch (err) {
+	} catch {
 		ctx.issues.push({
 			code: "custom",
 			message: "problem parsing identity token",

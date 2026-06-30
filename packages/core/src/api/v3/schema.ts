@@ -135,7 +135,7 @@ export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) =
 	}
 })
 
-export const createRevocationListEndpointSchema = (env: SshCaBindings) => ({
+export const createRevocationListEndpointSchema = () => ({
 	request: {
 		params: z.object({
 			certificateType: z.enum(["user", "host"])

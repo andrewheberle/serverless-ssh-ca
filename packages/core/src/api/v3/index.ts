@@ -148,7 +148,7 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 
 const RevocationListEndpoint = (env: SshCaBindings) => {
 	return class extends OpenAPIRoute {
-		override schema = createRevocationListEndpointSchema(env)
+		override schema = createRevocationListEndpointSchema()
 
 		override async handle(c: AppContext) {
 			const data = await this.getValidatedData<typeof this.schema>()

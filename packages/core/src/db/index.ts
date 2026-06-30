@@ -64,7 +64,7 @@ export const dbCleanup = async (env: SshCaBindings) => {
 		}).execute()
 		l.info("completed database cleanup", "changes", res.meta?.changes)
 	} catch (err) {
-		l.error("error during database cleanup", "retention", env.DB_CERTIFICATE_RETENTION)
+		l.error("error during database cleanup", "retention", env.DB_CERTIFICATE_RETENTION, "error", err)
 	}
 }
 
@@ -74,7 +74,7 @@ export const recordCertificate = async (env: SshCaBindings, certificate: Certifi
 		return v.toString()
 	}).join(",")
 	const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
-		// @ts-ignore: the name property does exist
+		// @ts-expect-error: the name property does exist
 		return v.name as string
 	}).join(",")
 	const qb = await connect(env)

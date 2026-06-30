@@ -215,7 +215,7 @@ function wrapEd25519Sig(sig: Uint8Array): Uint8Array {
  * Base64-encode bytes and wrap in SSH signature armor at 76 chars per line.
  */
 function armorSignature(bytes: Uint8Array): string {
-    let b64 = btoa(String.fromCharCode(...bytes))
+    const b64 = btoa(String.fromCharCode(...bytes))
     const lines: string[] = []
     for (let i = 0; i < b64.length; i += 76) {
         lines.push(b64.slice(i, i + 76))
