@@ -10,8 +10,12 @@
 		"cf-typegen": "npm run cf-typegen --workspaces --if-present",
 		"coverage": "npm run coverage --workspaces --if-present",
 		"dev": "npm run build && npm run dev --workspaces --if-present",
+		"lint": "npm run lint --workspaces --if-present",
 		"release": "npm run release --workspaces --if-present && release-it",
-		"release:ci": "npm run release:ci --workspaces --if-present && release-it --ci",
+		"release:ci": "npm run release:ci:patch",
+		"release:ci:major": "npm run release:ci:major --workspaces --if-present && release-it major --ci",
+		"release:ci:minor": "npm run release:ci:minor --workspaces --if-present && release-it minor --ci",
+		"release:ci:patch": "npm run release:ci:patch --workspaces --if-present && release-it patch --ci",
 		"release:dryrun": "npm run release:dryrun --workspaces --if-present && release-it --dry-run",
 		"schema": "npm run schema --workspaces --if-present",
 		"test": "npm run test --workspaces --if-present",
@@ -30,6 +34,7 @@
 			"requireCleanWorkingDir": false
 		},
 		"github": {
+			"assets": ["packages/core/schema.json", "sbom.spdx.json"],
 			"autoGenerate": true,
 			"release": true,
 			"releaseName": "v${version}"

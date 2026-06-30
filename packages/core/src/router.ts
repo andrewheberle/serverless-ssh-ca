@@ -21,7 +21,14 @@ export const createApp = (env: SshCaBindings) => {
         return c.json({ success: false, errors: [{ code: 7000, message: "Internal Server Error" }] }, 500)
     })
 
-    const app = fromHono(hono)
+    const app = fromHono(hono, {
+		schema: {
+			info: {
+				title: "Serverless SSH CA API",
+				version: "3.0.0"
+			},
+		}
+	})
 
     app.registry.registerComponent("securitySchemes", "oidcAuth", {
         type: 'http',

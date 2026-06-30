@@ -17,12 +17,17 @@
 	"scripts": {
 		"build": "tsc",
 		"coverage": "vitest run --coverage",
-		"test": "vitest run",
-		"test:watch": "vitest",
+		"lint": "eslint",
 		"prepublishOnly": "npm run build",
 		"release": "release-it",
-		"release:ci": "release-it --ci",
-		"release:dryrun": "release-it --dry-run"
+		"release:ci": "npm run release:patch",
+		"release:ci:major": "release-it major --ci",
+		"release:ci:minor": "release-it minor --ci",
+		"release:ci:patch": "release-it patch --ci",
+		"release:dryrun": "release-it --dry-run",
+		"schema": "node --require tsx/cjs scripts/export-schema.cjs",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@andrewheberle/ts-slog": "^1.3.0",
@@ -36,10 +41,13 @@
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {
+		"@eslint/js": "^10.0.1",
 		"@types/sshpk": "^1.17.4",
 		"@vitest/coverage-v8": "^4.1.7",
+		"eslint": "^10.4.1",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.0",
+		"typescript-eslint": "^8.61.0",
 		"vitest": "^4.1.7"
 	},
 	"repository": {

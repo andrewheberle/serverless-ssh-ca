@@ -38,7 +38,8 @@ export type GenerateCertificateOptions = {
 } & CreateCertificateOptions
 
 export const generateCertificate = (env: SshCaBindings, email: string, key: PrivateKey, public_key: Key, options?: GenerateCertificateOptions): Certificate => {
-	let { lifetime, principals, extensions, serial } = options ?? {}
+	let { lifetime } = options ?? {}
+	const { principals, extensions, serial } = options ?? {}
 
 	// add identities
 	const includeSelf = env.SSH_CERTIFICATE_INCLUDE_SELF === undefined
@@ -58,7 +59,7 @@ export const generateCertificate = (env: SshCaBindings, email: string, key: Priv
 	for (const p of split(env.SSH_CERTIFICATE_PRINCIPALS)) {
 		identity.push(identityForUser(p))
 	}
-	
+
 
 	// lifetime is the smaller of what was provided in the options or the default
 	lifetime = lifetime !== undefined
