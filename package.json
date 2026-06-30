@@ -1,6 +1,6 @@
 {
 	"private": true,
-	"version": "0.17.15",
+	"version": "0.17.16",
 	"workspaces": [
 		"packages/core",
 		"packages/workers-integration"
@@ -34,7 +34,10 @@
 			"requireCleanWorkingDir": false
 		},
 		"github": {
-			"assets": ["packages/core/schema.json", "sbom.spdx.json"],
+			"assets": [
+				"packages/core/schema.json",
+				"sbom.spdx.json"
+			],
 			"autoGenerate": true,
 			"release": true,
 			"releaseName": "v${version}"
