@@ -4,7 +4,6 @@
 	"scripts": {
 		"cf-typegen": "wrangler types",
 		"dev": "wrangler dev",
-		"schema": "chanfana",
 		"test:workers": "vitest run"
 	},
 	"dependencies": {
