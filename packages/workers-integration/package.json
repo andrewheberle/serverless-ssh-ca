@@ -10,7 +10,7 @@
 		"@andrewheberle/serverless-ssh-ca": "*"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.16.0",
+		"@cloudflare/vitest-pool-workers": "^0.18.0",
 		"@vitest/coverage-istanbul": "^4.1.7",
 		"typescript": "^7.0.0",
 		"vitest": "^4.1.7",
