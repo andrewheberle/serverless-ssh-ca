@@ -31,7 +31,7 @@
 	},
 	"dependencies": {
 		"@andrewheberle/ts-slog": "^1.3.0",
-		"@cloudflare/workers-types": "^4.20260528.1",
+		"@cloudflare/workers-types": "^5.0.0",
 		"chanfana": "^3.0.0",
 		"hono": "^4.10.6",
 		"itty-time": "^2.0.2",
