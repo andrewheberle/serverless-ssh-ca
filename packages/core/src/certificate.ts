@@ -1,5 +1,14 @@
 import { seconds } from "itty-time"
-import { Certificate, createCertificate, Identity, identityForHost, identityForUser, identityFromDN, Key, parsePrivateKey, PrivateKey } from "sshpk"
+import {
+	Certificate,
+	createCertificate,
+	Identity,
+	identityForHost,
+	identityForUser,
+	identityFromDN,
+	Key,
+	parsePrivateKey,
+	PrivateKey } from "sshpk"
 import { SSHExtension } from "./types"
 import { split } from "./utils"
 import type { SshCaBindings } from "./types"
@@ -50,6 +59,17 @@ export const generateCertificate = (env: SshCaBindings, email: string, key: Priv
 	const identity = includeSelf
 		? [identityForUser(email.split("@")[0]!)]
 		: []
+
+	// add email?
+	const includeSelfEmail = env.SSH_CERTIFICATE_INCLUDE_SELF_EMAIL === undefined
+		? false
+		: typeof env.SSH_CERTIFICATE_INCLUDE_SELF_EMAIL === "string"
+			? env.SSH_CERTIFICATE_INCLUDE_SELF_EMAIL === "true"
+			: env.SSH_CERTIFICATE_INCLUDE_SELF_EMAIL
+	if (includeSelfEmail) {
+		identity.push(identityForUser(email))
+	}
+
 	if (principals !== undefined) {
 		for (const p of principals) {
 			identity.push(identityForUser(p))
@@ -149,11 +169,6 @@ export type CreateHostCertificateOptions = {
 	principals?: string[]
 	subjects?: Identity[]
 }
-
-/* const DefaultCreateHostertificateOptions: CreateHostCertificateOptions = {
-	lifetime: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME),
-	principals: [],
-} */
 
 export class BadIssuerError extends Error {
 	constructor(message: string) {
