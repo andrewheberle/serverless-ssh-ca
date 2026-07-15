@@ -5,8 +5,9 @@ import { describe, expect, it } from "vitest"
 import { generateCertificate, generateSerial } from "../src/certificate"
 import { seconds } from "itty-time"
 import { split } from "../src/utils"
-import { env } from "./env"
+import { makeEnv } from "./env"
 import { Format, Identity, identityForUser, PrivateKey } from "sshpk"
+import { SshCaBindings } from "../src/types"
 
 const lifetimeString = "24 hours"
 
@@ -16,6 +17,8 @@ type Tests = {
     useridenties: string[]
     serial: bigint
     caKey: PrivateKey
+	defaultPrincipals?: string[]
+	envOverrides?: Partial<SshCaBindings>
     wantErr?: string
 }
 
@@ -53,11 +56,71 @@ const tests: Tests[] = [
         serial: generateSerial().readBigUInt64BE(0),
         caKey: ed25519Key.ca(),
     },
+	{
+        name: "ED25519 CA with include self",
+        email: "test@example.com",
+        useridenties: [
+            "testuser",
+            "group1",
+            "group2",
+        ],
+		defaultPrincipals: [
+			"test"
+		],
+		envOverrides: {
+			SSH_CERTIFICATE_INCLUDE_SELF: true,
+			SSH_CERTIFICATE_PRINCIPALS: undefined
+		},
+        serial: generateSerial().readBigUInt64BE(0),
+        caKey: ed25519Key.ca(),
+    },
+	{
+        name: "ED25519 CA with include email",
+        email: "test@example.com",
+        useridenties: [
+            "testuser",
+            "group1",
+            "group2",
+        ],
+		defaultPrincipals: [
+			"test@example.com"
+		],
+		envOverrides: {
+			SSH_CERTIFICATE_INCLUDE_SELF: false,
+			SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: true,
+			SSH_CERTIFICATE_PRINCIPALS: undefined
+		},
+        serial: generateSerial().readBigUInt64BE(0),
+        caKey: ed25519Key.ca(),
+    },
+	{
+        name: "ED25519 CA with include self and email",
+        email: "test@example.com",
+        useridenties: [
+            "testuser",
+            "group1",
+            "group2",
+        ],
+		defaultPrincipals: [
+			"test",
+			"test@example.com"
+		],
+		envOverrides: {
+			SSH_CERTIFICATE_INCLUDE_SELF: true,
+			SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: true,
+			SSH_CERTIFICATE_PRINCIPALS: undefined
+		},
+        serial: generateSerial().readBigUInt64BE(0),
+        caKey: ed25519Key.ca(),
+    }
 ]
 
 for (const tt of tests) {
+	const env = tt.envOverrides === undefined ? makeEnv() : makeEnv(tt.envOverrides)
+
     describe(`generateCertificate (${tt.name})`, async () => {
         if (tt.wantErr === undefined) {
+			const defaultPrincipals = tt.defaultPrincipals === undefined ? split(env.SSH_CERTIFICATE_PRINCIPALS) : tt.defaultPrincipals
             it(`${tt.name}: handle RSA user key`, () => {
                 const certificate = generateCertificate(env, tt.email, tt.caKey, rsaKey.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
 
@@ -65,14 +128,13 @@ for (const tt of tests) {
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
 
                 // check subjects
-                const defaultPrincipals = split(env.SSH_CERTIFICATE_PRINCIPALS)
                 expect(certificate.subjects.length).toBe(tt.useridenties.length + defaultPrincipals.length)
                 const certificateSubjects = certificate.subjects.map((v: Identity): string => {
                     return v.toString()
-                }).join(",")
+                }).sort().join(",")
                 const subjects = tt.useridenties.concat(defaultPrincipals).map((v: string): string => {
                     return identityForUser(v).toString()
-                }).join(",")
+                }).sort().join(",")
                 expect(certificateSubjects).toBe(subjects)
 
                 // check extensions
@@ -98,14 +160,13 @@ for (const tt of tests) {
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
 
                 // check subjects
-                const defaultPrincipals = split(env.SSH_CERTIFICATE_PRINCIPALS)
                 expect(certificate.subjects.length).toBe(tt.useridenties.length + defaultPrincipals.length)
                 const certificateSubjects = certificate.subjects.map((v: Identity): string => {
                     return v.toString()
-                }).join(",")
+                }).sort().join(",")
                 const subjects = tt.useridenties.concat(defaultPrincipals).map((v: string): string => {
                     return identityForUser(v).toString()
-                }).join(",")
+                }).sort().join(",")
                 expect(certificateSubjects).toBe(subjects)
 
                 // check extensions
@@ -131,14 +192,13 @@ for (const tt of tests) {
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
 
                 // check subjects
-                const defaultPrincipals = split(env.SSH_CERTIFICATE_PRINCIPALS)
                 expect(certificate.subjects.length).toBe(tt.useridenties.length + defaultPrincipals.length)
                 const certificateSubjects = certificate.subjects.map((v: Identity): string => {
                     return v.toString()
-                }).join(",")
+                }).sort().join(",")
                 const subjects = tt.useridenties.concat(defaultPrincipals).map((v: string): string => {
                     return identityForUser(v).toString()
-                }).join(",")
+                }).sort().join(",")
                 expect(certificateSubjects).toBe(subjects)
 
                 // check extensions
@@ -164,19 +224,18 @@ for (const tt of tests) {
                 expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
 
                 // check subjects
-                const defaultPrincipals = split(env.SSH_CERTIFICATE_PRINCIPALS)
                 expect(certificate.subjects.length).toBe(tt.useridenties.length + defaultPrincipals.length)
                 const certificateSubjects = certificate.subjects.map((v: Identity): string => {
                     return v.toString()
-                }).join(",")
+                }).sort().join(",")
                 const subjects = tt.useridenties.concat(defaultPrincipals).map((v: string): string => {
                     return identityForUser(v).toString()
-                }).join(",")
+                }).sort().join(",")
                 expect(certificateSubjects).toBe(subjects)
 
                 // check extensions
                 const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
-                    // @ts-ignore: the name property does exist
+                    // @ts-expect-error: the name property does exist
                     return v.name
                 }).join(",")
                 expect(extensions).toBe("permit-user-rc")

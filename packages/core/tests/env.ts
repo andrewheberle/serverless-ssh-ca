@@ -14,6 +14,7 @@ export const makeEnv = (overrides: Partial<SshCaBindings> = {}): SshCaBindings =
     SSH_CERTIFICATE_LIFETIME: "24 hours",
     SSH_CERTIFICATE_PRINCIPALS: "ssh-admin",
     SSH_CERTIFICATE_INCLUDE_SELF: false,
+    SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: false,
     SSH_CERTIFICATE_EXTENSIONS: "permit-X11-forwarding,permit-agent-forwarding,permit-port-forwarding,permit-pty,permit-user-rc",
     SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: undefined,
     SSH_HOST_CERTIFICATE_ALLOWED_ROLES: undefined,

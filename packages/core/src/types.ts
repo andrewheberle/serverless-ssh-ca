@@ -33,6 +33,7 @@ export interface SshCaBindings {
     SSH_CERTIFICATE_EXTENSIONS: string
     SSH_CERTIFICATE_LIFETIME: string
     SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean
+    SSH_CERTIFICATE_INCLUDE_SELF_EMAIL?: string | boolean
     SSH_CERTIFICATE_PRINCIPALS?: string | string[]
     SSH_HOST_CERTIFICATE_LIFETIME: string
     SSH_HOST_CERTIFICATE_ALLOWED_EMAILS?: string | string[]
