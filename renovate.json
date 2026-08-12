@@ -6,10 +6,10 @@
 	"packageRules": [
         {
             "matchPackageNames": [
-				"^releaseit$",
-                "^@releaseit/.*$"
+				"^release-it$",
+                "^@release-it/.*$"
 			],
-            "groupName": "releaseit"
+            "groupName": "release-it"
         }
     ]
 }
