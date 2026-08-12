@@ -22,7 +22,7 @@
 		"test:workers": "npm run test:workers --workspaces --if-present"
 	},
 	"devDependencies": {
-		"@release-it/bumper": "^7.0.6",
+		"@release-it/bumper": "^8.0.0",
 		"auto-changelog": "^2.5.1",
 		"release-it": "^20.0.1"
 	},
