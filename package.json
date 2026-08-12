@@ -24,7 +24,7 @@
 	"devDependencies": {
 		"@release-it/bumper": "^8.0.0",
 		"auto-changelog": "^2.5.1",
-		"release-it": "^20.0.1"
+		"release-it": "^21.0.0"
 	},
 	"release-it": {
 		"git": {
