@@ -151,7 +151,7 @@ export const identityPrincipals = (env: SshCaBindings, payload: CertificateReque
 	const principals = (typeof p === "string" ? [p] : p)
  		.map((value) => value.replaceAll(" ", "_"))
 
-	l.info("identity token included principals", "principals", principals)
+	l.debug("identity token included principals", "principals", principals)
 
 	return principals
 }
