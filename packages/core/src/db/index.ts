@@ -30,13 +30,13 @@ const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 	const l = logger(env)
 
 	try {
-		l.info("connecting to database")
+		l.debug("connecting to database")
 
 		const qb = new D1QB<DatabaseSchema>(env.DB)
 		const migrationBuilder = qb.migrations({ migrations })
 		const appliedMigrations = await migrationBuilder.apply()
 
-		l.info("applied database migrations", "migrations", appliedMigrations.length, "migration_names", appliedMigrations.map(m => m.name))
+		l.debug("applied database migrations", "migrations", appliedMigrations.length, "migration_names", appliedMigrations.map(m => m.name))
 
 		return qb
 	} catch (err) {
