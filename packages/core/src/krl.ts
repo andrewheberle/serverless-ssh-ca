@@ -1,4 +1,5 @@
-import type { PrivateKey } from "sshpk"
+import type { AlgorithmPart, PrivateKey } from "sshpk"
+import { toFixedWidth } from "./sshsig/sig_parser"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -94,20 +95,25 @@ const HASH_ALGORITHM = "sha512"
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * PEM string → raw DER bytes (strips header/footer and decodes base64).
- * Works for both PKCS8 ("-----BEGIN PRIVATE KEY-----") and any other PEM type.
+ * Get the raw bytes of a named part of an sshpk key.
  */
-function pemToDer(pem: string): Uint8Array<ArrayBuffer> {
-    const lines = pem
-        .trim()
-        .split("\n")
-        .filter((l) => !l.startsWith("-----"))
-    const binary = atob(lines.join(""))
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i)
+function keyPart(key: PrivateKey, name: AlgorithmPart): Uint8Array {
+    const part = key.parts.find((p) => p.name === name)
+    if (part === undefined) {
+        throw new Error(`Missing ${name} part in ${key.type} key`)
     }
-    return bytes
+    return part.data
+}
+
+/**
+ * Base64url-encode bytes without padding, as used for JWK values.
+ */
+function base64url(bytes: Uint8Array): string {
+    let binary = ""
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte)
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }
 
 /**
@@ -119,15 +125,21 @@ async function importPrivateKey(caKey: PrivateKey): Promise<{
     sigAlgo: string // SSH signature algorithm name
     webCryptoAlgo: SubtleCryptoSignAlgorithm
 }> {
-    const pkcs8Pem = caKey.toString("pkcs8")
-    const der = pemToDer(pkcs8Pem)
     const type = caKey.type // "ed25519" | "ecdsa" | etc.
     const curve = (caKey as unknown as { curve?: string }).curve
 
     if (type === "ed25519") {
+        // import from the raw key parts as a JWK rather than via sshpk's PKCS#8
+        // output, which drops a leading zero byte from the seed (about 1 key in
+        // 512) and is then rejected by WebCrypto
+        const seed = keyPart(caKey, "k")
+        const publicKey = keyPart(caKey, "A")
+        if (seed.length !== 32 || publicKey.length !== 32) {
+            throw new Error(`Unexpected Ed25519 key part lengths: k=${seed.length} A=${publicKey.length}`)
+        }
         const cryptoKey = await crypto.subtle.importKey(
-            "pkcs8",
-            der,
+            "jwk",
+            { kty: "OKP", crv: "Ed25519", d: base64url(seed), x: base64url(publicKey) },
             { name: "Ed25519" },
             false,
             ["sign"],
@@ -141,26 +153,45 @@ async function importPrivateKey(caKey: PrivateKey): Promise<{
         let namedCurve: string
         let sigAlgo: string
         let hash: string
+        let size: number // bytes in each coordinate and the private key
 
         if (curve === "nistp256") {
             namedCurve = "P-256"
             sigAlgo = "ecdsa-sha2-nistp256"
             hash = "SHA-256"
+            size = 32
         } else if (curve === "nistp384") {
             namedCurve = "P-384"
             sigAlgo = "ecdsa-sha2-nistp384"
             hash = "SHA-384"
+            size = 48
         } else if (curve === "nistp521") {
             namedCurve = "P-521"
             sigAlgo = "ecdsa-sha2-nistp521"
             hash = "SHA-512"
+            size = 66
         } else {
             throw new Error(`Unsupported ECDSA curve: ${curve}`)
         }
 
+        // import from the raw key parts as a JWK rather than via sshpk's PKCS#8
+        // output, which drops leading zero bytes from the private key so it is
+        // shorter than RFC 5915 requires (about half of P-521 keys)
+        const point = keyPart(caKey, "Q")
+        if (point.length !== 1 + size * 2 || point[0] !== 0x04) {
+            throw new Error(`Unexpected ECDSA public key encoding for ${curve}`)
+        }
+        // d is an SSH mpint, so may be short or have a leading sign byte
+        const d = toFixedWidth(keyPart(caKey, "d"), size)
         const cryptoKey = await crypto.subtle.importKey(
-            "pkcs8",
-            der,
+            "jwk",
+            {
+                kty: "EC",
+                crv: namedCurve,
+                d: base64url(d),
+                x: base64url(point.subarray(1, 1 + size)),
+                y: base64url(point.subarray(1 + size)),
+            },
             { name: "ECDSA", namedCurve },
             false,
             ["sign"],
