@@ -22,12 +22,13 @@ import {
 
 } from "../../certificate"
 import {
+	getPrivateKey,
 	getPublic,
 	split,
+	UnsupportedKeyError,
 } from "../../utils"
 import {
 	KeyParseError,
-	parsePrivateKey,
 } from "sshpk"
 import {
 	CertificateType,
@@ -63,6 +64,9 @@ const CaPublicKeyEndpoint = (env: SshCaBindings) => {
 				return c.text(`${pub.toString("ssh").trim()}\n`)
 			} catch (err) {
 				switch (true) {
+					case (err instanceof UnsupportedKeyError):
+						l.error(err.message)
+						throw new InternalServerErrorException(err.message)
 					case (err instanceof KeyParseError):
 						l.error("error parsing private key")
 						throw new InternalServerErrorException("error parsing private key")
@@ -120,7 +124,9 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 				try {
 					await recordCertificate(c.env, certificate, data.headers.Authorization.email)
 				} catch (err) {
+					// a certificate that is not recorded cannot be revoked, so do not issue it
 					l.error("there was a problem adding issued certificate to database", "error", err)
+					throw new InternalServerErrorException("there was a problem recording the issued certificate")
 				}
 
 				l.info("completed issuing certificate",
@@ -133,6 +139,9 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 				return c.json(response)
 			} catch (err) {
 				switch (true) {
+					case (err instanceof UnsupportedKeyError):
+						l.error(err.message)
+						throw new InternalServerErrorException(err.message)
 					case (err instanceof ApiException):
 						// re-throw any exisiting chanfana error
 						throw err
@@ -167,10 +176,7 @@ const RevocationListEndpoint = (env: SshCaBindings) => {
 				const serials = (await getRevocationList(c.env, certificateType)).map(v => BigInt(v))
 
 				// grab private key from secret store
-				const secret = await c.env.PRIVATE_KEY.get()
-
-				// parse key
-				const key = parsePrivateKey(secret)
+				const key = await getPrivateKey(c.env)
 
 				// generate KRL
 				const krl = new KRLBuilder(key)
@@ -194,6 +200,9 @@ const RevocationListEndpoint = (env: SshCaBindings) => {
 				})
 			} catch (err) {
 				switch (true) {
+					case (err instanceof UnsupportedKeyError):
+						l.error(err.message)
+						throw new InternalServerErrorException(err.message)
 					case (err instanceof KeyParseError):
 						l.error("error parsing private key")
 						throw new InternalServerErrorException("error parsing private key")
@@ -257,7 +266,9 @@ const HostCertificateRequestEndpoint = (env: SshCaBindings) => {
 				try {
 					await recordCertificate(c.env, certificate, `host_${certificate.subjects[0]!.hostname}`, CertificateType.Host)
 				} catch (err) {
+					// a certificate that is not recorded cannot be revoked, so do not issue it
 					l.error("there was a problem adding issued certificate to database", "error", err)
+					throw new InternalServerErrorException("there was a problem recording the issued certificate")
 				}
 
 				l.info("completed issuing certificate",
@@ -270,6 +281,9 @@ const HostCertificateRequestEndpoint = (env: SshCaBindings) => {
 				return c.json(response)
 			} catch (err) {
 				switch (true) {
+					case (err instanceof UnsupportedKeyError):
+						l.error(err.message)
+						throw new InternalServerErrorException(err.message)
 					case (err instanceof ApiException):
 						// re-throw any exisiting chanfana error
 						throw err
@@ -319,7 +333,9 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 				try {
 					await recordCertificate(c.env, certificate, `host_${certificate.subjects[0]!.hostname}`, CertificateType.Host)
 				} catch (err) {
+					// a certificate that is not recorded cannot be revoked, so do not issue it
 					l.error("there was a problem adding issued certificate to database", "error", err)
+					throw new InternalServerErrorException("there was a problem recording the issued certificate")
 				}
 
 				l.info("completed issuing certificate",
@@ -332,6 +348,9 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 				return c.json(response)
 			} catch (err) {
 				switch (true) {
+					case (err instanceof UnsupportedKeyError):
+						l.error(err.message)
+						throw new InternalServerErrorException(err.message)
 					case (err instanceof ApiException):
 						// re-throw any exisiting chanfana error
 						throw err

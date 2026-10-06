@@ -237,8 +237,13 @@ export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => 
 
 export const revokeCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
-			serial: z.bigint()
-				.meta({ description: "Serial number of certificate to revoke" }),
+			// sent as a decimal string as JSON cannot carry a bigint and
+			// numbers lose precision above 2^53
+			serial: z.string()
+				.regex(/^\d+$/)
+				.transform(BigInt)
+				.refine((v) => v <= 0xFFFFFFFFFFFFFFFFn, { message: "serial must fit in an unsigned 64-bit integer" })
+				.meta({ description: "Serial number of certificate to revoke", example: "12345678901234567890" }),
 			public_key: publicKey,
 			proof: proofOfPossession
 				.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),

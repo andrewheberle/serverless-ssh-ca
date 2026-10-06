@@ -50,6 +50,7 @@ export const dbCleanup = async (env: SshCaBindings) => {
 
 	if (env.DB_CERTIFICATE_RETENTION === "infinite") {
 		l.info("skipping database cleanup")
+		return
 	}
 
 	l.info("starting database cleanup")

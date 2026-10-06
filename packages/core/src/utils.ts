@@ -1,5 +1,5 @@
 import type { SshCaBindings } from "./types"
-import { JWKInvalid, JWKSInvalid, JWSInvalid, JWTClaimValidationFailed, JWTInvalid } from "jose/errors"
+import { JWKInvalid, JWKSInvalid, JWSInvalid, JWSSignatureVerificationFailed, JWTClaimValidationFailed, JWTExpired, JWTInvalid } from "jose/errors"
 import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificate, parseKey, parsePrivateKey, PrivateKey } from "sshpk"
 import z from "zod"
 import { verifyJWT } from "./verify"
@@ -8,6 +8,7 @@ import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } fro
 import type { isRevoked as IsRevokedFn } from "./db"
 import { logger } from "./logger"
 import { ms } from "itty-time"
+import { InternalServerErrorException } from "chanfana"
 
 export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) => {
 	ctx.issues.push({
@@ -87,7 +88,11 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 			case (err instanceof JWKSInvalid):
 				return fatalIssue(ctx, "the access token JWKS was invalid", val)
 			case (err instanceof JWTClaimValidationFailed):
-				return fatalIssue(ctx, "claim validtion of the JWT failed", val)
+				return fatalIssue(ctx, "claim validation of the JWT failed", val)
+			case (err instanceof JWTExpired):
+				return fatalIssue(ctx, "the access token has expired", val)
+			case (err instanceof JWSSignatureVerificationFailed):
+				return fatalIssue(ctx, "the access token signature verification failed", val)
 			default:
 				l.error("unhandled access token validation error", "in", "transformAuthorizationHeader", "error", err)
 				return fatalIssue(ctx, "unhandled access token validation error", val)
@@ -128,6 +133,21 @@ export const transformPublicKey = (val: string | Buffer<ArrayBufferLike>, ctx: z
 	}
 }
 
+/**
+ * Thrown by {@link identityPrincipals} when the principals claim of an
+ * identity token is not a string or an array of strings.
+ */
+export class PrincipalsClaimError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = "PrincipalsClaimError"
+
+		Object.setPrototypeOf(this, PrincipalsClaimError.prototype)
+	}
+}
+
+const PrincipalsClaimSchema = z.union([z.string(), z.array(z.string())]).nullish()
+
 export const identityPrincipals = (env: SshCaBindings, payload: CertificateRequestJWTPayload, claim?: string): string[] => {
 	if (claim === undefined) {
 		claim = env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM
@@ -135,10 +155,22 @@ export const identityPrincipals = (env: SshCaBindings, payload: CertificateReque
 
 	const l = logger(env)
 
- 	const p = payload[claim]
+	// the token is verified but the claim type is set by the IdP
+	const parsed = PrincipalsClaimSchema.safeParse(payload[claim])
+	if (!parsed.success) {
+		l.warn("claim was not a string or an array of strings", "claim", claim)
+		throw new PrincipalsClaimError(`the ${claim} claim must be a string or an array of strings`)
+	}
+
+ 	const p = parsed.data
 
 	if (p === undefined) {
 		l.warn("claim was missing despite being set in CA config", "claim", claim)
+		return []
+	}
+
+	if (p === null) {
+		l.warn("claim was present but was null", "claim", claim)
 		return []
 	}
 
@@ -182,10 +214,10 @@ export const transformIdentityToken = async (env: SshCaBindings, val: string, ct
 		const identity = await parseIdentity(env, val, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
 
 		return identity
-	} catch {
+	} catch (err) {
 		ctx.issues.push({
 			code: "custom",
-			message: "problem parsing identity token",
+			message: err instanceof PrincipalsClaimError ? err.message : "problem parsing identity token",
 			input: val
 		})
 		return z.NEVER
@@ -328,9 +360,15 @@ export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked
 			return fatalIssue(ctx, "the provided certificate was not signed by this CA", val)
 		}
 
-		// check certificate is not expired
-		if (val.certificate.isExpired()) {
+		// check certificate is within its validity period, allowing for clock
+		// skew at the start as a certificate issued moments ago may have a
+		// validity start up to a second in the future
+		const now = Date.now()
+		if (now >= val.certificate.validUntil.getTime()) {
 			return fatalIssue(ctx, "the provided certificate is expired", val)
+		}
+		if (val.certificate.validFrom.getTime() > now + ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
+			return fatalIssue(ctx, "the provided certificate is not yet valid", val)
 		}
 
 		// ensure certificate presented for renewal is not revoked
@@ -352,6 +390,11 @@ export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked
 
 		return z.NEVER
 	} catch (err) {
+		// a misconfigured CA key is a server error, not a validation failure
+		if (err instanceof UnsupportedKeyError) {
+			l.error(err.message, "in", "refineHostCertificateRenewal")
+			throw new InternalServerErrorException(err.message)
+		}
 		l.error("proof of possession verification unhandled error", "in", "refineHostCertificateRenewal", "error", err)
 		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
 	}
@@ -394,13 +437,47 @@ export const split = (v?: string | string[]): string[] => {
 			: v
 }
 
+/**
+ * Thrown by {@link getPrivateKey} when the CA private key is of a type that
+ * cannot be used.
+ */
+export class UnsupportedKeyError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = "UnsupportedKeyError"
+
+		Object.setPrototypeOf(this, UnsupportedKeyError.prototype)
+	}
+}
+
+/**
+ * Load and parse the CA private key from the `PRIVATE_KEY` secret.
+ *
+ * Only Ed25519 and ECDSA keys are supported. RSA keys are rejected because
+ * sshpk signs RSA certificates with SHA-1 (`ssh-rsa`), which OpenSSH 8.2 and
+ * later refuse by default, and because RSA keys in OpenSSH format are
+ * converted with invalid CRT parameters that the Workers runtime rejects.
+ *
+ * @throws KeyParseError when the secret cannot be parsed.
+ * @throws {@link UnsupportedKeyError} when the key is not Ed25519 or ECDSA.
+ */
+export const getPrivateKey = async (env: SshCaBindings): Promise<PrivateKey> => {
+	// grab private key from secret store
+	const secret = await env.PRIVATE_KEY.get()
+
+	// parse it
+	const key = parsePrivateKey(secret)
+
+	if (key.type !== "ed25519" && key.type !== "ecdsa") {
+		throw new UnsupportedKeyError(`CA key type ${key.type} is not supported, the CA key must be Ed25519 or ECDSA`)
+	}
+
+	return key
+}
+
 export const getPublic = async (env: SshCaBindings, key?: PrivateKey): Promise<Key> => {
 	if (key === undefined) {
-		// grab private key from secret store
-		const secret = await env.PRIVATE_KEY.get()
-
-		// parse it
-		key = parsePrivateKey(secret)
+		key = await getPrivateKey(env)
 	}
 
 	// convert to a public key and add comment
