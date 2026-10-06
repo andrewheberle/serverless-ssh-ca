@@ -51,6 +51,6 @@ Prefer the scripts in `package.json` over invoking tools directly.
 
 ## Boundaries
 - Don't commit secrets, tokens, or `.env` files.
-- Don't edit generated files (`worker-configuration.d.ts`); regenerate with `npm run cf-typegen`.
+- Don't edit generated files (`**/worker-configuration.d.ts` and `packages/core/openapi.json`); regenerate with `npm run cf-typegen` and `npm run schema` respectively.
 - Keep changes scoped to the task. No drive-by refactors or renames.
 - Do not change any of the OpenAPI surface as this could break clients.
