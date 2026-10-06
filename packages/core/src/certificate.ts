@@ -7,10 +7,9 @@ import {
 	identityForUser,
 	identityFromDN,
 	Key,
-	parsePrivateKey,
 	PrivateKey } from "sshpk"
 import { SSHExtension } from "./types"
-import { split } from "./utils"
+import { getPrivateKey, split } from "./utils"
 import type { SshCaBindings } from "./types"
 
 // const sshCertificateExtensions = split(env.SSH_CERTIFICATE_EXTENSIONS)
@@ -148,10 +147,7 @@ export const generateCertificate = (env: SshCaBindings, email: string, key: Priv
 
 export async function createSignedCertificate(env: SshCaBindings, email: string, public_key: Key, options?: CreateCertificateOptions): Promise<Certificate> {
 	// grab private key from secret store
-	const secret = await env.PRIVATE_KEY.get()
-
-	// parse key
-	const key = parsePrivateKey(secret)
+	const key = await getPrivateKey(env)
 
 	if (options === undefined) {
 		options = {
@@ -200,10 +196,7 @@ export async function createSignedHostCertificate(env: SshCaBindings, public_key
 	}
 
 	// grab private key from secret store
-	const secret = await env.PRIVATE_KEY.get()
-
-	// parse private key
-	const key = parsePrivateKey(secret)
+	const key = await getPrivateKey(env)
 
 	// lifetime is the smaller of what was provided in the options or the default
 	const lifetime = options.lifetime !== undefined

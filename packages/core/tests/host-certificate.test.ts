@@ -7,6 +7,7 @@ import { seconds } from "itty-time"
 import { makeEnv } from "./env"
 import { Format, Identity, type PrivateKey } from "sshpk"
 import { MockSecretStore } from "./helpers/secret"
+import { UnsupportedKeyError } from "../src/utils"
 
 type Test = {
     name: string
@@ -16,8 +17,9 @@ type Test = {
 
 const catests: Test[] = [
     {
-        name: "RSA CA - will fail on Workers runtime",
+        name: "RSA CA",
         key: rsaKey.ca(),
+        wantErr: "CA key type rsa is not supported, the CA key must be Ed25519 or ECDSA",
     },
     {
         name: "ECDSA CA",
@@ -47,6 +49,15 @@ const hosttests: Test[] = [
 for (const ca of catests) {
     describe(`createSignedHostCertificate (${ca.name})`, async () => {
         const env = makeEnv({ PRIVATE_KEY: new MockSecretStore(ca.key.toString("openssh")) })
+
+        if (ca.wantErr !== undefined) {
+            it("should reject the CA key", async () => {
+                const result = createSignedHostCertificate(env, ecdsaKey.host().toPublic(), { principals: ["test_host"] })
+                await expect(result).rejects.toBeInstanceOf(UnsupportedKeyError)
+                await expect(result).rejects.toThrow(ca.wantErr)
+            })
+            return
+        }
 
         for (const host of hosttests) {
             it(host.name, async () => {

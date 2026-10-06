@@ -172,6 +172,23 @@ sequenceDiagram
 
 ## Configuration
 
+### CA Private Key
+
+The CA private key is read from the `PRIVATE_KEY` Secrets Store binding and
+must be an Ed25519 or ECDSA (`nistp256`, `nistp384` or `nistp521`) key:
+
+```sh
+ssh-keygen -t ed25519 -N "" -C "" -f ssh-ca
+```
+
+RSA CA keys are not supported on the Workers runtime. With an RSA CA key
+configured, every request that uses the CA key (including `/api/v3/ca` and
+the KRL endpoints) returns a `500` error, and the reason is logged:
+
+```
+CA key type rsa is not supported, the CA key must be Ed25519 or ECDSA
+```
+
 ### Identity Provider
 
 This example shows the configuration in Cloudflare Access, however other

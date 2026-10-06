@@ -6,4 +6,4 @@ const env = makeEnv()
 const openapi = createApp(env)
 const schema = openapi.schema
 
-fs.writeFileSync('./schema.json', JSON.stringify(schema, null, 2))
+fs.writeFileSync('./openapi.json', JSON.stringify(schema, null, 2))
