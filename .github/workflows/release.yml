@@ -16,7 +16,14 @@ on:
           - major
 
 jobs:
+  client-e2e:
+    name: Client end-to-end tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/client-e2e.yml
+
   release:
+    needs: client-e2e
     runs-on: ubuntu-latest
     permissions:
       contents: write

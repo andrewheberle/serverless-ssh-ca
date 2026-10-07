@@ -1,0 +1,29 @@
+name: Client end-to-end tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+  workflow_call:
+
+# only superseded pull request runs are cancelled, so runs on main and those
+# called from the release workflow always complete
+concurrency:
+  group: client-e2e-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  client-e2e:
+    name: Client ${{ matrix.client-ref }}
+    strategy:
+      fail-fast: false
+      matrix:
+        client-ref: [main, latest]
+    uses: andrewheberle/ssh-ca-client/.github/workflows/e2e.yml@main
+    with:
+      ca-ref: ${{ github.sha }}
+      client-ref: ${{ matrix.client-ref }}
