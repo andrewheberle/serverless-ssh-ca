@@ -1,5 +1,5 @@
 import z from "zod"
-import type { SshCaBindings } from "../../types"
+import type { SshCaBindings } from "../../types.js"
 import {
 	split,
 	refineCertificateRequest,
@@ -12,7 +12,7 @@ import {
 	refineHostCertificateRenewal,
 	refineRevokeCertificate,
 	transformIdentityToken,
-} from "../../utils"
+} from "../../utils.js"
 import {
 	ConflictException,
 	contentJson,
@@ -23,7 +23,7 @@ import {
 	UnprocessableEntityException,
 } from "chanfana"
 import { seconds } from "itty-time"
-import { isRevoked } from "../../db"
+import { isRevoked } from "../../db/index.js"
 
 const openapiStringByte = z.base64()
 	.transform((v) => {

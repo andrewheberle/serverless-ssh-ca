@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest"
 import { generatePrivateKey, parsePrivateKey, type PrivateKey } from "sshpk"
-import { KRLBuilder } from "../src/krl"
-import { verify } from "../src/sshsig"
-import { key as ecdsaKey } from "./keys/ecdsa"
-import { key as ed25519Key } from "./keys/ed25519"
+import { KRLBuilder } from "../src/krl.js"
+import { verify } from "../src/sshsig/index.js"
+import { key as ecdsaKey } from "./keys/ecdsa.js"
+import { key as ed25519Key } from "./keys/ed25519.js"
 
 const namespace = "krl@com.github.serverless-ssh-ca.andrewheberle"
 

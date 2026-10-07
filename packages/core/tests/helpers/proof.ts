@@ -3,7 +3,7 @@ import { writeFileSync, readFileSync, unlinkSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { PrivateKey } from "sshpk"
-import { Namespace } from "../../src/proof"
+import { Namespace } from "../../src/proof.js"
 
 export const generateProof = (key: PrivateKey): string => {
     const timestamp = Date.now()

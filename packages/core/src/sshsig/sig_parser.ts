@@ -1,7 +1,7 @@
-import { Sig } from "./sig";
-import { Reader } from "./reader";
-import { parsePubkey } from "./formats";
-import { dearmor } from "./armor";
+import { Sig } from "./sig.js";
+import { Reader } from "./reader.js";
+import { parsePubkey } from "./formats.js";
+import { dearmor } from "./armor.js";
 
 /**
  * ECDSA signature algorithms whose signatures need converting from SSH

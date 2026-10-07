@@ -1,4 +1,4 @@
-import { Reader } from "./reader";
+import { Reader } from "./reader.js";
 
 /**
  * Represents an SSH public key.

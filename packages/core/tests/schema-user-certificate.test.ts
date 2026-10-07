@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { createHeaderSchema, createIdentityTokenSchema, userCertificateRequestEndpointBodySchema } from "../src/api/v3/schema"
-import { makeEnv } from "./env"
-import { getAccessToken, getIdentityToken } from "./helpers/token"
-import { key as ecdsaKey } from "./keys/ecdsa"
-import { generateProof } from "./helpers/proof"
+import { createHeaderSchema, createIdentityTokenSchema, userCertificateRequestEndpointBodySchema } from "../src/api/v3/schema.js"
+import { makeEnv } from "./env.js"
+import { getAccessToken, getIdentityToken } from "./helpers/token.js"
+import { key as ecdsaKey } from "./keys/ecdsa.js"
+import { generateProof } from "./helpers/proof.js"
 import { seconds } from "itty-time"
 
 const env = makeEnv()

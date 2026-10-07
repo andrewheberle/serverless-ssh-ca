@@ -1,5 +1,5 @@
 import type { AlgorithmPart, PrivateKey } from "sshpk"
-import { toFixedWidth } from "./sshsig/sig_parser"
+import { toFixedWidth } from "./sshsig/sig_parser.js"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

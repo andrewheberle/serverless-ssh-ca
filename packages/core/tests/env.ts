@@ -1,4 +1,4 @@
-import type { SshCaBindings } from "../src/types"
+import type { SshCaBindings } from "../src/types.js"
 
 const port = parseInt(process.env.OIDC_PORT ?? "4567")
 

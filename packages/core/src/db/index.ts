@@ -1,8 +1,8 @@
-import { Certificate, Format, Identity } from "sshpk"
-import { logger } from "../logger"
-import type { SshCaBindings } from "../types"
+import type { Certificate, Format, Identity } from "sshpk"
+import { logger } from "../logger.js"
+import type { SshCaBindings } from "../types.js"
 import { D1QB } from "workers-qb"
-import { migrations } from "./migrations"
+import { migrations } from "./migrations/index.js"
 
 export enum CertificateType {
 	User,

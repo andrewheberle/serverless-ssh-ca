@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { dbCleanup } from "../src/db"
-import { makeEnv } from "./env"
+import { dbCleanup } from "../src/db/index.js"
+import { makeEnv } from "./env.js"
 
 // a D1 binding that records any use of it
 const trackedDatabase = (): { db: D1Database, used: PropertyKey[] } => {

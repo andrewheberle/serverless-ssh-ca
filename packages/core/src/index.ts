@@ -1,7 +1,7 @@
-import { dbCleanup } from "./db"
-import { createApp } from "./router"
-import type { SshCaBindings } from "./types"
-export type { SshCaBindings } from "./types"
+import { dbCleanup } from "./db/index.js"
+import { createApp } from "./router.js"
+import type { SshCaBindings } from "./types.js"
+export type { SshCaBindings } from "./types.js"
 
 let app: ReturnType<typeof createApp> | undefined
 

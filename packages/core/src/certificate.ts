@@ -1,16 +1,12 @@
 import { seconds } from "itty-time"
-import {
-	Certificate,
-	createCertificate,
-	Identity,
-	identityForHost,
-	identityForUser,
-	identityFromDN,
-	Key,
-	PrivateKey } from "sshpk"
-import { SSHExtension } from "./types"
-import { getPrivateKey, split } from "./utils"
-import type { SshCaBindings } from "./types"
+import sshpk from "sshpk"
+import type { Certificate, Identity, Key, PrivateKey } from "sshpk"
+import { SSHExtension } from "./types.js"
+import { getPrivateKey, split } from "./utils.js"
+import type { SshCaBindings } from "./types.js"
+
+// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
+const { createCertificate, identityForHost, identityForUser, identityFromDN } = sshpk
 
 // const sshCertificateExtensions = split(env.SSH_CERTIFICATE_EXTENSIONS)
 

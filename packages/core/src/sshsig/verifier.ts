@@ -1,6 +1,6 @@
-import { Sig } from "./sig";
-import { convertAlgorithm, convertHash, convertPublicKey } from "./formats";
-import { Writer } from "./writer";
+import { Sig } from "./sig.js";
+import { convertAlgorithm, convertHash, convertPublicKey } from "./formats.js";
+import { Writer } from "./writer.js";
 
 export async function verify(
   subtle: SubtleCrypto,

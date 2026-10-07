@@ -1,14 +1,18 @@
-import type { SshCaBindings } from "./types"
+import type { SshCaBindings } from "./types.js"
 import { JWKInvalid, JWKSInvalid, JWSInvalid, JWSSignatureVerificationFailed, JWTClaimValidationFailed, JWTExpired, JWTInvalid } from "jose/errors"
-import { Certificate, Key, KeyParseError, CertificateParseError, parseCertificate, parseKey, parsePrivateKey, PrivateKey } from "sshpk"
+import sshpk from "sshpk"
+import type { Certificate, Key, PrivateKey } from "sshpk"
 import z from "zod"
-import { verifyJWT } from "./verify"
-import { CertificateRequestJWTPayload } from "./types"
-import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof"
-import type { isRevoked as IsRevokedFn } from "./db"
-import { logger } from "./logger"
+import { verifyJWT } from "./verify.js"
+import { CertificateRequestJWTPayload } from "./types.js"
+import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
+import type { isRevoked as IsRevokedFn } from "./db/index.js"
+import { logger } from "./logger.js"
 import { ms } from "itty-time"
 import { InternalServerErrorException } from "chanfana"
+
+// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
+const { KeyParseError, CertificateParseError, parseCertificate, parseKey, parsePrivateKey } = sshpk
 
 export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) => {
 	ctx.issues.push({

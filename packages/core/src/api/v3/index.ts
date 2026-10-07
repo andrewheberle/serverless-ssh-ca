@@ -11,8 +11,8 @@ import {
 	UnprocessableEntityException,
 } from "chanfana"
 import { Hono } from "hono"
-import { AppContext } from "../../router"
-import { CertificateSignerResponse } from "../../types"
+import { AppContext } from "../../router.js"
+import { CertificateSignerResponse } from "../../types.js"
 import {
 	BadIssuerError,
 	CreateCertificateOptions,
@@ -20,16 +20,14 @@ import {
 	createSignedCertificate,
 	createSignedHostCertificate,
 
-} from "../../certificate"
+} from "../../certificate.js"
 import {
 	getPrivateKey,
 	getPublic,
 	split,
 	UnsupportedKeyError,
-} from "../../utils"
-import {
-	KeyParseError,
-} from "sshpk"
+} from "../../utils.js"
+import sshpk from "sshpk"
 import {
 	CertificateType,
 	getRevocationList,
@@ -37,8 +35,8 @@ import {
 	RevocationStatus,
 	revocationStatus,
 	revokeCertificate,
-} from "../../db"
-import { KRLBuilder } from "../../krl"
+} from "../../db/index.js"
+import { KRLBuilder } from "../../krl.js"
 import {
 	CaPublicKeyEndpointSchema,
 	createUserCertificateRequestEndpointSchema,
@@ -46,9 +44,12 @@ import {
 	createHostCertificateRequestEndpointSchema,
 	createHostCertificateRenewEndpointSchema,
 	createRevokeCertificateEndpointSchema,
-} from "./schema"
-import { logger } from "../../logger"
-import type { SshCaBindings } from "../../types"
+} from "./schema.js"
+import { logger } from "../../logger.js"
+import type { SshCaBindings } from "../../types.js"
+
+// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
+const { KeyParseError } = sshpk
 
 const CaPublicKeyEndpoint = (env: SshCaBindings) => {
 	return class extends OpenAPIRoute {
