@@ -1,4 +1,4 @@
-import type { SshCaBindings } from "./types"
+import type { SshCaBindings } from "./types.js"
 import { Logger, LogLevel } from "@andrewheberle/ts-slog"
 
 export const logger = (env: SshCaBindings): Logger => {

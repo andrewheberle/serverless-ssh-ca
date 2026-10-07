@@ -1,6 +1,6 @@
-import { Sig } from "./sig";
-import { verify as rawVerify } from "./verifier";
-import { parse } from "./sig_parser";
+import { Sig } from "./sig.js";
+import { verify as rawVerify } from "./verifier.js";
+import { parse } from "./sig_parser.js";
 
 /**
  * Verifies SSH signature against provided data.

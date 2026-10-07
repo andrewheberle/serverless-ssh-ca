@@ -1,16 +1,16 @@
 import { describe, it, expect, vi } from "vitest"
-import { createApp } from "../src/router"
-import { createSignedHostCertificate } from "../src/certificate"
-import { makeEnv } from "./env"
-import { MockSecretStore } from "./helpers/secret"
-import { getAccessToken, getIdentityToken } from "./helpers/token"
-import { generateProof } from "./helpers/proof"
-import { key as ecdsaKey } from "./keys/ecdsa"
+import { createApp } from "../src/router.js"
+import { createSignedHostCertificate } from "../src/certificate.js"
+import { makeEnv } from "./env.js"
+import { MockSecretStore } from "./helpers/secret.js"
+import { getAccessToken, getIdentityToken } from "./helpers/token.js"
+import { generateProof } from "./helpers/proof.js"
+import { key as ecdsaKey } from "./keys/ecdsa.js"
 
 // fail every database write, but report nothing as revoked so renewals get
 // as far as recording the certificate
 vi.mock("../src/db", async (importOriginal) => {
-	const original = await importOriginal<typeof import("../src/db")>()
+	const original = await importOriginal<typeof import("../src/db/index.js")>()
 	return {
 		...original,
 		isRevoked: vi.fn(async () => false),

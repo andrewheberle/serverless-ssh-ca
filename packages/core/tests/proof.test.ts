@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { ProofOfPossession } from "../src/proof"
+import { ProofOfPossession } from "../src/proof.js"
 import { Key, parseKey } from "sshpk"
 
 type testSig = {

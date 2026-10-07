@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose"
-import { CertificateRequestJWTPayload } from "./types"
-import type { SshCaBindings } from "./types"
-import { split } from "./utils"
+import { CertificateRequestJWTPayload } from "./types.js"
+import type { SshCaBindings } from "./types.js"
+import { split } from "./utils.js"
 
 type VerifyOptions = {
 	aud?: string | string[]

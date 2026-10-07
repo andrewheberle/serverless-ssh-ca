@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest"
 import { generatePrivateKey } from "sshpk"
-import { verify } from "../src/sshsig"
-import { parse, ecdsaComponentSize, toFixedWidth } from "../src/sshsig/sig_parser"
-import { Namespace, ProofOfPossession } from "../src/proof"
-import { generateProof } from "./helpers/proof"
+import { verify } from "../src/sshsig/index.js"
+import { parse, ecdsaComponentSize, toFixedWidth } from "../src/sshsig/sig_parser.js"
+import { Namespace, ProofOfPossession } from "../src/proof.js"
+import { generateProof } from "./helpers/proof.js"
 
 type fixture = {
 	name: string

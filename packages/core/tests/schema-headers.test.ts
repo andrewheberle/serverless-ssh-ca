@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
-import { createAccessTokenSchema, createIdentityTokenSchema } from "../src/api/v3/schema"
-import { makeEnv } from "./env"
-import { getAccessToken, getIdentityToken } from "./helpers/token"
+import { createAccessTokenSchema, createIdentityTokenSchema } from "../src/api/v3/schema.js"
+import { makeEnv } from "./env.js"
+import { getAccessToken, getIdentityToken } from "./helpers/token.js"
 
 const env = makeEnv()
 

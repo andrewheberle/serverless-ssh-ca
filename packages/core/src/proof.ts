@@ -1,9 +1,13 @@
 import { ms } from "itty-time"
-import { Fingerprint, FingerprintFormatError, Key, parseFingerprint, parseKey } from "sshpk"
-import { verify } from "./sshsig"
-import { parse } from "./sshsig/sig_parser"
-import { Sig } from "./sshsig/sig"
+import sshpk from "sshpk"
+import type { Fingerprint, Key } from "sshpk"
+import { verify } from "./sshsig/index.js"
+import { parse } from "./sshsig/sig_parser.js"
+import { Sig } from "./sshsig/sig.js"
 import { group, Logger, LogLevel } from "@andrewheberle/ts-slog"
+
+// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
+const { FingerprintFormatError, parseFingerprint, parseKey } = sshpk
 
 export const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 

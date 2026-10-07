@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { revokeCertificateEndpointBodySchema } from "../src/api/v3/schema"
-import { createApp } from "../src/router"
-import { makeEnv } from "./env"
-import { key as ecdsaKey } from "./keys/ecdsa"
-import { generateProof } from "./helpers/proof"
+import { revokeCertificateEndpointBodySchema } from "../src/api/v3/schema.js"
+import { createApp } from "../src/router.js"
+import { makeEnv } from "./env.js"
+import { key as ecdsaKey } from "./keys/ecdsa.js"
+import { generateProof } from "./helpers/proof.js"
 
 const env = makeEnv()
 

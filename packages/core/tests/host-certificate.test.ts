@@ -1,13 +1,13 @@
-import { key as rsaKey } from "./keys/rsa"
-import { key as ecdsaKey } from "./keys/ecdsa"
-import { key as ed25519Key } from "./keys/ed25519"
+import { key as rsaKey } from "./keys/rsa.js"
+import { key as ecdsaKey } from "./keys/ecdsa.js"
+import { key as ed25519Key } from "./keys/ed25519.js"
 import { describe, expect, it } from "vitest"
-import { createSignedHostCertificate } from "../src/certificate"
+import { createSignedHostCertificate } from "../src/certificate.js"
 import { seconds } from "itty-time"
-import { makeEnv } from "./env"
+import { makeEnv } from "./env.js"
 import { Format, Identity, type PrivateKey } from "sshpk"
-import { MockSecretStore } from "./helpers/secret"
-import { UnsupportedKeyError } from "../src/utils"
+import { MockSecretStore } from "./helpers/secret.js"
+import { UnsupportedKeyError } from "../src/utils.js"
 
 type Test = {
     name: string

@@ -1,9 +1,9 @@
 import { fromHono } from "chanfana"
 import { Hono, type Context } from "hono"
-import { createApi as apiv3 } from "./api/v3"
+import { createApi as apiv3 } from "./api/v3/index.js"
 import { HTTPException } from "hono/http-exception"
-import { logger } from "./logger"
-import type { SshCaBindings } from "./types"
+import { logger } from "./logger.js"
+import type { SshCaBindings } from "./types.js"
 
 export type CFArgs = [SshCaBindings, ExecutionContext]
 export type AppContext = Context<{ Bindings: SshCaBindings }>

@@ -1,4 +1,4 @@
-import { Pubkey } from "./formats";
+import { Pubkey } from "./formats.js";
 
 /**
  * Represents a parsed SSH signature.
