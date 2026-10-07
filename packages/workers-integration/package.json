@@ -4,7 +4,7 @@
 	"scripts": {
 		"cf-typegen": "wrangler types",
 		"dev": "wrangler dev",
-		"test:workers": "vitest run"
+		"test:workers": "tsc --noEmit -p tests/tsconfig.json && vitest run"
 	},
 	"dependencies": {
 		"@andrewheberle/serverless-ssh-ca": "*"

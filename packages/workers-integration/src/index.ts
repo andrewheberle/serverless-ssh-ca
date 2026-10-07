@@ -1,3 +1,3 @@
 import app from "@andrewheberle/serverless-ssh-ca"
 
-export default app
+export default app satisfies ExportedHandler<Env>

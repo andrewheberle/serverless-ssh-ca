@@ -26,10 +26,35 @@ export type SSHExtension = {
     data: Buffer<ArrayBuffer>
 }
 
+/**
+ * The subset of a Cloudflare D1 database binding used by the CA.
+ *
+ * A Workers `D1Database` binding satisfies this structurally, so the package
+ * does not need to depend on `@cloudflare/workers-types`.
+ */
+export interface CaDatabase {
+    prepare(query: string): unknown
+    batch(statements: never[]): Promise<unknown>
+    exec(query: string): Promise<unknown>
+}
+
+/**
+ * The subset of a Cloudflare Secrets Store binding used to load the CA private key.
+ *
+ * A Workers `SecretsStoreSecret` binding satisfies this structurally.
+ */
+export interface CaSecret {
+    get(): Promise<string>
+}
+
+/**
+ * The bindings (environment) the CA expects, see {@link CaDatabase} and
+ * {@link CaSecret} for the non-string bindings.
+ */
 export interface SshCaBindings {
-    DB: D1Database
+    DB: CaDatabase
     DB_CERTIFICATE_RETENTION: string
-    PRIVATE_KEY: SecretsStoreSecret
+    PRIVATE_KEY: CaSecret
     SSH_CERTIFICATE_EXTENSIONS: string
     SSH_CERTIFICATE_LIFETIME: string
     SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean

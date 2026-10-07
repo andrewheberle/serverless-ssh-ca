@@ -14,7 +14,8 @@
 		"noImplicitOverride": true,
 		"sourceMap": true,
 		"declarationMap": true,
-		"types": ["@cloudflare/workers-types"]
+		"lib": ["es2024", "dom"],
+		"types": ["node"]
 	},
 	"exclude": ["tests", "dist"],
 	"include": ["src/**/*.ts"]

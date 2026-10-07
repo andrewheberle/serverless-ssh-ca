@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest"
 import { dbCleanup } from "../src/db/index.js"
 import { makeEnv } from "./env.js"
+import type { CaDatabase } from "../src/types.js"
 
 // a D1 binding that records any use of it
-const trackedDatabase = (): { db: D1Database, used: PropertyKey[] } => {
+const trackedDatabase = (): { db: CaDatabase, used: PropertyKey[] } => {
 	const used: PropertyKey[] = []
 	const db = new Proxy({}, {
 		get(_, prop) {
 			used.push(prop)
 			throw new Error("database should not be used")
 		},
-	}) as unknown as D1Database
+	}) as unknown as CaDatabase
 	return { db, used }
 }
 
