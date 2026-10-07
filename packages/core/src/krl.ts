@@ -123,7 +123,7 @@ function base64url(bytes: Uint8Array): string {
 async function importPrivateKey(caKey: PrivateKey): Promise<{
     cryptoKey: CryptoKey
     sigAlgo: string // SSH signature algorithm name
-    webCryptoAlgo: SubtleCryptoSignAlgorithm
+    webCryptoAlgo: Parameters<SubtleCrypto["sign"]>[0]
 }> {
     const type = caKey.type // "ed25519" | "ecdsa" | etc.
     const curve = (caKey as unknown as { curve?: string }).curve

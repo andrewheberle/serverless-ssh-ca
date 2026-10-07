@@ -5,7 +5,6 @@ import { HTTPException } from "hono/http-exception"
 import { logger } from "./logger.js"
 import type { SshCaBindings } from "./types.js"
 
-export type CFArgs = [SshCaBindings, ExecutionContext]
 export type AppContext = Context<{ Bindings: SshCaBindings }>
 
 export const createApp = (env: SshCaBindings) => {

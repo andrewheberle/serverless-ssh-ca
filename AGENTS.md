@@ -4,10 +4,11 @@
 This repository contains a serverless Certificate Authority (CA) that can be used to provide signed certificates for SSH users and hosts running on Cloudflare Workers. The client side component is written in Go and is here: [https://github.com/andrewheberle/ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client)
 
 ## Repository layout
+- `packages/core/` - @andrewheberle/serverless-ssh-ca
 - `packages/core/src/` - main package source
 - `packages/core/scripts/` - helper scripts
 - `packages/core/tests/` - tests for core package
-- `packages/workers-integration/` - package used for testing on Workers runtime
+- `packages/workers-integration/` - package used for testing @andrewheberle/serverless-ssh-ca on Workers runtime
 - `dist/` - build output; never edit by hand, never commit [unless it's a published artifact]
 
 ## Package manager and environment

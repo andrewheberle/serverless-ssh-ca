@@ -1,6 +1,6 @@
+import type { CaSecret } from "../../src/types.js"
 
-
-export class MockSecretStore {
+export class MockSecretStore implements CaSecret {
     private readonly privateKeyString: string
     
     constructor(key: string) {
