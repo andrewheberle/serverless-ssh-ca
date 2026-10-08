@@ -27,14 +27,56 @@ export type SSHExtension = {
 }
 
 /**
+ * The result of executing a statement via {@link CaPreparedStatement.run} or
+ * {@link CaDatabase.batch}, modelled on a Cloudflare D1 result.
+ */
+export interface CaDatabaseResult {
+    /** Whether the statement executed successfully */
+    success: boolean
+    meta?: {
+        /** The number of rows changed by the statement */
+        changes?: number
+    }
+}
+
+/**
+ * The result of executing a statement that returns rows via
+ * {@link CaPreparedStatement.all}.
+ */
+export interface CaDatabaseQueryResult extends CaDatabaseResult {
+    /** The rows returned, one object per row keyed by column name */
+    results: unknown[]
+}
+
+/**
+ * The subset of a Cloudflare D1 prepared statement used by the CA.
+ */
+export interface CaPreparedStatement {
+    /** Bind positional (`?`) parameters, returning a statement to execute */
+    bind(...values: unknown[]): CaPreparedStatement
+    /** Execute the statement and return all rows */
+    all(): Promise<CaDatabaseQueryResult>
+    /** Execute the statement without returning rows */
+    run(): Promise<CaDatabaseResult>
+}
+
+/**
  * The subset of a Cloudflare D1 database binding used by the CA.
  *
  * A Workers `D1Database` binding satisfies this structurally, so the package
- * does not need to depend on `@cloudflare/workers-types`.
+ * does not need to depend on `@cloudflare/workers-types`. Any other SQLite
+ * compatible database may be used by implementing this interface.
+ *
+ * The SQL the CA runs is SQLite dialect, and statements passed to
+ * {@link CaDatabase.prepare} may contain more than one SQL statement (as used
+ * when applying schema migrations).
  */
 export interface CaDatabase {
-    prepare(query: string): unknown
-    batch(statements: never[]): Promise<unknown>
+    /** Prepare a SQL query for execution, see {@link CaPreparedStatement} */
+    prepare(query: string): CaPreparedStatement
+    /** Execute several prepared statements atomically, returning a result for each */
+    batch(statements: CaPreparedStatement[]): Promise<CaDatabaseResult[]>
+    /** Execute one or more SQL statements without parameters */
     exec(query: string): Promise<unknown>
 }
 
