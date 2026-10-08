@@ -53,5 +53,6 @@ Prefer the scripts in `package.json` over invoking tools directly.
 ## Boundaries
 - Don't commit secrets, tokens, or `.env` files.
 - Don't edit generated files (`**/worker-configuration.d.ts` and `packages/core/openapi.json`); regenerate with `npm run cf-typegen` and `npm run schema` respectively.
+- `packages/core/openapi.json` is committed and published in the npm package; the client generates its bindings from it. CI fails if it doesn't match `npm run schema`, so commit the regenerated file with any change that affects it.
 - Keep changes scoped to the task. No drive-by refactors or renames.
 - Do not change any of the OpenAPI surface as this could break clients.
