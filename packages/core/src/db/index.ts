@@ -2,6 +2,7 @@ import type { Certificate, Format, Identity } from "sshpk"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { D1QB } from "workers-qb"
+import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
 
 export enum CertificateType {
@@ -32,13 +33,11 @@ const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 	try {
 		l.debug("connecting to database")
 
-		const qb = new D1QB<DatabaseSchema>(env.DB)
-		const migrationBuilder = qb.migrations({ migrations })
-		const appliedMigrations = await migrationBuilder.apply()
+		const appliedMigrations = await migrateOnce(env.DB, migrations)
 
 		l.debug("applied database migrations", "migrations", appliedMigrations.length, "migration_names", appliedMigrations.map(m => m.name))
 
-		return qb
+		return new D1QB<DatabaseSchema>(env.DB)
 	} catch (err) {
 		l.error("error connecting to database", "error", err)
 		throw err
