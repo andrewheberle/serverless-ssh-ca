@@ -33,10 +33,26 @@ describe("compiled output", () => {
 			expect(build.status, build.stdout + build.stderr).toBe(0)
 
 			const entry = pathToFileURL(join(outDir, "index.js")).href
+			const nodeEntry = pathToFileURL(join(outDir, "node", "index.js")).href
 			const script = `
 				const mod = await import(${JSON.stringify(entry)})
 				if (typeof mod.default?.fetch !== "function" || typeof mod.default?.scheduled !== "function") {
 					throw new Error("default export is missing fetch or scheduled handlers")
+				}
+				if (typeof mod.createSshCa !== "function") {
+					throw new Error("createSshCa is not exported")
+				}
+				const node = await import(${JSON.stringify(nodeEntry)})
+				for (const name of ["bindingsFromEnv", "fromNodeSqlite", "secretFromFile", "secretFromString"]) {
+					if (typeof node[name] !== "function") {
+						throw new Error(name + " is not exported from the node entry point")
+					}
+				}
+				const { DatabaseSync } = await import("node:sqlite")
+				const db = node.fromNodeSqlite(new DatabaseSync(":memory:"))
+				const res = await db.prepare("SELECT ? AS v").bind(1).all()
+				if (res.results[0]?.v !== 1) {
+					throw new Error("node:sqlite adapter did not return the expected row")
 				}
 			`
 			const run = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf-8" })

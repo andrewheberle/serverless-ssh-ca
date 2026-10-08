@@ -36,6 +36,10 @@ export interface CaDatabaseResult {
     meta?: {
         /** The number of rows changed by the statement */
         changes?: number
+        /** The rowid of the last row inserted */
+        last_row_id?: number
+        /** How long the statement took to execute in milliseconds */
+        duration?: number
     }
 }
 
