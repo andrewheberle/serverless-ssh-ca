@@ -72,8 +72,9 @@ export interface CaPreparedStatement {
  * compatible database may be used by implementing this interface.
  *
  * The SQL the CA runs is SQLite dialect, and statements passed to
- * {@link CaDatabase.prepare} may contain more than one SQL statement (as used
- * when applying schema migrations).
+ * {@link CaDatabase.prepare} may contain more than one SQL statement.
+ * Schema migrations rely on {@link CaDatabase.batch} being atomic so they can
+ * be applied safely by concurrent requests.
  */
 export interface CaDatabase {
     /** Prepare a SQL query for execution, see {@link CaPreparedStatement} */
