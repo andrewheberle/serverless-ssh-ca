@@ -1,55 +1,48 @@
-name: Release & Publish to NPM
+name: Release
+
+# The tag and GitHub release are created by release-please when the release
+# PR is merged. This workflow name is registered as the trusted publisher on
+# npm, so don't rename it
+on:
+  push:
+    tags:
+      - 'v*'
 
 permissions: {}
 
-on:
-  workflow_dispatch:
-    inputs:
-      release:
-        description: Release type
-        required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-
 jobs:
-  client-e2e:
-    name: Client end-to-end tests
-    permissions:
-      contents: read
-    uses: ./.github/workflows/client-e2e.yml
-
-  release:
-    needs: client-e2e
+  publish:
+    name: publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
       attestations: write
       artifact-metadata: write
-
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
-      - name: git config
+      - name: Check tag matches package versions
         run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          version="${GITHUB_REF_NAME#v}"
+          for pkg in package.json packages/core/package.json packages/testing/package.json; do
+            actual="$(node -p "require('./$pkg').version")"
+            if [ "$actual" != "$version" ]; then
+              echo "$pkg has version $actual but the tag is $GITHUB_REF_NAME"
+              exit 1
+            fi
+          done
       - run: npm ci
-      - run: npm run lint
-      - run: npm run test
       - run: npm run build
-      - run: npm run test:workers
       - run: npm run schema
+      - name: Check OpenAPI schema is up to date
+        run: git diff --exit-code -- packages/core/openapi.json
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           output-file: sbom.spdx.json
@@ -61,6 +54,9 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: packages/core/openapi.json
-      - run: npm run release:ci:${{ inputs.release }}
+      - name: Publish to npm
+        run: npm publish --workspace packages/core --workspace packages/testing --access public
+      - name: Add assets to GitHub release
+        run: gh release upload "$GITHUB_REF_NAME" packages/core/openapi.json sbom.spdx.json --clobber --repo "$GITHUB_REPOSITORY"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

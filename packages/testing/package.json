@@ -21,12 +21,6 @@
 	"scripts": {
 		"build": "tsc",
 		"lint": "eslint",
-		"release": "release-it",
-		"release:ci": "npm run release:patch",
-		"release:ci:major": "release-it major --ci",
-		"release:ci:minor": "release-it minor --ci",
-		"release:ci:patch": "release-it patch --ci",
-		"release:dryrun": "release-it --dry-run",
 		"test": "vitest run",
 		"test:workers": "vitest run --config vitest.integration.config.mts"
 	},
@@ -62,12 +56,5 @@
 		"url": "https://github.com/andrewheberle/serverless-ssh-ca/issues"
 	},
 	"author": "Andrew Heberle",
-	"license": "Apache-2.0",
-	"release-it": {
-		"git": false,
-		"npm": {
-			"publish": true,
-			"skipChecks": true
-		}
-	}
+	"license": "Apache-2.0"
 }

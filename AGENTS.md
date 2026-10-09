@@ -39,7 +39,7 @@ Prefer the scripts in `package.json` over invoking tools directly.
 - Use `safeParse` where failure is expected and handle the error path explicitly.
 
 ## Linting
-- ESLint uses flat config (`eslint.config.ts`). Add ignores to the config's global `ignores` entry, not per-file comments.
+- ESLint uses flat config (`eslint.config.ts`). ESLint needs the root `jiti` devDependency to load TypeScript config files, so keep it. Add ignores to the config's global `ignores` entry, not per-file comments.
 - Don't disable rules inline without a comment giving the reason. Never disable rules project-wide to pass a check.
 
 ## Documentation
@@ -52,6 +52,15 @@ Prefer the scripts in `package.json` over invoking tools directly.
 ## Dependencies
 - Ask before adding a new dependency. Prefer the platform and standard library.
 - Don't upgrade major versions as a side effect of another task.
+
+## Releases
+- Releases are prepared by release-please (`release-please-config.json`, `.release-please-manifest.json`), which keeps a `chore(release): vX.Y.Z` PR open with the version bump of the root, core and testing packages and the `CHANGELOG.md` entry, derived from conventional commit messages on `main`.
+- Merging the release PR creates the `vX.Y.Z` tag and GitHub release; the tag triggers `.github/workflows/release.yml`, which publishes core and testing to npm and adds `openapi.json` and the SBOM to the release.
+- npm trusted publishing is tied to the `release.yml` filename, so don't rename it.
+- Don't edit `CHANGELOG.md`, `.release-please-manifest.json` or package versions by hand; release-please maintains them.
+- PRs are squash merged with the PR title as the commit message, so PR titles must be conventional commits (`feat:`, `fix(scope):`, `feat!:` for breaking changes); the PR title check enforces this. Only `feat`, `fix`, `perf`, `revert` and breaking changes trigger a release.
+- Never delete, move, or force-push an existing tag; fix forward with a new patch version.
+- Do not create or push a tag unless specifically directed to as this triggers the release workflow.
 
 ## Boundaries
 - Don't commit secrets, tokens, or `.env` files.
