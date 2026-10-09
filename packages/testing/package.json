@@ -1,6 +1,6 @@
 {
 	"name": "@andrewheberle/serverless-ssh-ca-testing",
-	"version": "0.20.1",
+	"version": "0.21.0",
 	"description": "Runs the Serverless SSH CA under Node.js or workerd for end-to-end tests of clients",
 	"type": "module",
 	"types": "./dist/index.d.ts",
