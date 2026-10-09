@@ -10,7 +10,7 @@ permissions: {}
 
 jobs:
   worker:
-    name: Build
+    name: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,3 +30,25 @@ jobs:
       - name: Check OpenAPI schema is up to date
         run: |
           git diff --exit-code -- packages/core/openapi.json || (echo "OpenAPI schema is out of date. Run 'npm run schema' and commit the changes." && exit 1)
+
+  # Single required check for branch protection, so the ruleset doesn't need
+  # updating when jobs or matrix entries change. Runs even when a needed job
+  # fails, as a skipped required check counts as passing
+  build-ok:
+    name: build-ok
+    runs-on: ubuntu-latest
+    needs: [worker]
+    if: ${{ always() }}
+    permissions: {}
+    steps:
+      - name: Check all build jobs passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) exit 1 ;;
+            esac
+          done

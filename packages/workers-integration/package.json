@@ -15,11 +15,5 @@
 		"typescript": "^7.0.0",
 		"vitest": "^4.1.7",
 		"wrangler": "^4.95.0"
-	},
-	"release-it": {
-		"git": false,
-		"npm": {
-			"publish": false
-		}
 	}
 }

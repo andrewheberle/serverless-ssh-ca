@@ -2,14 +2,5 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": [
 		"config:recommended"
-	],
-	"packageRules": [
-        {
-            "matchPackageNames": [
-				"^release-it$",
-                "^@release-it/.*$"
-			],
-            "groupName": "release-it"
-        }
-    ]
+	]
 }
