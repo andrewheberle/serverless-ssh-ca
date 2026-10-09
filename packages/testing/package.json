@@ -5,7 +5,7 @@
 	"type": "module",
 	"types": "./dist/index.d.ts",
 	"bin": {
-		"serverless-ssh-ca-test-server": "./dist/cli.js"
+		"serverless-ssh-ca-test-server": "dist/cli.js"
 	},
 	"files": [
 		"dist",
