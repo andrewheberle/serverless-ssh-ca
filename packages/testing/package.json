@@ -1,0 +1,73 @@
+{
+	"name": "@andrewheberle/serverless-ssh-ca-testing",
+	"version": "0.20.1",
+	"description": "Runs the Serverless SSH CA under Node.js or workerd for end-to-end tests of clients",
+	"type": "module",
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"serverless-ssh-ca-test-server": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"scripts": {
+		"build": "tsc",
+		"lint": "eslint",
+		"release": "release-it",
+		"release:ci": "npm run release:patch",
+		"release:ci:major": "release-it major --ci",
+		"release:ci:minor": "release-it minor --ci",
+		"release:ci:patch": "release-it patch --ci",
+		"release:dryrun": "release-it --dry-run",
+		"test": "vitest run",
+		"test:workers": "vitest run --config vitest.integration.config.mts"
+	},
+	"dependencies": {
+		"wrangler": "^4.95.0",
+		"zod": "^4.0.0"
+	},
+	"peerDependencies": {
+		"@andrewheberle/serverless-ssh-ca": ">=0.20.0"
+	},
+	"devDependencies": {
+		"@andrewheberle/serverless-ssh-ca": "*",
+		"@eslint/js": "^10.0.1",
+		"@types/node": "^24.19.1",
+		"eslint": "^10.4.1",
+		"typescript": "^7.0.0",
+		"typescript-eslint": "^8.61.0",
+		"vitest": "^4.1.7"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/andrewheberle/serverless-ssh-ca.git",
+		"directory": "packages/testing"
+	},
+	"homepage": "https://github.com/andrewheberle/serverless-ssh-ca/tree/main/packages/testing#readme",
+	"bugs": {
+		"url": "https://github.com/andrewheberle/serverless-ssh-ca/issues"
+	},
+	"author": "Andrew Heberle",
+	"license": "Apache-2.0",
+	"release-it": {
+		"git": false,
+		"npm": {
+			"publish": true,
+			"skipChecks": true
+		}
+	}
+}

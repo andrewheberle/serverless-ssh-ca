@@ -3,6 +3,7 @@
 	"version": "0.20.1",
 	"workspaces": [
 		"packages/core",
+		"packages/testing",
 		"packages/workers-integration"
 	],
 	"scripts": {

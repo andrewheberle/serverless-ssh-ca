@@ -8,6 +8,9 @@ This repository contains a serverless Certificate Authority (CA) that can be use
 - `packages/core/src/` - main package source
 - `packages/core/scripts/` - helper scripts
 - `packages/core/tests/` - tests for core package
+- `packages/testing/` - @andrewheberle/serverless-ssh-ca-testing; runs the CA under Node.js or workerd for client end-to-end tests. Its command line, configuration file and log format are relied on by the client's end-to-end tests, so keep them compatible and documented in its README.
+- `packages/testing/tests/` - unit tests, run against `packages/core/src`
+- `packages/testing/integration/` - tests of the built command under both runtimes, run by `npm run test:workers` after `npm run build`
 - `packages/workers-integration/` - package used for testing @andrewheberle/serverless-ssh-ca on Workers runtime
 - `dist/` - build output; never edit by hand, never commit [unless it's a published artifact]
 
