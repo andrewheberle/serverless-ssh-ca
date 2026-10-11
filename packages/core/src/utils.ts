@@ -361,35 +361,78 @@ type ParsedHostCertificateRenewal = {
 	proof: RenewalProofOfPossession
 } & HostCertificateRequest
 
+/**
+ * Checks a certificate presented for renewal was issued by this CA, is a host
+ * certificate, is within its validity period and has not been revoked.
+ *
+ * @param env The CA bindings
+ * @param isRevoked Returns whether a serial has been revoked
+ * @param certificate The certificate presented for renewal
+ * @returns The reason the certificate cannot be renewed, or undefined if it can be
+ * @throws {@link UnsupportedKeyError} when the CA key is not supported
+ */
+export const checkRenewableCertificate = async (env: SshCaBindings, isRevoked: typeof IsRevokedFn, certificate: SshCertificate): Promise<string | undefined> => {
+	// ensure certificate is signed by CA
+	const issuer = await getPublic(env)
+	if (!await certificate.isSignedBy(issuer)) {
+		return "the provided certificate was not signed by this CA"
+	}
+
+	// only host certificates can be renewed, as renewal does not need the
+	// OIDC authentication a user certificate is issued with
+	if (certificate.kind !== "host") {
+		return "the provided certificate is not a host certificate"
+	}
+
+	// check certificate is within its validity period, allowing for clock
+	// skew at the start as a certificate issued moments ago may have a
+	// validity start up to a second in the future
+	const now = Date.now()
+	if (now >= certificate.validBefore.getTime()) {
+		return "the provided certificate is expired"
+	}
+	if (certificate.validAfter.getTime() > now + ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
+		return "the provided certificate is not yet valid"
+	}
+
+	// ensure certificate presented for renewal is not revoked
+	if (await isRevoked(env, certificate.serial)) {
+		return "the provided certificate is revoked"
+	}
+
+	return undefined
+}
+
+/**
+ * Refines a host certificate renewal so only a certificate that can be
+ * renewed (see {@link checkRenewableCertificate}) is accepted.
+ */
+export const refineRenewableCertificate = async (env: SshCaBindings, isRevoked: typeof IsRevokedFn, val: { certificate: SshCertificate }, ctx: z.RefinementCtx): Promise<never> => {
+	const l = logger(env)
+	try {
+		const reason = await checkRenewableCertificate(env, isRevoked, val.certificate)
+		if (reason !== undefined) {
+			return fatalIssue(ctx, reason, val)
+		}
+
+		return z.NEVER
+	} catch (err) {
+		// a misconfigured CA key is a server error, not a validation failure
+		if (err instanceof UnsupportedKeyError) {
+			l.error(err.message, "in", "refineRenewableCertificate")
+			throw new InternalServerErrorException(err.message)
+		}
+		l.error("certificate renewal check unhandled error", "in", "refineRenewableCertificate", "error", err)
+		return fatalIssue(ctx, "certificate renewal check unhandled error", val)
+	}
+}
+
 export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked: typeof IsRevokedFn, val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
 	const l = logger(env)
 	try {
-		// ensure certificate is signed by CA
-		const issuer = await getPublic(env)
-		if (!await val.certificate.isSignedBy(issuer)) {
-			return fatalIssue(ctx, "the provided certificate was not signed by this CA", val)
-		}
-
-		// only host certificates can be renewed, as renewal does not need the
-		// OIDC authentication a user certificate is issued with
-		if (val.certificate.kind !== "host") {
-			return fatalIssue(ctx, "the provided certificate is not a host certificate", val)
-		}
-
-		// check certificate is within its validity period, allowing for clock
-		// skew at the start as a certificate issued moments ago may have a
-		// validity start up to a second in the future
-		const now = Date.now()
-		if (now >= val.certificate.validBefore.getTime()) {
-			return fatalIssue(ctx, "the provided certificate is expired", val)
-		}
-		if (val.certificate.validAfter.getTime() > now + ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
-			return fatalIssue(ctx, "the provided certificate is not yet valid", val)
-		}
-
-		// ensure certificate presented for renewal is not revoked
-		if (await isRevoked(env, val.certificate.serial)) {
-			return fatalIssue(ctx, "the provided certificate is revoked", val)
+		const reason = await checkRenewableCertificate(env, isRevoked, val.certificate)
+		if (reason !== undefined) {
+			return fatalIssue(ctx, reason, val)
 		}
 
 		// check proof of possession fingerprint matches public key and certificate subject key
