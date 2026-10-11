@@ -5,13 +5,15 @@ import { describe, expect, it } from "vitest"
 import { createSignedHostCertificate } from "../src/certificate.js"
 import { seconds } from "itty-time"
 import { makeEnv } from "./env.js"
-import sshpk, { Format, Identity, type PrivateKey } from "sshpk"
+import type { TestKey } from "./keys/types.js"
+import { fingerprint, listCertificate } from "./helpers/ssh-keygen.js"
 import { MockSecretStore } from "./helpers/secret.js"
 import { UnsupportedKeyError } from "../src/utils.js"
+import { pub } from "./helpers/keys.js"
 
 type Test = {
     name: string
-    key: PrivateKey
+    key: TestKey
     wantErr?: string
 }
 
@@ -48,11 +50,11 @@ const hosttests: Test[] = [
 
 for (const ca of catests) {
     describe(`createSignedHostCertificate (${ca.name})`, async () => {
-        const env = makeEnv({ PRIVATE_KEY: new MockSecretStore(ca.key.toString("openssh")) })
+        const env = makeEnv({ PRIVATE_KEY: new MockSecretStore(ca.key.privateKey) })
 
         if (ca.wantErr !== undefined) {
             it("should reject the CA key", async () => {
-                const result = createSignedHostCertificate(env, ecdsaKey.host().toPublic(), { principals: ["test_host"] })
+                const result = createSignedHostCertificate(env, pub(ecdsaKey.host()), { principals: ["test_host"] })
                 await expect(result).rejects.toBeInstanceOf(UnsupportedKeyError)
                 await expect(result).rejects.toThrow(ca.wantErr)
             })
@@ -62,30 +64,19 @@ for (const ca of catests) {
         for (const host of hosttests) {
             it(host.name, async () => {
                 if (host.wantErr === undefined) {
-                    const certificate = sshpk.parseCertificate(Buffer.from((await createSignedHostCertificate(env, host.key.toPublic(), { principals: ["test_host"] })).toString()), "openssh")
+                    const issued = await createSignedHostCertificate(env, pub(host.key), { principals: ["test_host"] })
 
-                    // check its signed by the CA
-                    expect(certificate.isSignedByKey(ca.key.toPublic())).toBe(true)
-
-                    // check subjects
-                    expect(certificate.subjects.length).toBe(1)
-                    const certificateSubjects = certificate.subjects.map((v: Identity): string => {
-                        return v.toString()
-                    }).join(",")
-                    expect(certificateSubjects).toBe("CN=test_host")
-
-                    // check extensions
-                    const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
-                        // @ts-ignore: the name property does exist
-                        return v.name
-                    }).join(",")
-                    expect(extensions).toBe("")
-
-                    // confirm lifetime
-                    const lifetime = Math.round((certificate.validUntil.getTime() - certificate.validFrom.getTime()) / 1000)
-                    expect(lifetime).toBe(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+                    // ssh-keygen verifies the signature
+                    const certificate = listCertificate(issued.toString())
+                    expect(certificate.kind).toBe("host")
+                    expect(certificate.signingCa).toBe(fingerprint(ca.key.publicKey))
+                    expect(certificate.publicKey).toBe(fingerprint(host.key.publicKey))
+                    expect(certificate.keyId).toBe("host_test_host")
+                    expect(certificate.principals).toEqual(["test_host"])
+                    expect(certificate.extensions).toEqual([])
+                    expect((certificate.validBefore.getTime() - certificate.validAfter.getTime()) / 1000).toBe(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
                 } else {
-                    expect(async () => await createSignedHostCertificate(env, host.key.toPublic(), { principals: ["test_host"] }))
+                    expect(async () => await createSignedHostCertificate(env, pub(host.key), { principals: ["test_host"] }))
                         .toThrow(host.wantErr)
                 }
             })

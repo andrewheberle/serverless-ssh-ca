@@ -6,6 +6,7 @@ import { MockSecretStore } from "./helpers/secret.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
 import { generateProof } from "./helpers/proof.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
+import { priv, pub } from "./helpers/keys.js"
 
 // fail every database write, but report nothing as revoked so renewals get
 // as far as recording the certificate
@@ -22,7 +23,7 @@ vi.mock("../src/db", async (importOriginal) => {
 
 const email = "user@example.com"
 const env = makeEnv({
-	PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().toString("openssh")),
+	PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey),
 	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: email,
 })
 const app = createApp(env)
@@ -49,7 +50,7 @@ describe("certificate issuance when the database write fails", () => {
 	it("user certificate request responds with a 500", async () => {
 		const key = ecdsaKey.user()
 		const response = await post("/api/v3/user/certificate", {
-			public_key: Buffer.from(key.toPublic().toString("ssh")).toString("base64"),
+			public_key: Buffer.from(key.publicKey).toString("base64"),
 			proof: generateProof(key),
 			identity: await getIdentityToken(claims),
 		}, await getAccessToken(claims))
@@ -60,7 +61,7 @@ describe("certificate issuance when the database write fails", () => {
 	it("host certificate request responds with a 500", async () => {
 		const key = ecdsaKey.host()
 		const response = await post("/api/v3/host/certificate", {
-			public_key: Buffer.from(key.toPublic().toString("ssh")).toString("base64"),
+			public_key: Buffer.from(key.publicKey).toString("base64"),
 			proof: generateProof(key),
 			identity: await getIdentityToken(claims),
 			principals: ["test_host"],
@@ -71,10 +72,10 @@ describe("certificate issuance when the database write fails", () => {
 
 	it("host certificate renewal responds with a 500", async () => {
 		const key = ecdsaKey.host()
-		const certificate = await createSignedHostCertificate(env, key.toPublic(), { principals: ["test_host"] })
+		const certificate = await createSignedHostCertificate(env, pub(key), { principals: ["test_host"] })
 		const response = await post("/api/v3/host/renew", {
 			certificate: Buffer.from(certificate.toString()).toString("base64"),
-			public_key: Buffer.from(key.toPublic().toString("ssh")).toString("base64"),
+			public_key: Buffer.from(key.publicKey).toString("base64"),
 			proof: generateProof(key),
 		})
 

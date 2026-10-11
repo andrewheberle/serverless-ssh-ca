@@ -2,13 +2,13 @@ import { spawnSync } from "node:child_process"
 import { writeFileSync, readFileSync, unlinkSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { PrivateKey } from "sshpk"
 import { Namespace } from "../../src/proof.js"
+import type { TestKey } from "../keys/types.js"
+import { fingerprint } from "./ssh-keygen.js"
 
-export const generateProof = (key: PrivateKey): string => {
+export const generateProof = (key: TestKey): string => {
     const timestamp = Date.now()
-    const fingerprint = key.toPublic().fingerprint("sha256").toString()
-    const data = `${timestamp}.${fingerprint}`
+    const data = `${timestamp}.${fingerprint(key.publicKey)}`
 
     // create temp dir to hold key and data files
     const dir = mkdtempSync(join(tmpdir(), "ssh-proof-"))
@@ -18,7 +18,7 @@ export const generateProof = (key: PrivateKey): string => {
 
     try {
         // write key and data to temp files
-        writeFileSync(keyFile, key.toString("openssh"), { mode: 0o600 })
+        writeFileSync(keyFile, key.privateKey, { mode: 0o600 })
         writeFileSync(dataFile, data, { encoding: "utf-8" })
 
         // sign with ssh-keygen

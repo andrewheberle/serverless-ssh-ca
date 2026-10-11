@@ -27,7 +27,6 @@ import {
 	split,
 	UnsupportedKeyError,
 } from "../../utils.js"
-import sshpk from "sshpk"
 import { CertificateType } from "../../db/types.js"
 import {
 	getKrlVersion,
@@ -38,6 +37,7 @@ import {
 	revokeCertificate,
 } from "../../db/index.js"
 import { KRLBuilder } from "../../krl.js"
+import { KeyParseError } from "../../ssh/keys.js"
 import {
 	CaPublicKeyEndpointSchema,
 	createUserCertificateRequestEndpointSchema,
@@ -50,8 +50,6 @@ import {
 import { logger } from "../../logger.js"
 import type { SshCaBindings } from "../../types.js"
 
-// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
-const { KeyParseError } = sshpk
 
 const CaPublicKeyEndpoint = (env: SshCaBindings) => {
 	return class extends OpenAPIRoute {
@@ -64,7 +62,7 @@ const CaPublicKeyEndpoint = (env: SshCaBindings) => {
 			try {
 				const pub = await getPublic(c.env)
 
-				return c.text(`${pub.toString("ssh").trim()}\n`)
+				return c.text(`${pub.toString()}\n`)
 			} catch (err) {
 				switch (true) {
 					case (err instanceof UnsupportedKeyError):
@@ -305,7 +303,7 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 
 		override async handle(c: AppContext) {
 			const data = await this.getValidatedData<typeof this.schema>()
-			const serial = data.body.certificate.serial.readBigUInt64BE(0)
+			const serial = data.body.certificate.serial
 
 			const l = logger(env).with(
 				...group("request",
@@ -316,14 +314,14 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 			)
 
 			// use smaller of the current certificate lifetime and the requested lifetime
-			const originalLifetime = (data.body.certificate.validUntil.getTime() - data.body.certificate.validFrom.getTime()) / 1000
+			const originalLifetime = (data.body.certificate.validBefore.getTime() - data.body.certificate.validAfter.getTime()) / 1000
 			const lifetime = originalLifetime > data.body.lifetime
 				? data.body.lifetime
 				: originalLifetime
 
 			const opts: CreateHostCertificateOptions = {
 				lifetime: lifetime,
-				principals: data.body.certificate.subjects.map((s) => s.hostname!),
+				principals: data.body.certificate.principals,
 			}
 
 			try {

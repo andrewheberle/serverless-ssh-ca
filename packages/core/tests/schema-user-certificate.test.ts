@@ -125,7 +125,7 @@ describe("user certificate schema", () => {
 			email: "user123@example.com"
 		})
 		const key = ecdsaKey.user()
-		const publicKey = Buffer.from(key.toPublic().toString("ssh")).toString("base64")
+		const publicKey = Buffer.from(key.publicKey).toString("base64")
 		const proof = generateProof(key)
 
 		it("should fail with no proof", async () => {

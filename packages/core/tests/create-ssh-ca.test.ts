@@ -24,26 +24,26 @@ describe("createSshCa", () => {
 	describe("fetch", () => {
 		it("should serve requests using the bindings it was created with", async () => {
 			const key = ecdsaKey.ca()
-			const ca = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(key.toString("openssh")) }))
+			const ca = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(key.privateKey) }))
 
 			// only the request is passed, so the handler must supply the bindings itself
 			const response = await ca.fetch(new Request("http://example.com/api/v3/ca"))
 
 			expect(response.status).toBe(200)
-			expect(keyBlob(await response.text())).toBe(keyBlob(key.toPublic().toString("ssh")))
+			expect(keyBlob(await response.text())).toBe(keyBlob(key.publicKey))
 		})
 
 		it("should keep the bindings of separate instances apart", async () => {
 			const first = ecdsaKey.ca()
 			const second = ecdsaKey.user()
-			const a = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(first.toString("openssh")), ISSUER_DN: "CN=First CA" }))
-			const b = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(second.toString("openssh")), ISSUER_DN: "CN=Second CA" }))
+			const a = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(first.privateKey), ISSUER_DN: "CN=First CA" }))
+			const b = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(second.privateKey), ISSUER_DN: "CN=Second CA" }))
 
 			const fromA = await (await a.fetch(new Request("http://example.com/api/v3/ca"))).text()
 			const fromB = await (await b.fetch(new Request("http://example.com/api/v3/ca"))).text()
 
-			expect(fromA).toBe(`${keyBlob(first.toPublic().toString("ssh"))} CN=First CA\n`)
-			expect(fromB).toBe(`${keyBlob(second.toPublic().toString("ssh"))} CN=Second CA\n`)
+			expect(fromA).toBe(`${keyBlob(first.publicKey)} CN=First CA\n`)
+			expect(fromB).toBe(`${keyBlob(second.publicKey)} CN=Second CA\n`)
 		})
 
 		it("should respond with a 404 for unknown paths", async () => {

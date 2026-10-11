@@ -7,7 +7,9 @@ import {
 	SSHText,
 	SSHTextList,
 } from "./encoding.js"
-import type { Signer } from "./signer.js"
+import { base64 } from "@scure/base"
+import { KeyParseError, PublicKey } from "./keys.js"
+import { verify, type Signer } from "./signer.js"
 
 /**
  * Encoding, decoding and signing of OpenSSH certificates as described in
@@ -26,8 +28,8 @@ const CertificateKinds: Readonly<Record<CertificateKind, number>> = {
 export type CertificateFields = {
 	/** Whether the certificate is for a user or a host */
 	kind: CertificateKind
-	/** The wire encoding of the public key being certified */
-	publicKey: Uint8Array
+	/** The public key being certified */
+	publicKey: PublicKey
 	/** The serial number of the certificate */
 	serial: bigint
 	/** The key ID of the certificate, which is logged by sshd when it is used */
@@ -71,13 +73,17 @@ const Certificate = P.tag(SSHText, Object.fromEntries(
 
 const toSeconds = (date: Date): bigint => BigInt(Math.floor(date.getTime() / 1000))
 
-const toBase64 = (bytes: Uint8Array): string => {
-	let binary = ""
-	for (const byte of bytes) {
-		binary += String.fromCharCode(byte)
-	}
+/**
+ * Thrown when a certificate cannot be parsed
+ */
+export class CertificateParseError extends Error {
+	constructor(message: string, cause?: unknown) {
+		super(message)
+		this.name = "CertificateParseError"
+		this.cause = cause
 
-	return btoa(binary)
+		Object.setPrototypeOf(this, CertificateParseError.prototype)
+	}
 }
 
 /**
@@ -89,10 +95,8 @@ export class SshCertificate {
 	/** The certificate type, for example "ssh-ed25519-cert-v01@openssh.com" */
 	readonly type: string
 	readonly kind: CertificateKind
-	/** The wire encoding of the public key being certified */
-	readonly publicKey: Uint8Array
-	/** The type of the public key being certified, for example "ssh-ed25519" */
-	readonly publicKeyType: string
+	/** The public key being certified */
+	readonly publicKey: PublicKey
 	readonly serial: bigint
 	readonly keyId: string
 	readonly principals: string[]
@@ -102,26 +106,39 @@ export class SshCertificate {
 	readonly extensions: string[]
 	/** The wire encoding of the public key of the CA that signed the certificate */
 	readonly signatureKey: Uint8Array
+	/** The signature of the CA in the SSH wire format */
+	readonly signature: Uint8Array
 
 	/**
 	 * Decodes a certificate from its wire encoding. This does not verify the
 	 * signature on the certificate.
 	 *
 	 * @param bytes The wire encoding of the certificate
-	 * @throws Error when the certificate cannot be decoded or its type is not supported
+	 * @throws {@link CertificateParseError} when the certificate cannot be decoded or its type is not supported
 	 */
 	constructor(bytes: Uint8Array) {
-		const { TAG, data } = Certificate.decode(bytes)
+		let decoded: P.UnwrapCoder<typeof Certificate>
+		try {
+			decoded = Certificate.decode(bytes)
+		} catch (err) {
+			throw new CertificateParseError("certificate could not be decoded", err)
+		}
+		const { TAG, data } = decoded
 		const kind = (Object.keys(CertificateKinds) as CertificateKind[]).find((k) => CertificateKinds[k] === data.kind)
 		if (kind === undefined) {
-			throw new Error(`unknown certificate kind: ${data.kind}`)
+			throw new CertificateParseError(`unknown certificate kind: ${data.kind}`)
+		}
+
+		const publicKeyType = TAG.replace(/-cert-v01@openssh\.com$/, "")
+		try {
+			this.publicKey = new PublicKey(P.struct({ type: SSHText, key: P.array(data.key.length, SSHBytes) }).encode({ type: publicKeyType, key: data.key }))
+		} catch (err) {
+			throw new CertificateParseError(err instanceof KeyParseError ? err.message : "certificate public key could not be decoded", err)
 		}
 
 		this.bytes = bytes
 		this.type = TAG
 		this.kind = kind
-		this.publicKeyType = TAG.replace(/-cert-v01@openssh\.com$/, "")
-		this.publicKey = P.struct({ type: SSHText, key: P.array(data.key.length, SSHBytes) }).encode({ type: this.publicKeyType, key: data.key })
 		this.serial = data.serial
 		this.keyId = data.keyId
 		this.principals = data.principals
@@ -129,20 +146,59 @@ export class SshCertificate {
 		this.validBefore = new Date(Number(data.validBefore) * 1000)
 		this.extensions = data.extensions.map((e) => e.name)
 		this.signatureKey = data.signatureKey
+		this.signature = data.signature
 	}
 
 	/**
-	 * Returns the public key being certified in OpenSSH format, without a comment
+	 * Parses a certificate in OpenSSH format, `${type} ${base64}[ ${comment}]`,
+	 * as found in `-cert.pub` files. This does not verify the signature on the
+	 * certificate.
+	 *
+	 * @param text The certificate
+	 * @throws {@link CertificateParseError} when the certificate cannot be parsed or its type is not supported
 	 */
-	publicKeyString(): string {
-		return `${this.publicKeyType} ${toBase64(this.publicKey)}`
+	static parse(text: string): SshCertificate {
+		const [type, data] = text.trim().split(/\s+/)
+		if (type === undefined || type === "" || data === undefined) {
+			throw new CertificateParseError("certificate was not in OpenSSH format")
+		}
+
+		let bytes: Uint8Array
+		try {
+			bytes = base64.decode(data)
+		} catch (err) {
+			throw new CertificateParseError("certificate was not valid base64", err)
+		}
+
+		const certificate = new SshCertificate(bytes)
+		if (certificate.type !== type) {
+			throw new CertificateParseError(`certificate type ${type} did not match encoded type ${certificate.type}`)
+		}
+
+		return certificate
+	}
+
+	/**
+	 * Returns whether the certificate was signed by a CA key
+	 *
+	 * @param ca The public key of the CA
+	 */
+	async isSignedBy(ca: PublicKey): Promise<boolean> {
+		if (!ca.equals(new PublicKey(this.signatureKey))) {
+			return false
+		}
+
+		// the signature is the last field, so everything before it is signed
+		const signed = this.bytes.subarray(0, this.bytes.length - 4 - this.signature.length)
+
+		return await verify(ca, this.signature, new Uint8Array(signed))
 	}
 
 	/**
 	 * Returns the certificate in OpenSSH format, as used for `-cert.pub` files
 	 */
 	toString(): string {
-		return `${this.type} ${toBase64(this.bytes)}`
+		return `${this.type} ${base64.encode(this.bytes)}`
 	}
 }
 
@@ -155,7 +211,7 @@ export class SshCertificate {
  * @throws Error when the type of the public key being certified is not supported
  */
 export const signCertificate = async (fields: CertificateFields, signer: Signer): Promise<SshCertificate> => {
-	const { type, fields: key } = decodePublicKey(fields.publicKey)
+	const { type, fields: key } = decodePublicKey(fields.publicKey.blob)
 
 	const value = {
 		nonce: crypto.getRandomValues(new Uint8Array(32)),

@@ -8,7 +8,7 @@ import {
 import { describe, it, expect, beforeAll } from "vitest"
 import { inject } from "vitest"
 import worker from "../src"
-import { privateKeyString, userPrivateKey } from "./keys/ecdsa"
+import { privateKeyString, userKey } from "./keys/ecdsa"
 import { getAccessToken, getIdentityToken } from "./helpers/token"
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>
@@ -32,14 +32,14 @@ describe("post /api/v3/user/certificate", () => {
     })
 
     it("valid request issues a certificate", async () => {
-        const key = userPrivateKey()
+        const key = userKey
 
         const headers = new Headers()
         headers.set("Authorization", accessToken)
         headers.set("Content-Type", "application/json")
 
         const body = JSON.stringify({
-            public_key: Buffer.from(key.toPublic().toString("ssh")).toString("base64"),
+            public_key: Buffer.from(key.publicKey).toString("base64"),
             proof: proof,
             identity: identityToken,
             extensions: [],
@@ -65,7 +65,7 @@ describe("post /api/v3/user/certificate", () => {
     })
 
     it("mismatched token subjects returns 403", async () => {
-        const key = userPrivateKey()
+        const key = userKey
 
         const differentIdentityToken = await getIdentityToken({
             sub: "different-user",
@@ -77,7 +77,7 @@ describe("post /api/v3/user/certificate", () => {
         headers.set("Content-Type", "application/json")
 
         const body = JSON.stringify({
-            public_key: Buffer.from(key.toPublic().toString("ssh")).toString("base64"),
+            public_key: Buffer.from(key.publicKey).toString("base64"),
             proof: proof,
             identity: differentIdentityToken,
             extensions: [],

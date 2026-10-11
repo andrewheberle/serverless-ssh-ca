@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { generatePrivateKey, parsePrivateKey, type PrivateKey } from "sshpk"
+import { base64urlnopad } from "@scure/base"
 import { KRLBuilder } from "../src/krl.js"
-import { verify } from "../src/sshsig/index.js"
+import { generateKey, isRevoked, testKey, listKrl, signCertificate, verifySignature, fingerprint } from "./helpers/ssh-keygen.js"
+import type { TestKey } from "./keys/types.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
+import { priv } from "./helpers/keys.js"
 
 const namespace = "krl@com.github.serverless-ssh-ca.andrewheberle"
 
@@ -13,14 +15,18 @@ const header = (krl: ArrayBuffer): { version: bigint, generatedDate: bigint } =>
 	return { version: view.getBigUint64(12, false), generatedDate: view.getBigUint64(20, false) }
 }
 
-const signAndVerify = async (caKey: PrivateKey): Promise<boolean> => {
-	const krl = new KRLBuilder(caKey).addSerials([1n, 2n])
+// signs a KRL and verifies the signature with ssh-keygen
+const signAndVerify = async (caKey: TestKey): Promise<boolean> => {
+	const krl = new KRLBuilder(priv(caKey)).addSerials([1n, 2n])
 	const bytes = new Uint8Array(krl.generate())
-	return await verify(await krl.signature(), bytes, { namespace })
+	return verifySignature(caKey.publicKey, namespace, bytes, await krl.signature())
 }
 
-// ECDSA CA keys whose private key is shorter than the curve size, which sshpk
-// writes to PKCS#8 without the required leading zero bytes
+// the private value of a CA key as WebCrypto is given it
+const privateValue = (key: TestKey): Uint8Array => base64urlnopad.decode(priv(key).jwk.d!)
+
+// ECDSA CA keys whose private key is shorter than the curve size, which
+// WebCrypto requires to be padded with leading zero bytes
 const shortEcdsaKeys: { curve: string, size: number, key: string }[] = [
 	{
 		curve: "nistp256",
@@ -74,29 +80,29 @@ describe("KRLBuilder signature", () => {
 		["ECDSA CA", ecdsaKey.ca()],
 		["Ed25519 CA", ed25519Key.ca()],
 		["Ed25519 CA with a leading zero seed byte", ed25519Key.leadingZeroCa()],
-	] as [string, PrivateKey][])("%s should produce a valid signature", async (_, caKey) => {
+	] as [string, TestKey][])("%s should produce a valid signature", async (_, caKey) => {
 		expect(await signAndVerify(caKey)).toBe(true)
 	})
 
 	it.each(shortEcdsaKeys)("ECDSA $curve CA with a short private key should produce a valid signature", async ({ key, size }) => {
-		const caKey = parsePrivateKey(key)
+		const caKey = testKey(key)
 
 		// guards against the fixture being replaced with an ordinary key
-		const d = caKey.parts.find((p) => p.name === "d")?.data ?? []
-		const start = d.findIndex((b) => b !== 0)
-		expect(d.length - start).toBeLessThan(size)
+		const d = privateValue(caKey)
+		expect(d.length).toBe(size)
+		expect(d[0]).toBe(0)
 
 		expect(await signAndVerify(caKey)).toBe(true)
 	})
 
-	// covers every encoding sshpk produces for the private key: short, full
-	// width and with a leading sign byte
-	it.each(["nistp256", "nistp384", "nistp521"] as const)("should sign with generated ECDSA %s CA keys", async (curve) => {
+	// covers every encoding of the private key: short, full width and with a
+	// leading sign byte
+	it.each([256, 384, 521])("should sign with generated ECDSA P-%i CA keys", async (bits) => {
 		const failures: string[] = []
 		for (let i = 0; i < 100; i++) {
-			const caKey = generatePrivateKey("ecdsa", { curve })
+			const caKey = generateKey("ecdsa", bits)
 			if (!(await signAndVerify(caKey))) {
-				failures.push(caKey.toString("openssh"))
+				failures.push(caKey.privateKey)
 			}
 		}
 		expect(failures).toEqual([])
@@ -104,20 +110,51 @@ describe("KRLBuilder signature", () => {
 
 	it("leading zero seed fixture should match the problem pattern", () => {
 		// guards against the fixture being replaced with an ordinary key
-		const seed = ed25519Key.leadingZeroCa().parts.find((p) => p.name === "k")?.data
-		expect(seed?.[0]).toBe(0x00)
-		expect(seed?.[1]).toBeLessThan(0x80)
+		const seed = privateValue(ed25519Key.leadingZeroCa())
+		expect(seed[0]).toBe(0x00)
+		expect(seed[1]).toBeLessThan(0x80)
 	})
 })
 
 describe("KRLBuilder generate", () => {
+	it("should be read by ssh-keygen", () => {
+		const ca = ecdsaKey.ca()
+		const krl = new Uint8Array(new KRLBuilder(priv(ca)).addSerials([1n, 18446744073709551615n]).addKeyIds(["revoked key"]).generate(7n))
+
+		expect(listKrl(krl)).toEqual({
+			version: 7n,
+			ca: fingerprint(ca.publicKey),
+			serials: [1n, 18446744073709551615n],
+			keyIds: ["revoked key"],
+		})
+	})
+
+	it.each([
+		["a revoked serial", 1n, "key", true],
+		["a revoked key ID", 3n, "revoked key", true],
+		["a serial and key ID that are not revoked", 2n, "key", false],
+	])("should be used by ssh-keygen to check a certificate with %s", (_, serial, keyId, revoked) => {
+		const ca = ed25519Key.ca()
+		const krl = new Uint8Array(new KRLBuilder(priv(ca)).addSerials([1n]).addKeyIds(["revoked key"]).generate())
+		const certificate = signCertificate(ca, ed25519Key.user().publicKey, { kind: "user", keyId, principals: ["user"], serial })
+
+		expect(isRevoked(krl, certificate)).toBe(revoked)
+	})
+
+	it("should not revoke a certificate from another CA", () => {
+		const krl = new Uint8Array(new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n]).generate())
+		const certificate = signCertificate(ed25519Key.ca(), ed25519Key.user().publicKey, { kind: "user", keyId: "key", principals: ["user"], serial: 1n })
+
+		expect(isRevoked(krl, certificate)).toBe(false)
+	})
+
 	it("should default to version 1", () => {
-		expect(header(new KRLBuilder(ecdsaKey.ca()).generate()).version).toBe(1n)
+		expect(header(new KRLBuilder(priv(ecdsaKey.ca())).generate()).version).toBe(1n)
 	})
 
 	it("should set the version and generated date in the header", () => {
 		const before = BigInt(Math.floor(Date.now() / 1000))
-		const krl = new KRLBuilder(ecdsaKey.ca()).addSerials([1n]).generate(42n)
+		const krl = new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n]).generate(42n)
 		const after = BigInt(Math.floor(Date.now() / 1000))
 
 		const { version, generatedDate } = header(krl)
@@ -129,14 +166,14 @@ describe("KRLBuilder generate", () => {
 
 describe("KRLBuilder digest", () => {
 	it("should not depend on the order serials and key IDs are added in", async () => {
-		const a = new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n, 3n]).addKeyIds(["a", "b"])
-		const b = new KRLBuilder(ecdsaKey.ca()).addSerials([3n]).addKeyIds(["b", "a"]).addSerials([2n, 1n])
+		const a = new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n, 2n, 3n]).addKeyIds(["a", "b"])
+		const b = new KRLBuilder(priv(ecdsaKey.ca())).addSerials([3n]).addKeyIds(["b", "a"]).addSerials([2n, 1n])
 
 		expect(await a.digest()).toBe(await b.digest())
 	})
 
 	it("should not change once the KRL is generated", async () => {
-		const krl = new KRLBuilder(ecdsaKey.ca()).addSerials([1n])
+		const krl = new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n])
 		const digest = await krl.digest()
 		krl.generate(5n)
 
@@ -144,13 +181,13 @@ describe("KRLBuilder digest", () => {
 	})
 
 	it.each([
-		["a serial is added", new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n, 3n])],
-		["a serial is removed", new KRLBuilder(ecdsaKey.ca()).addSerials([1n])],
-		["a serial is changed", new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 4n])],
-		["a key ID is added", new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n]).addKeyIds(["a"])],
-		["the CA is changed", new KRLBuilder(ed25519Key.ca()).addSerials([1n, 2n])],
+		["a serial is added", new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n, 2n, 3n])],
+		["a serial is removed", new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n])],
+		["a serial is changed", new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n, 4n])],
+		["a key ID is added", new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n, 2n]).addKeyIds(["a"])],
+		["the CA is changed", new KRLBuilder(priv(ed25519Key.ca())).addSerials([1n, 2n])],
 	] as [string, KRLBuilder][])("should change when %s", async (_, krl) => {
-		const base = new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n])
+		const base = new KRLBuilder(priv(ecdsaKey.ca())).addSerials([1n, 2n])
 
 		expect(await krl.digest()).not.toBe(await base.digest())
 	})

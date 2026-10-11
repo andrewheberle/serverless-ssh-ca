@@ -1,4 +1,4 @@
-import { parsePrivateKey, type PrivateKey } from "sshpk"
+import type { TestKey } from "./types.js"
 
 const caKey  = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
@@ -32,14 +32,13 @@ QAAAAhANuVGDONB+pmASf7pjOLISf7nTFf4Sy2JJ2bIkLdcpFEAAAAAAECAwQFBgc=
 `
 
 export const key = {
-    ca(): PrivateKey {
-        return parsePrivateKey(caKey)
+    ca(): TestKey {
+        return { privateKey: caKey, publicKey: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOuHkGuyTakRj+XUdS/2IHrfeqy4/N8bFVtlSLstcqK0m5ri/iZkSm5B8IZdrZlgm0ggNeb6bdh0uRsBgESVZxI=" }
     },
-    host(): PrivateKey {
-        return parsePrivateKey(hostKey)
+    host(): TestKey {
+        return { privateKey: hostKey, publicKey: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLlUHAiEz36WsvvVWtf7kxJobfUdOFqXBfdktfxe96yLP4ZFBCLmxIKCzb0srkRunE73RM1nbqVeai4VDPSk9WQ=" }
     },
-    user(): PrivateKey {
-        return parsePrivateKey(userKey)
+    user(): TestKey {
+        return { privateKey: userKey, publicKey: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGMpSJttf0IttNCVc28TzXFR1D0xvO3np67VzeAQsbdZskrDcYjSlwJ6HPDmTpXaU0lEaX9L4Yhc/cCf1Me9FTk= user@example.com" }
     },
-
 }

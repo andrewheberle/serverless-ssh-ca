@@ -1,4 +1,4 @@
-import { parsePrivateKey, type PrivateKey } from "sshpk"
+import type { TestKey } from "./types.js"
 
 export const caKey = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -27,8 +27,8 @@ foOq9xilaxUIu1Rz3PzDAAAAAAECAwQF
 -----END OPENSSH PRIVATE KEY-----
 `
 
-// a CA key whose seed starts with 0x00 followed by a byte below 0x80, which
-// sshpk writes to PKCS#8 with the leading zero dropped
+// a CA key whose seed starts with 0x00 followed by a byte below 0x80, so the
+// leading zero must be kept when the seed is given to WebCrypto
 export const leadingZeroCaKey = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACCID/KNdIMcAOAkNTKYgXBmzI3Fz2Z7N1+Ea8AmcRHK7wAAAIi7BqbYuwam
@@ -39,17 +39,16 @@ jcXPZns3X4RrwCZxEcrvAAAAAAECAwQF
 `
 
 export const key = {
-    ca(): PrivateKey {
-        return parsePrivateKey(caKey)
+    ca(): TestKey {
+        return { privateKey: caKey, publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMVtQh5Agnm9nknP29cudULJc2Fdp0ok65tui/+GJ8x/" }
     },
-    leadingZeroCa(): PrivateKey {
-        return parsePrivateKey(leadingZeroCaKey)
+    leadingZeroCa(): TestKey {
+        return { privateKey: leadingZeroCaKey, publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIgP8o10gxwA4CQ1MpiBcGbMjcXPZns3X4RrwCZxEcrv" }
     },
-    host(): PrivateKey {
-        return parsePrivateKey(hostKey)
+    host(): TestKey {
+        return { privateKey: hostKey, publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtiBmRe64hsla5ItE4SZ5o3foOq9xilaxUIu1Rz3PzD" }
     },
-    user(): PrivateKey {
-        return parsePrivateKey(userKey)
+    user(): TestKey {
+        return { privateKey: userKey, publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPYBPqsUTVz/viPaS5SbSQ1rgKLq7bj9fYWLuUXmvsaH user@example.com" }
     },
-
 }

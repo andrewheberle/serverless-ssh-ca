@@ -1,5 +1,5 @@
-import type { PrivateKey } from "sshpk"
-import { createSigner, publicKeyBlob } from "./ssh/signer.js"
+import type { PrivateKey } from "./ssh/keys.js"
+import { createSigner } from "./ssh/signer.js"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -134,7 +134,7 @@ export class KRLBuilder {
         const keyIds = [...this._keyIds].sort()
 
         const content = concat(
-            encodeString(publicKeyBlob(this._caKey)),
+            encodeString(this._caKey.publicKey.blob),
             encodeUint32(serials.length),
             ...serials.map(encodeUint64),
             encodeUint32(keyIds.length),
@@ -199,7 +199,7 @@ export class KRLBuilder {
         //   <one or more cert sub-sections>
         //
         const certSectionData = concat(
-            encodeString(publicKeyBlob(this._caKey)), // ca_key
+            encodeString(this._caKey.publicKey.blob), // ca_key
             encodeString(""), // reserved
             ...certSubSections
         )

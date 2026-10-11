@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { generatePrivateKey } from "sshpk"
+import { generateKey } from "./helpers/ssh-keygen.js"
 import { verify } from "../src/sshsig/index.js"
 import { parse, ecdsaComponentSize, toFixedWidth } from "../src/sshsig/sig_parser.js"
 import { Namespace, ProofOfPossession } from "../src/proof.js"
@@ -162,11 +162,11 @@ describe("ECDSA signatures with short components", () => {
 })
 
 describe("ECDSA proof of possession", () => {
-	for (const curve of ["nistp256", "nistp384", "nistp521"] as const) {
-		it(`should verify every ${curve} proof`, async () => {
+	for (const bits of [256, 384, 521]) {
+		it(`should verify every P-${bits} proof`, async () => {
 			// the fixtures above cover short r and s deterministically, this
 			// checks real ssh-keygen output end to end
-			const key = generatePrivateKey("ecdsa", { curve })
+			const key = generateKey("ecdsa", bits)
 			const failures: string[] = []
 			for (let i = 0; i < 300; i++) {
 				const proof = generateProof(key)

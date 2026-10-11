@@ -1,4 +1,4 @@
-import { parsePrivateKey, type PrivateKey } from "sshpk"
+import type { TestKey } from "./types.js"
 
 const caKey = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn
@@ -99,14 +99,13 @@ AaZU9UmamejosQAAAAABAgME
 `
 
 export const key = {
-    ca(): PrivateKey {
-        return parsePrivateKey(caKey)
+    ca(): TestKey {
+        return { privateKey: caKey, publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDFVTGEUwL1F4tZ4APuwHW/H0XOMq5PTkzTPEvwfBpyY+s4Yh04k5e3Zt13KGXTXEylUCU085tEA0tvZ0mzS9yPnxeNeSbx+scdBSL+KT8z+ufWv7pUVEnRE97nF4/bmbcgglF6WvdrnVk9AeDyqHRJqDvxaIG4/ib3CP8x19h7dwxGtc3ikduoiNedJ/ri3hOtCTqgk6XVvTAARqr/Ugsu6YKCn61Spmmm/jvVRpHVtJTfsEjqnLqnyEzy7Ku7HCtykfnWVUSEfcRR5Lixsb62XOOtME8nE+F10uy1ZDWEKNLuvddXhrfyPu9lShpNAskXE4d/scJ/+Ostd438hRsZ" }
     },
-    host(): PrivateKey {
-        return parsePrivateKey(hostKey)
+    host(): TestKey {
+        return { privateKey: hostKey, publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0M9/w3HddT5bzxL8mu3HKrW+zYKwQPNVh2OAqw4mb4N864H+rYzj0kGOSGo22Uv+YlX+/x05FGoaiHW52M2xlo2sPc+TrlNP8sXwHbJO8MBjCajkCcQOmZ3IT9s2L3uyR25ohOI/ax5j6FqOWpCwdInM43sQsrh3iawan6XISKbm3be5cHozZV9kj7RDo2TXMH3gbw7ej2Y69lSEIQz+vZ9zzf3dQoJxL6bUkAO+i8I0IDODOod4lVoul8gORDaIrMnzcIDabRfjzH3YcqAUlCQ8QDWP7YP5Pa4vsblqWAxWSabpX3lxcbxM9TmLTCC0HlT5L+kaUag8UjBc0ux3t" }
     },
-    user(): PrivateKey {
-        return parsePrivateKey(userKey)
+    user(): TestKey {
+        return { privateKey: userKey, publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCyp9qhO4oNNBapRSum4MQrE9CXCK6b08xnj7o+WedsHDo+GmkSkAfnqssqnxdFAJ/CEDntpZ6IXJXr+F3DTGNVXzkPzn0qAHxqnub0rW1cBcbJNgyJmAY55u3S/y58UTyVUz23MWI7F6uL+Zmvgj6ullYb/ODFJ0eYPI+EKNdZNtanrZuiuJgSARSeLLxfhfsdcyS1Zt4y1ocDWJoNRRiZ+G3ka/7ya1wnUBJKT//Bw1CCeBuNOH1t4dAXj+ToxIbGJ/dbSZLTzGoynWqgdxCvSA/+kbivnezMlZDRAF5mkzDf6bH/Hr3RqE8ck4NHcb/j9g7iI+8rAO+ZeYkzA4wt83OGXdbxoI6c+YwR6VnPouBnV47v01XgFNqA3Yoo6F934b5R8Eje6MJX2szxTs6Mb1uNgDxnHBh9L3GCZEjrMGK/zMtHT/j4b5+WYnnf9T33d/Ij54n2WgqAnMnTvowJkp6i3wzBimjTnV7aPUVaoy81cWQhISOaMGy/T6lsg48= user@example.com" }
     },
-
 }

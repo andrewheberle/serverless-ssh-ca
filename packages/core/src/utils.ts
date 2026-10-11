@@ -1,7 +1,7 @@
 import type { SshCaBindings } from "./types.js"
 import { JWKInvalid, JWKSInvalid, JWSInvalid, JWSSignatureVerificationFailed, JWTClaimValidationFailed, JWTExpired, JWTInvalid } from "jose/errors"
-import sshpk from "sshpk"
-import type { Certificate, Key, PrivateKey } from "sshpk"
+import { CertificateParseError, SshCertificate } from "./ssh/certificate.js"
+import { KeyParseError, parsePrivateKey, PublicKey, UnsupportedKeyError, type PrivateKey } from "./ssh/keys.js"
 import z from "zod"
 import { verifyJWT } from "./verify.js"
 import { CertificateRequestJWTPayload } from "./types.js"
@@ -11,8 +11,7 @@ import { logger } from "./logger.js"
 import { ms } from "itty-time"
 import { InternalServerErrorException } from "chanfana"
 
-// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
-const { KeyParseError, CertificateParseError, parseCertificate, parseKey, parsePrivateKey } = sshpk
+export { UnsupportedKeyError }
 
 export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) => {
 	ctx.issues.push({
@@ -104,11 +103,20 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 	}
 }
 
-export const transformPublicKey = (val: string | Buffer<ArrayBufferLike>, ctx: z.RefinementCtx): Key | never => {
-	try {
-		const key = typeof val === "string" ? parseKey(Buffer.from(val, "base64")) : parseKey(val)
+// decodes a value sent as base64, which may already have been decoded by the schema
+const fromBase64 = (val: string | Buffer<ArrayBufferLike>): string => {
+	return (typeof val === "string" ? Buffer.from(val, "base64") : Buffer.from(val)).toString("utf8")
+}
 
-		return key
+/**
+ * Parses a public key in OpenSSH format, `${type} ${base64}[ ${comment}]`
+ *
+ * @param val The public key, either base64 encoded or as bytes
+ * @param ctx The Zod context for any errors
+ */
+export const transformPublicKey = (val: string | Buffer<ArrayBufferLike>, ctx: z.RefinementCtx): PublicKey | never => {
+	try {
+		return PublicKey.parse(fromBase64(val))
 	} catch (err) {
 		switch (true) {
 			case (err instanceof TypeError):
@@ -234,11 +242,9 @@ export const transformIdentityToken = async (env: SshCaBindings, val: string, ct
  * @param ctx The Zod context for any errors
  * @returns
  */
-export const transformCertificate = (val: string | Buffer<ArrayBufferLike>, ctx: z.RefinementCtx): Certificate | never => {
+export const transformCertificate = (val: string | Buffer<ArrayBufferLike>, ctx: z.RefinementCtx): SshCertificate | never => {
 	try {
-		const cert = typeof val === "string" ? parseCertificate(Buffer.from(val, "base64"), "openssh") : parseCertificate(val, "openssh")
-
-		return cert
+		return SshCertificate.parse(fromBase64(val))
 	} catch (err) {
 		switch (true) {
 			case (err instanceof TypeError):
@@ -269,7 +275,7 @@ export const transformCertificate = (val: string | Buffer<ArrayBufferLike>, ctx:
 
 type ParsedCertificateRequest = {
 	proof: ProofOfPossession
-	public_key: Key
+	public_key: PublicKey
 	lifetime: number
 	identity: IdentityToken
 	extensions: string[]
@@ -311,7 +317,7 @@ export const transformRenewalProofOfPossession = (env: SshCaBindings, val: strin
 }
 
 type HostCertificateRequest = {
-	public_key: Key
+	public_key: PublicKey
 	lifetime: number
 }
 
@@ -327,7 +333,7 @@ export const refineHostCertificateRequest = async (env: SshCaBindings, val: Pars
 
 	try {
 		// check proof of possession fingerprint matches public key
-		l.debug("checking val.proof.matches()", "public_key", val.public_key.toString("ssh"))
+		l.debug("checking val.proof.matches()", "public_key", val.public_key.toString())
 		if (!val.proof.matches(val.public_key)) {
 			l.warn("proof of possession fingerprint did not match public_key")
 			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
@@ -351,7 +357,7 @@ export const refineHostCertificateRequest = async (env: SshCaBindings, val: Pars
 }
 
 type ParsedHostCertificateRenewal = {
-	certificate: Certificate
+	certificate: SshCertificate
 	proof: RenewalProofOfPossession
 } & HostCertificateRequest
 
@@ -360,13 +366,13 @@ export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked
 	try {
 		// ensure certificate is signed by CA
 		const issuer = await getPublic(env)
-		if (!val.certificate.isSignedByKey(issuer)) {
+		if (!await val.certificate.isSignedBy(issuer)) {
 			return fatalIssue(ctx, "the provided certificate was not signed by this CA", val)
 		}
 
 		// only host certificates can be renewed, as renewal does not need the
 		// OIDC authentication a user certificate is issued with
-		if (val.certificate.subjects.length === 0 || !val.certificate.subjects.every((s) => s.type === "host")) {
+		if (val.certificate.kind !== "host") {
 			return fatalIssue(ctx, "the provided certificate is not a host certificate", val)
 		}
 
@@ -374,21 +380,20 @@ export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked
 		// skew at the start as a certificate issued moments ago may have a
 		// validity start up to a second in the future
 		const now = Date.now()
-		if (now >= val.certificate.validUntil.getTime()) {
+		if (now >= val.certificate.validBefore.getTime()) {
 			return fatalIssue(ctx, "the provided certificate is expired", val)
 		}
-		if (val.certificate.validFrom.getTime() > now + ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
+		if (val.certificate.validAfter.getTime() > now + ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
 			return fatalIssue(ctx, "the provided certificate is not yet valid", val)
 		}
 
 		// ensure certificate presented for renewal is not revoked
-		const serial = val.certificate.serial.readBigUInt64BE(0)
-		if (await isRevoked(env, serial)) {
+		if (await isRevoked(env, val.certificate.serial)) {
 			return fatalIssue(ctx, "the provided certificate is revoked", val)
 		}
 
 		// check proof of possession fingerprint matches public key and certificate subject key
-		if (!val.proof.matches(val.public_key, val.certificate.subjectKey)) {
+		if (!val.proof.matches(val.public_key, val.certificate.publicKey)) {
 			return fatalIssue(ctx, "proof of possession fingerprints did not match public_key and/or certificate", val)
 		}
 
@@ -412,7 +417,7 @@ export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked
 
 type ParsedRevokeCertificate = {
 	serial: bigint
-	public_key: Key
+	public_key: PublicKey
 	proof: ProofOfPossession
 }
 
@@ -448,50 +453,28 @@ export const split = (v?: string | string[]): string[] => {
 }
 
 /**
- * Thrown by {@link getPrivateKey} when the CA private key is of a type that
- * cannot be used.
- */
-export class UnsupportedKeyError extends Error {
-	constructor(message: string) {
-		super(message)
-		this.name = "UnsupportedKeyError"
-
-		Object.setPrototypeOf(this, UnsupportedKeyError.prototype)
-	}
-}
-
-/**
  * Load and parse the CA private key from the `PRIVATE_KEY` secret.
  *
  * Only Ed25519 and ECDSA keys are supported, as these are the key types that
  * certificates and KRLs are signed with (see `createSigner` in `ssh/signer.ts`).
  *
- * @throws KeyParseError when the secret cannot be parsed.
+ * @throws {@link KeyParseError} when the secret cannot be parsed.
  * @throws {@link UnsupportedKeyError} when the key is not Ed25519 or ECDSA.
  */
 export const getPrivateKey = async (env: SshCaBindings): Promise<PrivateKey> => {
 	// grab private key from secret store
 	const secret = await env.PRIVATE_KEY.get()
 
-	// parse it
-	const key = parsePrivateKey(secret)
-
-	if (key.type !== "ed25519" && key.type !== "ecdsa") {
-		throw new UnsupportedKeyError(`CA key type ${key.type} is not supported, the CA key must be Ed25519 or ECDSA`)
-	}
-
-	return key
+	return parsePrivateKey(secret)
 }
 
-export const getPublic = async (env: SshCaBindings, key?: PrivateKey): Promise<Key> => {
+/**
+ * Returns the public key of the CA, with `ISSUER_DN` as its comment
+ */
+export const getPublic = async (env: SshCaBindings, key?: PrivateKey): Promise<PublicKey> => {
 	if (key === undefined) {
 		key = await getPrivateKey(env)
 	}
 
-	// convert to a public key and add comment
-	const pub = key.toPublic()
-	pub.comment = env.ISSUER_DN
-
-	// return in ssh format trimmed of any whitespace
-	return pub
+	return key.publicKey.withComment(env.ISSUER_DN)
 }
