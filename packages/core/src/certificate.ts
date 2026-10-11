@@ -1,6 +1,6 @@
 import { seconds } from "itty-time"
 import sshpk from "sshpk"
-import type { Certificate, Identity, Key, PrivateKey } from "sshpk"
+import type { Certificate, Identity, Key, PrivateKey, Signature } from "sshpk"
 import { SSHExtension } from "./types.js"
 import { getPrivateKey, split } from "./utils.js"
 import type { SshCaBindings } from "./types.js"
@@ -30,6 +30,66 @@ export class CertificateError extends Error {
 		// This is necessary for proper stack trace in TypeScript
 		Object.setPrototypeOf(this, CertificateError.prototype)
 	}
+}
+
+/**
+ * Encodes bytes as an SSH string (a uint32 length followed by the bytes)
+ */
+const sshString = (bytes: Buffer): Buffer => {
+	const length = Buffer.alloc(4)
+	length.writeUInt32BE(bytes.length)
+
+	return Buffer.concat([length, bytes])
+}
+
+/**
+ * Encodes a big-endian unsigned integer as an SSH mpint, which has no leading
+ * zero bytes other than one to keep the value positive if the high bit is set
+ */
+const sshMpint = (bytes: Buffer): Buffer => {
+	let start = 0
+	while (start < bytes.length && bytes[start] === 0) {
+		start++
+	}
+	const trimmed = bytes.subarray(start)
+
+	return sshString(trimmed.length > 0 && trimmed[0]! & 0x80 ? Buffer.concat([Buffer.from([0]), trimmed]) : trimmed)
+}
+
+/**
+ * Ensures the ECDSA signature on a certificate is written with the curve of
+ * the CA key.
+ *
+ * sshpk works out the curve of an ECDSA signature from the length of its r
+ * value, so when r has leading zero bytes (about 1 in 256 signatures for
+ * nistp256 and nistp384, and about 1 in 2 for nistp521) the signature is
+ * written as "ecdsa-sha2-undefined" and the certificate is rejected by
+ * OpenSSH. This replaces the SSH encoding of the signature with one that uses
+ * the curve of the key that made it.
+ *
+ * This must be called each time the certificate is signed, as signing
+ * replaces the signature.
+ *
+ * @param certificate The signed certificate
+ * @param key The CA key the certificate was signed with
+ */
+export const encodeEcdsaSignature = (certificate: Certificate, key: PrivateKey): void => {
+	const signature: Signature | undefined = certificate.signatures.openssh?.signature
+	if (key.type !== "ecdsa" || signature === undefined) {
+		return
+	}
+
+	if (key.curve === undefined) {
+		throw new CertificateError("ECDSA CA key has no curve")
+	}
+
+	const toBuffer = signature.toBuffer.bind(signature)
+	const ssh = Buffer.concat([
+		sshString(Buffer.from(`ecdsa-sha2-${key.curve}`)),
+		sshString(Buffer.concat([sshMpint(signature.part.r.data), sshMpint(signature.part.s.data)])),
+	])
+
+	signature.toBuffer = (format) => format === "ssh" ? Buffer.from(ssh) : toBuffer(format)
 }
 
 export type GenerateCertificateOptions = {
@@ -137,6 +197,7 @@ export const generateCertificate = (env: SshCaBindings, email: string, key: Priv
 
 	// re-sign after changes
 	certificate.signWith(key)
+	encodeEcdsaSignature(certificate, key)
 
 	return certificate
 }
@@ -207,6 +268,7 @@ export async function createSignedHostCertificate(env: SshCaBindings, public_key
 
 	// create certificate
 	const certificate = createCertificate(identity, public_key, issuer, key, { lifetime: lifetime, serial: serial })
+	encodeEcdsaSignature(certificate, key)
 
 	return certificate
 }
