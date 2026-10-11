@@ -122,6 +122,31 @@ describe("running on Node.js with node:sqlite", () => {
 		expect(krl).toEqual(Buffer.from(expected))
 	})
 
+	it("should revoke a certificate when the public key has a different comment", async () => {
+		const key = ecdsaKey.user()
+		const serial = await requestUserCertificate(ca, key)
+		const [type, data] = key.toPublic().toString("ssh").split(" ")
+
+		const response = await post(ca, "/api/v3/user/revoke", {
+			serial: `${serial}`,
+			public_key: Buffer.from(`${type} ${data} another-comment`).toString("base64"),
+			proof: generateProof(key),
+		})
+		expect(response.status).toBe(200)
+	})
+
+	it("should not revoke a certificate issued for another key", async () => {
+		const serial = await requestUserCertificate(ca, ecdsaKey.user())
+		const other = ecdsaKey.host()
+
+		const response = await post(ca, "/api/v3/user/revoke", {
+			serial: `${serial}`,
+			public_key: publicKey(other),
+			proof: generateProof(other),
+		})
+		expect(response.status).toBe(404)
+	})
+
 	it("should revoke a host certificate and include it in the host KRL", async () => {
 		const key = ecdsaKey.host()
 		const issued = await post(ca, "/api/v3/host/certificate", {

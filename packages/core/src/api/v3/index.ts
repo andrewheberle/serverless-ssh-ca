@@ -380,14 +380,11 @@ const RevokeCertificateEndpoint = (env: SshCaBindings, certificateType: Certific
 			)
 
 			// ensure certificate can be revoked
-			const status = await revocationStatus(c.env, data.body.serial, data.body.public_key.toString("ssh"), certificateType)
+			const status = await revocationStatus(c.env, data.body.serial, data.body.public_key, certificateType)
 			switch (status) {
 				case RevocationStatus.Revoked:
 					l.warn("certificate is already revoked")
 					throw new ConflictException("certificate is already revoked")
-				case RevocationStatus.Unrevokable:
-					l.warn("cannot revoke this certificate")
-					throw new ForbiddenException("cannot revoke this certificate")
 				case RevocationStatus.NotFound:
 					l.warn("certificate not found")
 					throw new NotFoundException("certificate not found")

@@ -1,4 +1,5 @@
-import type { Certificate, Format, Identity } from "sshpk"
+import sshpk from "sshpk"
+import type { Certificate, Format, Identity, Key } from "sshpk"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { D1QB } from "workers-qb"
@@ -6,6 +7,9 @@ import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
 import { CertificateType, type CertificateRecord, type DatabaseSchema, type KrlRecord } from "./types.js"
+
+// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
+const { parseKey } = sshpk
 
 const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 	const l = logger(env)
@@ -95,21 +99,34 @@ export enum RevocationStatus {
 	NotFound,
 	Revoked,
 	Revokable,
-	Unrevokable
 }
 
-export const revocationStatus = async (env: SshCaBindings, serial: bigint, publickey: string, certificateType: CertificateType): Promise<RevocationStatus> => {
+/**
+ * Returns whether a certificate can be revoked by the holder of a public key.
+ *
+ * The public key is compared by fingerprint, so a key with a different
+ * comment to the one the certificate was issued for still matches.
+ *
+ * @param env The CA bindings
+ * @param serial The serial of the certificate
+ * @param publicKey The public key the requester has proven possession of
+ * @param certificateType The type of certificate
+ * @returns The revocation status of the certificate
+ */
+export const revocationStatus = async (env: SshCaBindings, serial: bigint, publicKey: Key, certificateType: CertificateType): Promise<RevocationStatus> => {
 	const qb = await connect(env)
 	const res = await qb.fetchOne({
 		tableName: "certificates",
 		fields: ["public_key", "revoked_at"],
 		where: {
-			conditions: "serial = ? AND public_key = ? AND certificate_type = ?",
-			params: [`${serial}`, publickey, certificateType]
+			conditions: "serial = ? AND certificate_type = ?",
+			params: [`${serial}`, certificateType]
 		}
 	}).execute()
 
-	if (res.results === undefined) {
+	// a certificate issued for another key is reported as not found, so
+	// requests cannot be used to discover which serials exist
+	if (res.results?.public_key == null || !publicKey.fingerprint("sha256").matches(parseKey(res.results.public_key, "ssh"))) {
 		return RevocationStatus.NotFound
 	}
 
@@ -117,11 +134,7 @@ export const revocationStatus = async (env: SshCaBindings, serial: bigint, publi
 		return RevocationStatus.Revoked
 	}
 
-	if (publickey === res.results.public_key) {
-		return RevocationStatus.Revokable
-	}
-
-	return RevocationStatus.Unrevokable
+	return RevocationStatus.Revokable
 }
 
 export const getRevocationList = async (env: SshCaBindings, certificateType: CertificateType): Promise<string[]> => {
