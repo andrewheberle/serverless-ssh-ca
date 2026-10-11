@@ -70,3 +70,7 @@ Prefer the scripts in `package.json` over invoking tools directly.
   - `packages/core/openapi.json` is committed and published in the npm package; the client generates its bindings from it. CI fails if it doesn't match `npm run schema`, so commit the regenerated file with any change that affects it.
 - Keep changes scoped to the task. No drive-by refactors or renames.
 - Do not change any of the OpenAPI surface as this could break clients.
+  - The client end-to-end tests (`.github/workflows/client-e2e.yml`) run oasdiff to compare `packages/core/openapi.json` against the schema committed in the client's `main` and in its latest release, and fail on any breaking change.
+  - When a breaking schema change has been approved (for example one that is compatible on the wire, or that the client is being updated for), list the oasdiff errors to accept in `packages/core/.oasdiff-err-ignore` in the same PR, one per line as `METHOD /path <error message>` (eg `GET /api/v3/{certificateType}/krl api path removed without deprecation`). This keeps the acknowledgement visible in review.
+  - Only add entries for the specific approved change. Never use the file to silence an unapproved break.
+  - Entries are temporary: remove them once a client release includes the updated schema, and delete the file when it is empty. The file is optional and is not published to npm.
