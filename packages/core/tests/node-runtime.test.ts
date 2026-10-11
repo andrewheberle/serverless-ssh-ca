@@ -147,6 +147,39 @@ describe("running on Node.js with node:sqlite", () => {
 		expect(response.status).toBe(404)
 	})
 
+	it("should renew a host certificate", async () => {
+		const key = ecdsaKey.host()
+		const issued = await post(ca, "/api/v3/host/certificate", {
+			public_key: publicKey(key),
+			proof: generateProof(key),
+			identity: await getIdentityToken(claims),
+			principals: ["renewed_host"],
+		}, await getAccessToken(claims))
+		expect(issued.status).toBe(200)
+		const { certificate } = CertificateResponse.parse(await issued.json())
+
+		const response = await post(ca, "/api/v3/host/renew", { certificate, public_key: publicKey(key), proof: generateProof(key) })
+		expect(response.status).toBe(200)
+		const renewed = sshpk.parseCertificate(Buffer.from(CertificateResponse.parse(await response.json()).certificate, "base64"), "openssh")
+		expect(renewed.subjects.map((s) => s.toString())).toEqual(["CN=renewed_host"])
+	})
+
+	it("should not renew a user certificate", async () => {
+		const key = ecdsaKey.user()
+		const issued = await post(ca, "/api/v3/user/certificate", {
+			public_key: publicKey(key),
+			proof: generateProof(key),
+			identity: await getIdentityToken(claims),
+		}, await getAccessToken(claims))
+		expect(issued.status).toBe(200)
+		const { certificate } = CertificateResponse.parse(await issued.json())
+
+		// renewal does not need OIDC authentication, so must not extend a user certificate
+		const response = await post(ca, "/api/v3/host/renew", { certificate, public_key: publicKey(key), proof: generateProof(key) })
+		expect(response.status).toBe(400)
+		expect(JSON.stringify(await response.json())).toContain("the provided certificate is not a host certificate")
+	})
+
 	it("should revoke a host certificate and include it in the host KRL", async () => {
 		const key = ecdsaKey.host()
 		const issued = await post(ca, "/api/v3/host/certificate", {
