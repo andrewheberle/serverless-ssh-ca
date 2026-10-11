@@ -45,6 +45,7 @@ import {
 	createHostCertificateRequestEndpointSchema,
 	createHostCertificateRenewEndpointSchema,
 	createRevokeCertificateEndpointSchema,
+	certificateTypeName,
 } from "./schema.js"
 import { logger } from "../../logger.js"
 import type { SshCaBindings } from "../../types.js"
@@ -157,21 +158,17 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 	}
 }
 
-const RevocationListEndpoint = (env: SshCaBindings) => {
+const RevocationListEndpoint = (env: SshCaBindings, certificateType: CertificateType) => {
 	return class extends OpenAPIRoute {
-		override schema = createRevocationListEndpointSchema()
+		override schema = createRevocationListEndpointSchema(certificateType)
 
 		override async handle(c: AppContext) {
-			const data = await this.getValidatedData<typeof this.schema>()
-
 			const l = logger(env).with(
 				...group("request",
-					"type", data.params.certificateType,
+					"type", certificateTypeName(certificateType),
 					"action", "krl",
 				),
 			)
-
-			const certificateType = data.params.certificateType === "user" ? CertificateType.User : CertificateType.Host
 
 			try {
 				// get revoked serials
@@ -371,21 +368,19 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 	}
 }
 
-const RevokeCertificateEndpoint = (env: SshCaBindings) => {
+const RevokeCertificateEndpoint = (env: SshCaBindings, certificateType: CertificateType) => {
 	return class extends OpenAPIRoute {
-		override schema = createRevokeCertificateEndpointSchema(env)
+		override schema = createRevokeCertificateEndpointSchema(env, certificateType)
 
 		override async handle(c: AppContext) {
 			const data = await this.getValidatedData<typeof this.schema>()
 
 			const l = logger(env).with(
-				...group("request", "type", data.params.certificateType, "action", "revoke", "serial", data.body.serial),
+				...group("request", "type", certificateTypeName(certificateType), "action", "revoke", "serial", data.body.serial),
 			)
 
-			const certificatetype = data.params.certificateType === "user" ? CertificateType.User : CertificateType.Host
-
 			// ensure certificate can be revoked
-			const status = await revocationStatus(c.env, data.body.serial, data.body.public_key.toString("ssh"), certificatetype)
+			const status = await revocationStatus(c.env, data.body.serial, data.body.public_key.toString("ssh"), certificateType)
 			switch (status) {
 				case RevocationStatus.Revoked:
 					l.warn("certificate is already revoked")
@@ -434,10 +429,12 @@ export const createApi = (env: SshCaBindings) => {
 
 	api.get("/ca", CaPublicKeyEndpoint(env))
 	api.post("/user/certificate", UserCertificateRequestEndpoint(env))
-	api.get("/:certificateType/krl", RevocationListEndpoint(env))
+	api.get("/user/krl", RevocationListEndpoint(env, CertificateType.User))
+	api.post("/user/revoke", RevokeCertificateEndpoint(env, CertificateType.User))
 	api.post("/host/certificate", HostCertificateRequestEndpoint(env))
 	api.post("/host/renew", HostCertificateRenewEndpoint(env))
-	api.post("/:certificateType/revoke", RevokeCertificateEndpoint(env))
+	api.get("/host/krl", RevocationListEndpoint(env, CertificateType.Host))
+	api.post("/host/revoke", RevokeCertificateEndpoint(env, CertificateType.Host))
 
 	return api
 }

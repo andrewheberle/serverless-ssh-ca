@@ -24,6 +24,43 @@ import {
 } from "chanfana"
 import { seconds } from "itty-time"
 import { isRevoked } from "../../db/index.js"
+import { CertificateType } from "../../db/types.js"
+
+/**
+ * Returns the name of a {@link CertificateType} as used in API paths and logs
+ * @param certificateType The type of certificate
+ * @returns "user" or "host"
+ */
+export const certificateTypeName = (certificateType: CertificateType): "user" | "host" => {
+	switch (certificateType) {
+		case CertificateType.User:
+			return "user"
+		case CertificateType.Host:
+			return "host"
+		default: {
+			const unknownType: never = certificateType
+			throw new Error(`unknown certificate type: ${String(unknownType)}`)
+		}
+	}
+}
+
+/**
+ * Returns the OpenAPI tag that groups the endpoints for a {@link CertificateType}
+ * @param certificateType The type of certificate
+ * @returns "User" or "Host"
+ */
+const certificateTypeTag = (certificateType: CertificateType): "User" | "Host" => {
+	switch (certificateType) {
+		case CertificateType.User:
+			return "User"
+		case CertificateType.Host:
+			return "Host"
+		default: {
+			const unknownType: never = certificateType
+			throw new Error(`unknown certificate type: ${String(unknownType)}`)
+		}
+	}
+}
 
 const openapiStringByte = z.base64()
 	.transform((v) => {
@@ -80,6 +117,7 @@ const certificate = openapiStringByte
 	.meta({ description: "Issued Certificate" })
 
 export const CaPublicKeyEndpointSchema = {
+	tags: ["CA"],
 	responses: {
 		"200": {
 			content: {
@@ -113,6 +151,7 @@ export const userCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 )
 
 export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
+	tags: [certificateTypeTag(CertificateType.User)],
 	security: [{ oidcAuth: [] }],
 	request: {
 		headers: createHeaderSchema(env),
@@ -135,15 +174,12 @@ export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) =
 	}
 })
 
-export const createRevocationListEndpointSchema = () => ({
-	request: {
-		params: z.object({
-			certificateType: z.enum(["user", "host"])
-		}),
-	},
+export const createRevocationListEndpointSchema = (certificateType: CertificateType) => ({
+	tags: [certificateTypeTag(certificateType)],
+	summary: `Get the Key Revocation List for ${certificateTypeName(certificateType)} certificates`,
 	responses: {
 		"200": {
-			description: "Returns an Open SSH Key Revocation List as BASE64 and an SSHSIG signature for verification",
+			description: `Returns an Open SSH Key Revocation List of revoked ${certificateTypeName(certificateType)} certificates as BASE64 and an SSHSIG signature for verification`,
 			...contentJson(z.object({
 				krl: krl,
 				signature: z.string()
@@ -174,6 +210,7 @@ export const hostCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 )
 
 export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
+	tags: [certificateTypeTag(CertificateType.Host)],
 	security: [{ oidcAuth: [] }],
 	request: {
 		headers: createHeaderSchema(env),
@@ -215,6 +252,7 @@ export const hostCertificateRenewEndpointBodySchema = (env: SshCaBindings) => (
 )
 
 export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => ({
+	tags: [certificateTypeTag(CertificateType.Host)],
 	request: {
 		body: contentJson(hostCertificateRenewEndpointBodySchema(env))
 	},
@@ -252,16 +290,15 @@ export const revokeCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.superRefine((val, ctx) => refineRevokeCertificate(env, val, ctx))
 )
 
-export const createRevokeCertificateEndpointSchema = (env: SshCaBindings) => ({
+export const createRevokeCertificateEndpointSchema = (env: SshCaBindings, certificateType: CertificateType) => ({
+	tags: [certificateTypeTag(certificateType)],
+	summary: `Revoke a ${certificateTypeName(certificateType)} certificate`,
 	request: {
-		params: z.object({
-			certificateType: z.enum(["user", "host"])
-		}),
 		body: contentJson(revokeCertificateEndpointBodySchema(env))
 	},
 	responses: {
 		"200": {
-			description: "SSH certificate revoked successfully",
+			description: `SSH ${certificateTypeName(certificateType)} certificate revoked successfully`,
 			...contentJson(z.object({
 				revoked_at: z.iso.datetime(),
 			})
