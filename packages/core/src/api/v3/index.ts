@@ -30,6 +30,7 @@ import {
 import sshpk from "sshpk"
 import {
 	CertificateType,
+	getKrlVersion,
 	getRevocationList,
 	recordCertificate,
 	RevocationStatus,
@@ -183,7 +184,10 @@ const RevocationListEndpoint = (env: SshCaBindings) => {
 				const krl = new KRLBuilder(key)
 					.addSerials(serials)
 
-				const krlBytes = krl.generate()
+				// the version only changes when the content of the KRL does
+				const version = await getKrlVersion(c.env, certificateType, await krl.digest())
+
+				const krlBytes = krl.generate(version)
 
 				// convert to base64
 				const bytes = new Uint8Array(krlBytes)

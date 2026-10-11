@@ -7,6 +7,12 @@ import { key as ed25519Key } from "./keys/ed25519.js"
 
 const namespace = "krl@com.github.serverless-ssh-ca.andrewheberle"
 
+// the version and generated date from a KRL header, after the magic and format version
+const header = (krl: ArrayBuffer): { version: bigint, generatedDate: bigint } => {
+	const view = new DataView(krl)
+	return { version: view.getBigUint64(12, false), generatedDate: view.getBigUint64(20, false) }
+}
+
 const signAndVerify = async (caKey: PrivateKey): Promise<boolean> => {
 	const krl = new KRLBuilder(caKey).addSerials([1n, 2n])
 	const bytes = new Uint8Array(krl.generate())
@@ -101,5 +107,51 @@ describe("KRLBuilder signature", () => {
 		const seed = ed25519Key.leadingZeroCa().parts.find((p) => p.name === "k")?.data
 		expect(seed?.[0]).toBe(0x00)
 		expect(seed?.[1]).toBeLessThan(0x80)
+	})
+})
+
+describe("KRLBuilder generate", () => {
+	it("should default to version 1", () => {
+		expect(header(new KRLBuilder(ecdsaKey.ca()).generate()).version).toBe(1n)
+	})
+
+	it("should set the version and generated date in the header", () => {
+		const before = BigInt(Math.floor(Date.now() / 1000))
+		const krl = new KRLBuilder(ecdsaKey.ca()).addSerials([1n]).generate(42n)
+		const after = BigInt(Math.floor(Date.now() / 1000))
+
+		const { version, generatedDate } = header(krl)
+		expect(version).toBe(42n)
+		expect(generatedDate).toBeGreaterThanOrEqual(before)
+		expect(generatedDate).toBeLessThanOrEqual(after)
+	})
+})
+
+describe("KRLBuilder digest", () => {
+	it("should not depend on the order serials and key IDs are added in", async () => {
+		const a = new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n, 3n]).addKeyIds(["a", "b"])
+		const b = new KRLBuilder(ecdsaKey.ca()).addSerials([3n]).addKeyIds(["b", "a"]).addSerials([2n, 1n])
+
+		expect(await a.digest()).toBe(await b.digest())
+	})
+
+	it("should not change once the KRL is generated", async () => {
+		const krl = new KRLBuilder(ecdsaKey.ca()).addSerials([1n])
+		const digest = await krl.digest()
+		krl.generate(5n)
+
+		expect(await krl.digest()).toBe(digest)
+	})
+
+	it.each([
+		["a serial is added", new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n, 3n])],
+		["a serial is removed", new KRLBuilder(ecdsaKey.ca()).addSerials([1n])],
+		["a serial is changed", new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 4n])],
+		["a key ID is added", new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n]).addKeyIds(["a"])],
+		["the CA is changed", new KRLBuilder(ed25519Key.ca()).addSerials([1n, 2n])],
+	] as [string, KRLBuilder][])("should change when %s", async (_, krl) => {
+		const base = new KRLBuilder(ecdsaKey.ca()).addSerials([1n, 2n])
+
+		expect(await krl.digest()).not.toBe(await base.digest())
 	})
 })

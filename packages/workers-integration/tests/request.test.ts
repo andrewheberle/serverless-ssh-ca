@@ -11,6 +11,15 @@ import { privateKeyString } from "./keys/ecdsa"
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>
 
+// fetch a KRL and return the version from its header
+const krlVersion = async (type: "user" | "host"): Promise<bigint> => {
+	const response = await exports.default.fetch(`http://example.com/api/v3/${type}/krl`)
+	expect(response.status).toBe(200)
+	const { krl } = await response.json<{ krl: string }>()
+	const bytes = Uint8Array.from(atob(krl), c => c.charCodeAt(0))
+	return new DataView(bytes.buffer).getBigUint64(12, false)
+}
+
 describe("get /404", () => {
 	it("responds with a 404", async () => {
 		const response = await exports.default.fetch("http://example.com/404")
@@ -81,6 +90,13 @@ describe("GET /api/v3/user/krl", () => {
 		// expect 200 ok
 		expect(response.status).toBe(200)
 		expect(response.headers.get("content-type")).toContain("application/json")
+	})
+
+	it("keeps the same version while the KRL is unchanged", async () => {
+		const first = await krlVersion("user")
+
+		expect(first).toBeGreaterThan(1n)
+		expect(await krlVersion("user")).toBe(first)
 	})
 })
 

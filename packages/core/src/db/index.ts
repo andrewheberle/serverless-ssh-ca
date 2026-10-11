@@ -2,6 +2,7 @@ import type { Certificate, Format, Identity } from "sshpk"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { D1QB } from "workers-qb"
+import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
 
@@ -191,4 +192,73 @@ export const revokeCertificate = async (env: SshCaBindings, serial: bigint): Pro
 	}
 
 	return res.results
+}
+
+// the krl table is not part of DatabaseSchema as workers-qb then fails to infer
+// the result types of queries on the certificates table, so rows are validated here
+const KrlVersionRow = z.object({
+	version: z.number().int().nonnegative(),
+	digest: z.string().nullable(),
+})
+
+// the number of times to retry when another request updates the KRL version concurrently
+const KRL_VERSION_ATTEMPTS = 5
+
+/**
+ * Get the version of the KRL for a certificate type, incrementing it if the
+ * content of the KRL has changed since the version was last returned.
+ *
+ * The version is only ever incremented, so clients can use it to detect a
+ * newer KRL. When several requests see the same change concurrently the
+ * version is incremented once.
+ *
+ * @param env The bindings for the CA, see {@link SshCaBindings}
+ * @param certificateType The type of certificates in the KRL, see {@link CertificateType}
+ * @param digest A digest of the content of the KRL, which changes whenever the content does
+ * @returns The version to use for the KRL
+ */
+export const getKrlVersion = async (env: SshCaBindings, certificateType: CertificateType, digest: string): Promise<bigint> => {
+	const qb = await connect(env)
+
+	for (let attempt = 0; attempt < KRL_VERSION_ATTEMPTS; attempt++) {
+		const res = await qb.fetchOne({
+			tableName: "krl",
+			fields: ["version", "digest"],
+			where: {
+				conditions: "certificate_type = ?",
+				params: certificateType
+			}
+		}).execute()
+
+		const current = KrlVersionRow.parse(res.results)
+		if (current.digest === digest) {
+			return BigInt(current.version)
+		}
+
+		// only update if the version has not been changed by another request
+		const next = current.version + 1
+		const updated = await qb.update({
+			tableName: "krl",
+			data: {
+				version: next,
+				digest: digest,
+				updated_at: (new Date).toISOString()
+			},
+			where: {
+				conditions: "certificate_type = ? AND version = ?",
+				params: [certificateType, current.version]
+			},
+			returning: ["version"]
+		}).execute()
+
+		if (!updated.success) {
+			throw new Error("error during query")
+		}
+
+		if (updated.results !== undefined && updated.results.length > 0) {
+			return BigInt(next)
+		}
+	}
+
+	throw new Error("unable to update KRL version due to concurrent updates")
 }
