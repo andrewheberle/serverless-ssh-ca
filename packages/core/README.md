@@ -239,6 +239,58 @@ sequenceDiagram
     deactivate Client
 ```
 
+## API
+
+The CA serves two versions of its API, which are documented in OpenAPI
+format at `/docs` and in [openapi.json](openapi.json):
+
+| Action                   | v3                              | v4                                              |
+|--------------------------|---------------------------------|-------------------------------------------------|
+| Get the CA public key    | `GET /api/v3/ca`                | `GET /api/v4/ca`                                |
+| Request user certificate | `POST /api/v3/user/certificate` | `POST /api/v4/user/certificates`                |
+| Revoke user certificate  | `POST /api/v3/user/revoke`      | `DELETE /api/v4/user/certificates/{serial}`     |
+| Get user KRL             | `GET /api/v3/user/krl`          | `GET /api/v4/user/krl`                          |
+| Request host certificate | `POST /api/v3/host/certificate` | `POST /api/v4/host/certificates`                |
+| Renew host certificate   | `POST /api/v3/host/renew`       | `POST /api/v4/host/certificates/{serial}/renew` |
+| Revoke host certificate  | `POST /api/v3/host/revoke`      | `DELETE /api/v4/host/certificates/{serial}`     |
+| Get host KRL             | `GET /api/v3/host/krl`          | `GET /api/v4/host/krl`                          |
+
+### Proof of Possession
+
+Requests that use an SSH key prove possession of its private key by including
+a proof of the form `${timestamp}.${fingerprint}.${signature}`, where
+`timestamp` is the time in milliseconds since the Unix epoch, `fingerprint` is
+the SHA256 fingerprint of the public key (for example
+`SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs`) and `signature` is the
+BASE64 encoded armored SSHSIG signature (as produced by `ssh-keygen -Y sign`)
+of the signed data. The proof is rejected if the timestamp is outside of
+`CERTIFICATE_REQUEST_TIME_SKEW_MAX` of the time on the CA.
+
+In v3 the proof is sent as the `proof` property of the request body and the
+signed data is `${timestamp}.${fingerprint}` using the
+`proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace.
+As this does not say which request the proof is for, a proof captured from one
+request may be replayed against another endpoint while it is valid.
+
+In v4 the proof is sent in the `Proof-Of-Possession` header and is bound to
+the request it is made for. The signed data is
+`${timestamp}.${fingerprint}.${METHOD} ${path}` using the
+`request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle`
+namespace, where `${METHOD} ${path}` is the request as documented in the
+OpenAPI schema with any parameters filled in, for example:
+
+```
+1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.DELETE /api/v4/user/certificates/12345678901234567890
+```
+
+Only `${timestamp}.${fingerprint}.${signature}` is sent, as the CA rebuilds
+the request part from the request it receives. The path does not change if
+the CA is served behind a proxy under another path, and serials in the path
+are written in decimal without leading zeros.
+
+In v4 the public key for a revocation or renewal is taken from the proof and
+the certificate respectively, so it is not sent separately.
+
 ## Configuration
 
 ### CA Private Key

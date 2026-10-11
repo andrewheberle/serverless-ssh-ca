@@ -1,6 +1,7 @@
 import { fromHono } from "chanfana"
 import { Hono, type Context } from "hono"
 import { createApi as apiv3 } from "./api/v3/index.js"
+import { BasePath as v4BasePath, createApi as apiv4 } from "./api/v4/index.js"
 import { HTTPException } from "hono/http-exception"
 import { logger } from "./logger.js"
 import type { SshCaBindings } from "./types.js"
@@ -24,7 +25,7 @@ export const createApp = (env: SshCaBindings) => {
 		schema: {
 			info: {
 				title: "Serverless SSH CA API",
-				version: "3.0.0"
+				version: "4.0.0"
 			},
 		}
 	})
@@ -36,6 +37,7 @@ export const createApp = (env: SshCaBindings) => {
     })
 
     app.route("/api/v3", apiv3(env))
+    app.route(v4BasePath, apiv4(env))
 
     return app
 }

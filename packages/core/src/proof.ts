@@ -10,6 +10,25 @@ const FingerprintFormat = /^SHA256:[A-Za-z0-9+/]{43}$/
 
 export const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 
+/**
+ * The namespace used for proofs of possession that are bound to a request,
+ * kept separate from {@link Namespace} so a proof made for one form can never
+ * be accepted as the other.
+ */
+export const RequestNamespace = "request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
+
+/**
+ * Returns the request a proof of possession is bound to, which is appended to
+ * the signed data as `${timestamp}.${fingerprint}.${binding}`.
+ *
+ * @param method The HTTP method of the request, for example "DELETE"
+ * @param path The path of the request with any parameters filled in, for example "/api/v4/user/certificates/123"
+ * @returns The request binding, for example "DELETE /api/v4/user/certificates/123"
+ */
+export const requestBinding = (method: string, path: string): string => {
+	return `${method.toUpperCase()} ${path}`
+}
+
 export class PossessionParseError extends Error {
 	constructor(message: string, cause?: unknown) {
 		super(message)
@@ -117,6 +136,22 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 	 */
 	async verify(namespace?: string): Promise<boolean> {
 		return await verify(this.signature, this.data, { namespace: namespace || Namespace })
+	}
+
+	/**
+	 * Verifies the proof was made for a specific request, so it cannot be
+	 * replayed against another endpoint or with other path parameters (such
+	 * as a different certificate serial).
+	 *
+	 * The signed data is `${timestamp}.${fingerprint}.${METHOD} ${path}` using
+	 * the {@link RequestNamespace} namespace.
+	 *
+	 * @param method The HTTP method of the request
+	 * @param path The path of the request with any parameters filled in
+	 * @returns true if signature is valid for the request, false otherwise
+	 */
+	async verifyRequest(method: string, path: string): Promise<boolean> {
+		return await verify(this.signature, `${this.data}.${requestBinding(method, path)}`, { namespace: RequestNamespace })
 	}
 
 	/**
