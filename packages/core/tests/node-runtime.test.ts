@@ -122,6 +122,35 @@ describe("running on Node.js with node:sqlite", () => {
 		expect(krl).toEqual(Buffer.from(expected))
 	})
 
+	it("should revoke a host certificate and include it in the host KRL", async () => {
+		const key = ecdsaKey.host()
+		const issued = await post(ca, "/api/v3/host/certificate", {
+			public_key: publicKey(key),
+			proof: generateProof(key),
+			identity: await getIdentityToken(claims),
+			principals: ["revoked_host"],
+		}, await getAccessToken(claims))
+		expect(issued.status).toBe(200)
+		const { certificate } = CertificateResponse.parse(await issued.json())
+		const serial = sshpk.parseCertificate(Buffer.from(certificate, "base64"), "openssh").serial.readBigUInt64BE(0)
+		const revoke = () => ({ serial: `${serial}`, public_key: publicKey(key), proof: generateProof(key) })
+
+		// a host certificate cannot be revoked through the user endpoint
+		expect((await post(ca, "/api/v3/user/revoke", revoke())).status).toBe(404)
+
+		const response = await post(ca, "/api/v3/host/revoke", revoke())
+		expect(response.status).toBe(200)
+		expect(await response.json()).toEqual({ revoked_at: expect.any(String) })
+
+		const { krl, version } = await getKrl(ca, "host")
+		expect(krl).toEqual(Buffer.from(new KRLBuilder(ecdsaKey.ca()).addSerials([serial]).generate(version)))
+	})
+
+	it("should not serve endpoints for an unknown certificate type", async () => {
+		expect((await ca.fetch(new Request("http://example.com/api/v3/other/krl"))).status).toBe(404)
+		expect((await post(ca, "/api/v3/other/revoke", {})).status).toBe(404)
+	})
+
 	it("should increment the KRL version only when a certificate is revoked", async () => {
 		const { version } = await getKrl(ca)
 		expect((await getKrl(ca)).version).toBe(version)

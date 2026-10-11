@@ -90,6 +90,45 @@
           "signature"
         ]
       },
+      "Revocation Response": {
+        "type": "object",
+        "properties": {
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "revoked_at"
+        ]
+      },
+      "Certificate Revocation": {
+        "type": "object",
+        "properties": {
+          "serial": {
+            "type": "string",
+            "pattern": "^\\d+$",
+            "description": "Serial number of certificate to revoke",
+            "example": "12345678901234567890"
+          },
+          "public_key": {
+            "type": "string",
+            "format": "byte",
+            "description": "SSH public key to sign",
+            "example": "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
+          },
+          "proof": {
+            "type": "string",
+            "description": "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}",
+            "example": "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFHZ0FBQUFUWldOa2MyRXRjMmhoTWkxdWFYTjBjREkxTmdBQUFBaHVhWE4wY0RJMQpOZ0FBQUVFRUR6Ymk4OE10alBYSDFCb1JURU9HaS96aEc4QnhQNVZUUW5OQkFNMGZtMExtekErUUZkUlNVYVRFCkdNN2l0QjhINmZNZFAydlAxcElQcGUyOWVLQkJZd0FBQUFSbWFXeGxBQUFBQUFBQUFBWnphR0UxTVRJQUFBQmsKQUFBQUUyVmpaSE5oTFhOb1lUSXRibWx6ZEhBeU5UWUFBQUJKQUFBQUlHdmZVZGNDQkRXa3ZwL0ZHS3NkakgrRQpKZzZXN0EvWUJVZng2Z0srQ01raEFBQUFJUUQxOFd5cDNZejZ0eXNvdllXbEJHTXprRnlYbFRrSHM5blVVRXJqCkczNWVPQT09Ci0tLS0tRU5EIFNTSCBTSUdOQVRVUkUtLS0tLQo="
+          }
+        },
+        "required": [
+          "serial",
+          "public_key",
+          "proof"
+        ]
+      },
       "Host Certificate Request": {
         "type": "object",
         "properties": {
@@ -164,45 +203,6 @@
           "public_key",
           "proof"
         ]
-      },
-      "Revocation Response": {
-        "type": "object",
-        "properties": {
-          "revoked_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "revoked_at"
-        ]
-      },
-      "Certificate Revocation": {
-        "type": "object",
-        "properties": {
-          "serial": {
-            "type": "string",
-            "pattern": "^\\d+$",
-            "description": "Serial number of certificate to revoke",
-            "example": "12345678901234567890"
-          },
-          "public_key": {
-            "type": "string",
-            "format": "byte",
-            "description": "SSH public key to sign",
-            "example": "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
-          },
-          "proof": {
-            "type": "string",
-            "description": "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}",
-            "example": "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFHZ0FBQUFUWldOa2MyRXRjMmhoTWkxdWFYTjBjREkxTmdBQUFBaHVhWE4wY0RJMQpOZ0FBQUVFRUR6Ymk4OE10alBYSDFCb1JURU9HaS96aEc4QnhQNVZUUW5OQkFNMGZtMExtekErUUZkUlNVYVRFCkdNN2l0QjhINmZNZFAydlAxcElQcGUyOWVLQkJZd0FBQUFSbWFXeGxBQUFBQUFBQUFBWnphR0UxTVRJQUFBQmsKQUFBQUUyVmpaSE5oTFhOb1lUSXRibWx6ZEhBeU5UWUFBQUJKQUFBQUlHdmZVZGNDQkRXa3ZwL0ZHS3NkakgrRQpKZzZXN0EvWUJVZng2Z0srQ01raEFBQUFJUUQxOFd5cDNZejZ0eXNvdllXbEJHTXprRnlYbFRrSHM5blVVRXJqCkczNWVPQT09Ci0tLS0tRU5EIFNTSCBTSUdOQVRVUkUtLS0tLQo="
-          }
-        },
-        "required": [
-          "serial",
-          "public_key",
-          "proof"
-        ]
       }
     },
     "parameters": {}
@@ -210,6 +210,9 @@
   "paths": {
     "/api/v3/ca": {
       "get": {
+        "tags": [
+          "CA"
+        ],
         "operationId": "get_ca",
         "responses": {
           "200": {
@@ -267,6 +270,9 @@
     },
     "/api/v3/user/certificate": {
       "post": {
+        "tags": [
+          "User"
+        ],
         "security": [
           {
             "oidcAuth": []
@@ -523,26 +529,16 @@
         }
       }
     },
-    "/api/v3/{certificateType}/krl": {
+    "/api/v3/user/krl": {
       "get": {
-        "operationId": "get_certificateType_krl",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "user",
-                "host"
-              ]
-            },
-            "required": true,
-            "name": "certificateType",
-            "in": "path"
-          }
+        "tags": [
+          "User"
         ],
+        "summary": "Get the Key Revocation List for user certificates",
+        "operationId": "get_user_krl",
         "responses": {
           "200": {
-            "description": "Returns an Open SSH Key Revocation List as BASE64 and an SSHSIG signature for verification",
+            "description": "Returns an Open SSH Key Revocation List of revoked user certificates as BASE64 and an SSHSIG signature for verification",
             "content": {
               "application/json": {
                 "schema": {
@@ -594,8 +590,295 @@
         }
       }
     },
+    "/api/v3/user/revoke": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Revoke a user certificate",
+        "operationId": "post_user_revoke",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Certificate Revocation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSH user certificate revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Revocation Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v3/host/certificate": {
       "post": {
+        "tags": [
+          "Host"
+        ],
         "security": [
           {
             "oidcAuth": []
@@ -854,6 +1137,9 @@
     },
     "/api/v3/host/renew": {
       "post": {
+        "tags": [
+          "Host"
+        ],
         "operationId": "post_host_renew",
         "requestBody": {
           "content": {
@@ -1092,23 +1378,74 @@
         }
       }
     },
-    "/api/v3/{certificateType}/revoke": {
-      "post": {
-        "operationId": "post_certificateType_revoke",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "user",
-                "host"
-              ]
-            },
-            "required": true,
-            "name": "certificateType",
-            "in": "path"
-          }
+    "/api/v3/host/krl": {
+      "get": {
+        "tags": [
+          "Host"
         ],
+        "summary": "Get the Key Revocation List for host certificates",
+        "operationId": "get_host_krl",
+        "responses": {
+          "200": {
+            "description": "Returns an Open SSH Key Revocation List of revoked host certificates as BASE64 and an SSHSIG signature for verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Key Revocation List Response"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/host/revoke": {
+      "post": {
+        "tags": [
+          "Host"
+        ],
+        "summary": "Revoke a host certificate",
+        "operationId": "post_host_revoke",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1120,7 +1457,7 @@
         },
         "responses": {
           "200": {
-            "description": "SSH certificate revoked successfully",
+            "description": "SSH host certificate revoked successfully",
             "content": {
               "application/json": {
                 "schema": {
