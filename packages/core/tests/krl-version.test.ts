@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { DatabaseSync } from "node:sqlite"
-import { CertificateType, getKrlVersion } from "../src/db/index.js"
+import { getKrlVersion } from "../src/db/index.js"
+import { CertificateType } from "../src/db/types.js"
 import { fromNodeSqlite } from "../src/node/sqlite.js"
 import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"

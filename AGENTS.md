@@ -6,6 +6,7 @@ This repository contains a serverless Certificate Authority (CA) that can be use
 ## Repository layout
 - `packages/core/` - @andrewheberle/serverless-ssh-ca
 - `packages/core/src/` - main package source
+- `packages/core/src/db/types.ts` - database types used by workers-qb to type queries; keep them in sync with the schema whenever a migration or other database change is made
 - `packages/core/scripts/` - helper scripts
 - `packages/core/tests/` - tests for core package
 - `packages/testing/` - @andrewheberle/serverless-ssh-ca-testing; runs the CA under Node.js or workerd for client end-to-end tests. Its command line, configuration file and log format are relied on by the client's end-to-end tests, so keep them compatible and documented in its README.

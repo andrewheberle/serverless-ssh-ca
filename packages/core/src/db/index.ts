@@ -5,36 +5,7 @@ import { D1QB } from "workers-qb"
 import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
-
-export enum CertificateType {
-	User,
-	Host
-}
-
-export type CertificateRecord = {
-	id: number
-	serial: string
-	key_id: string
-	principals: string
-	extensions: string | null
-	valid_after: Date
-	valid_before: Date
-	revoked_at: Date | null
-	certificate_type: CertificateType
-	public_key: string | null
-}
-
-export type KrlRecord = {
-	certificate_type: CertificateType
-	version: number
-	digest: string | null
-	updated_at: Date
-}
-
-export type DatabaseSchema = {
-	certificates: CertificateRecord
-	krl: KrlRecord
-}
+import { CertificateType, type CertificateRecord, type DatabaseSchema, type KrlRecord } from "./types.js"
 
 const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 	const l = logger(env)

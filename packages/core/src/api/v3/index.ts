@@ -28,8 +28,8 @@ import {
 	UnsupportedKeyError,
 } from "../../utils.js"
 import sshpk from "sshpk"
+import { CertificateType } from "../../db/types.js"
 import {
-	CertificateType,
 	getKrlVersion,
 	getRevocationList,
 	recordCertificate,
