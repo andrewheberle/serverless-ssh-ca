@@ -118,6 +118,8 @@ const certificate = openapiStringByte
 
 export const CaPublicKeyEndpointSchema = {
 	tags: ["CA"],
+	summary: "Get the CA public key",
+	description: "Returns the public key of the SSH Certificate Authority in OpenSSH format, for use in `TrustedUserCAKeys` on SSH servers or `@cert-authority` entries in `known_hosts` on SSH clients.",
 	responses: {
 		"200": {
 			content: {
@@ -152,6 +154,8 @@ export const userCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 
 export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
 	tags: [certificateTypeTag(CertificateType.User)],
+	summary: "Request a user certificate",
+	description: "Issues a signed SSH user certificate for the provided public key. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key. Principals on the issued certificate are derived from the identity token.",
 	security: [{ oidcAuth: [] }],
 	request: {
 		headers: createHeaderSchema(env),
@@ -177,6 +181,7 @@ export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) =
 export const createRevocationListEndpointSchema = (certificateType: CertificateType) => ({
 	tags: [certificateTypeTag(certificateType)],
 	summary: `Get the Key Revocation List for ${certificateTypeName(certificateType)} certificates`,
+	description: `Returns the OpenSSH Key Revocation List (KRL) of revoked ${certificateTypeName(certificateType)} certificates issued by this CA, along with an SSHSIG signature made by the CA key so the KRL can be verified before use.`,
 	responses: {
 		"200": {
 			description: `Returns an Open SSH Key Revocation List of revoked ${certificateTypeName(certificateType)} certificates as BASE64 and an SSHSIG signature for verification`,
@@ -211,6 +216,8 @@ export const hostCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 
 export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) => ({
 	tags: [certificateTypeTag(CertificateType.Host)],
+	summary: "Request a host certificate",
+	description: "Issues a signed SSH host certificate for the provided public key and principals. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key. The user must be permitted to request host certificates by email address or role.",
 	security: [{ oidcAuth: [] }],
 	request: {
 		headers: createHeaderSchema(env),
@@ -253,6 +260,8 @@ export const hostCertificateRenewEndpointBodySchema = (env: SshCaBindings) => (
 
 export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => ({
 	tags: [certificateTypeTag(CertificateType.Host)],
+	summary: "Renew a host certificate",
+	description: "Issues a new SSH host certificate with the same principals as an existing, unexpired and unrevoked host certificate issued by this CA. No OIDC authentication is required; instead the public key must match the existing certificate and the proof of possession must be made with its private key. The lifetime of the renewed certificate is no longer than that of the existing certificate.",
 	request: {
 		body: contentJson(hostCertificateRenewEndpointBodySchema(env))
 	},
@@ -293,6 +302,7 @@ export const revokeCertificateEndpointBodySchema = (env: SshCaBindings) => (
 export const createRevokeCertificateEndpointSchema = (env: SshCaBindings, certificateType: CertificateType) => ({
 	tags: [certificateTypeTag(certificateType)],
 	summary: `Revoke a ${certificateTypeName(certificateType)} certificate`,
+	description: `Revokes a ${certificateTypeName(certificateType)} certificate issued by this CA, identified by its serial number, and adds it to the ${certificateTypeName(certificateType)} Key Revocation List. The request must include a proof of possession of the private key for the public key that the certificate was issued for.`,
 	request: {
 		body: contentJson(revokeCertificateEndpointBodySchema(env))
 	},

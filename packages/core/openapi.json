@@ -213,6 +213,8 @@
         "tags": [
           "CA"
         ],
+        "summary": "Get the CA public key",
+        "description": "Returns the public key of the SSH Certificate Authority in OpenSSH format, for use in `TrustedUserCAKeys` on SSH servers or `@cert-authority` entries in `known_hosts` on SSH clients.",
         "operationId": "get_ca",
         "responses": {
           "200": {
@@ -273,6 +275,8 @@
         "tags": [
           "User"
         ],
+        "summary": "Request a user certificate",
+        "description": "Issues a signed SSH user certificate for the provided public key. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key. Principals on the issued certificate are derived from the identity token.",
         "security": [
           {
             "oidcAuth": []
@@ -535,6 +539,7 @@
           "User"
         ],
         "summary": "Get the Key Revocation List for user certificates",
+        "description": "Returns the OpenSSH Key Revocation List (KRL) of revoked user certificates issued by this CA, along with an SSHSIG signature made by the CA key so the KRL can be verified before use.",
         "operationId": "get_user_krl",
         "responses": {
           "200": {
@@ -596,6 +601,7 @@
           "User"
         ],
         "summary": "Revoke a user certificate",
+        "description": "Revokes a user certificate issued by this CA, identified by its serial number, and adds it to the user Key Revocation List. The request must include a proof of possession of the private key for the public key that the certificate was issued for.",
         "operationId": "post_user_revoke",
         "requestBody": {
           "content": {
@@ -879,6 +885,8 @@
         "tags": [
           "Host"
         ],
+        "summary": "Request a host certificate",
+        "description": "Issues a signed SSH host certificate for the provided public key and principals. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key. The user must be permitted to request host certificates by email address or role.",
         "security": [
           {
             "oidcAuth": []
@@ -1140,6 +1148,8 @@
         "tags": [
           "Host"
         ],
+        "summary": "Renew a host certificate",
+        "description": "Issues a new SSH host certificate with the same principals as an existing, unexpired and unrevoked host certificate issued by this CA. No OIDC authentication is required; instead the public key must match the existing certificate and the proof of possession must be made with its private key. The lifetime of the renewed certificate is no longer than that of the existing certificate.",
         "operationId": "post_host_renew",
         "requestBody": {
           "content": {
@@ -1384,6 +1394,7 @@
           "Host"
         ],
         "summary": "Get the Key Revocation List for host certificates",
+        "description": "Returns the OpenSSH Key Revocation List (KRL) of revoked host certificates issued by this CA, along with an SSHSIG signature made by the CA key so the KRL can be verified before use.",
         "operationId": "get_host_krl",
         "responses": {
           "200": {
@@ -1445,6 +1456,7 @@
           "Host"
         ],
         "summary": "Revoke a host certificate",
+        "description": "Revokes a host certificate issued by this CA, identified by its serial number, and adds it to the host Key Revocation List. The request must include a proof of possession of the private key for the public key that the certificate was issued for.",
         "operationId": "post_host_revoke",
         "requestBody": {
           "content": {

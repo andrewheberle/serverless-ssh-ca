@@ -99,23 +99,23 @@ export interface CaSecret {
  * {@link CaSecret} for the non-string bindings.
  */
 export interface SshCaBindings {
-    DB: CaDatabase
-    DB_CERTIFICATE_RETENTION: string
-    PRIVATE_KEY: CaSecret
-    SSH_CERTIFICATE_EXTENSIONS: string
-    SSH_CERTIFICATE_LIFETIME: string
-    SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean
-    SSH_CERTIFICATE_INCLUDE_SELF_EMAIL?: string | boolean
-    SSH_CERTIFICATE_PRINCIPALS?: string | string[]
-    SSH_HOST_CERTIFICATE_LIFETIME: string
-    SSH_HOST_CERTIFICATE_ALLOWED_EMAILS?: string | string[]
-    SSH_HOST_CERTIFICATE_ALLOWED_ROLES?: string | string[]
-    ISSUER_DN: string
-	JWT_JWKS_URL: string
+	CERTIFICATE_REQUEST_TIME_SKEW_MAX: string
+	JWT_ALGORITHMS: string | string[]
 	JWT_AUD?: string | string[]
 	JWT_ISSUER: string
-	JWT_ALGORITHMS: string | string[]
+	JWT_JWKS_URL: string
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: string
-	CERTIFICATE_REQUEST_TIME_SKEW_MAX: string
 	LOG_LEVEL?: string
+    DB_CERTIFICATE_RETENTION: string
+    DB: CaDatabase
+    ISSUER_DN: string
+    PRIVATE_KEY: CaSecret
+    SSH_CERTIFICATE_EXTENSIONS: string
+    SSH_CERTIFICATE_INCLUDE_SELF_EMAIL?: string | boolean
+    SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean
+    SSH_CERTIFICATE_LIFETIME: string
+    SSH_CERTIFICATE_PRINCIPALS?: string | string[]
+    SSH_HOST_CERTIFICATE_ALLOWED_EMAILS?: string | string[]
+    SSH_HOST_CERTIFICATE_ALLOWED_ROLES?: string | string[]
+    SSH_HOST_CERTIFICATE_LIFETIME: string
 }
