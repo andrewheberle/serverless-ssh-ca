@@ -1,0 +1,2 @@
+GET /api/v3/{certificateType}/krl api path removed without deprecation
+POST /api/v3/{certificateType}/revoke api path removed without deprecation
