@@ -457,10 +457,8 @@ export class UnsupportedKeyError extends Error {
 /**
  * Load and parse the CA private key from the `PRIVATE_KEY` secret.
  *
- * Only Ed25519 and ECDSA keys are supported. RSA keys are rejected because
- * sshpk signs RSA certificates with SHA-1 (`ssh-rsa`), which OpenSSH 8.2 and
- * later refuse by default, and because RSA keys in OpenSSH format are
- * converted with invalid CRT parameters that the Workers runtime rejects.
+ * Only Ed25519 and ECDSA keys are supported, as these are the key types that
+ * certificates and KRLs are signed with (see `createSigner` in `ssh/signer.ts`).
  *
  * @throws KeyParseError when the secret cannot be parsed.
  * @throws {@link UnsupportedKeyError} when the key is not Ed25519 or ECDSA.

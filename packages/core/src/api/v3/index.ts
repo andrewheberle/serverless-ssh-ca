@@ -121,7 +121,7 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 			try {
 				const certificate = await createSignedCertificate(c.env, data.headers.Authorization.email, data.body.public_key, opts)
 				const response: CertificateSignerResponse = {
-					certificate: btoa(certificate.toString("openssh"))
+					certificate: btoa(certificate.toString())
 				}
 
 				try {
@@ -135,7 +135,7 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 				l.info("completed issuing certificate",
 					...group(
 						"certificate", "principals",
-						certificate.subjects.map(v => v.toString()).join(","), "serial", certificate.serial.readBigUInt64BE(0),
+						certificate.principals.join(","), "serial", certificate.serial,
 					),
 				)
 
@@ -262,11 +262,11 @@ const HostCertificateRequestEndpoint = (env: SshCaBindings) => {
 			try {
 				const certificate = await createSignedHostCertificate(c.env, data.body.public_key, opts)
 				const response: CertificateSignerResponse = {
-					certificate: btoa(certificate.toString("openssh"))
+					certificate: btoa(certificate.toString())
 				}
 
 				try {
-					await recordCertificate(c.env, certificate, `host_${certificate.subjects[0]!.hostname}`, CertificateType.Host)
+					await recordCertificate(c.env, certificate, certificate.keyId, CertificateType.Host)
 				} catch (err) {
 					// a certificate that is not recorded cannot be revoked, so do not issue it
 					l.error("there was a problem adding issued certificate to database", "error", err)
@@ -276,7 +276,7 @@ const HostCertificateRequestEndpoint = (env: SshCaBindings) => {
 				l.info("completed issuing certificate",
 					...group(
 						"certificate", "principals",
-						certificate.subjects.map(v => v.toString()).join(","), "serial", certificate.serial.readBigUInt64BE(0),
+						certificate.principals.join(","), "serial", certificate.serial,
 					),
 				)
 
@@ -323,17 +323,17 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 
 			const opts: CreateHostCertificateOptions = {
 				lifetime: lifetime,
-				subjects: data.body.certificate.subjects
+				principals: data.body.certificate.subjects.map((s) => s.hostname!),
 			}
 
 			try {
 				const certificate = await createSignedHostCertificate(c.env, data.body.public_key, opts)
 				const response: CertificateSignerResponse = {
-					certificate: btoa(certificate.toString("openssh"))
+					certificate: btoa(certificate.toString())
 				}
 
 				try {
-					await recordCertificate(c.env, certificate, `host_${certificate.subjects[0]!.hostname}`, CertificateType.Host)
+					await recordCertificate(c.env, certificate, certificate.keyId, CertificateType.Host)
 				} catch (err) {
 					// a certificate that is not recorded cannot be revoked, so do not issue it
 					l.error("there was a problem adding issued certificate to database", "error", err)
@@ -343,7 +343,7 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 				l.info("completed issuing certificate",
 					...group(
 						"certificate", "principals",
-						certificate.subjects.map(v => v.toString()).join(","), "serial", certificate.serial.readBigUInt64BE(0),
+						certificate.principals.join(","), "serial", certificate.serial,
 					),
 				)
 

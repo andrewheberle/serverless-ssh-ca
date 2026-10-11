@@ -73,7 +73,7 @@ describe("certificate issuance when the database write fails", () => {
 		const key = ecdsaKey.host()
 		const certificate = await createSignedHostCertificate(env, key.toPublic(), { principals: ["test_host"] })
 		const response = await post("/api/v3/host/renew", {
-			certificate: Buffer.from(certificate.toString("openssh")).toString("base64"),
+			certificate: Buffer.from(certificate.toString()).toString("base64"),
 			public_key: Buffer.from(key.toPublic().toString("ssh")).toString("base64"),
 			proof: generateProof(key),
 		})

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest"
 import { createSignedHostCertificate } from "../src/certificate.js"
 import { seconds } from "itty-time"
 import { makeEnv } from "./env.js"
-import { Format, Identity, type PrivateKey } from "sshpk"
+import sshpk, { Format, Identity, type PrivateKey } from "sshpk"
 import { MockSecretStore } from "./helpers/secret.js"
 import { UnsupportedKeyError } from "../src/utils.js"
 
@@ -62,7 +62,7 @@ for (const ca of catests) {
         for (const host of hosttests) {
             it(host.name, async () => {
                 if (host.wantErr === undefined) {
-                    const certificate = await createSignedHostCertificate(env, host.key.toPublic(), { principals: ["test_host"] })
+                    const certificate = sshpk.parseCertificate(Buffer.from((await createSignedHostCertificate(env, host.key.toPublic(), { principals: ["test_host"] })).toString()), "openssh")
 
                     // check its signed by the CA
                     expect(certificate.isSignedByKey(ca.key.toPublic())).toBe(true)
