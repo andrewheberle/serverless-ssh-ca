@@ -71,6 +71,9 @@ Prefer the scripts in `package.json` over invoking tools directly.
 - Keep changes scoped to the task. No drive-by refactors or renames.
 - Do not change any of the OpenAPI surface as this could break clients.
   - The client end-to-end tests (`.github/workflows/client-e2e.yml`) run oasdiff to compare `packages/core/openapi.json` against the schema committed in the client's `main` and in its latest release, and fail on any breaking change.
-  - When a breaking schema change has been approved (for example one that is compatible on the wire, or that the client is being updated for), list the oasdiff errors to accept in `packages/core/.oasdiff-err-ignore` in the same PR, one per line as `METHOD /path <error message>` (eg `GET /api/v3/{certificateType}/krl api path removed without deprecation`). This keeps the acknowledgement visible in review.
+  - `packages/core/.oasdiff-err-ignore` lists the breaking schema changes that this check accepts. When a breaking schema change has been approved (for example one that is compatible on the wire, or that the client is being updated for), add its oasdiff errors to the file in the same PR, so the acknowledgement is visible in review. Write one entry per line as `METHOD /path <error message>` (eg `GET /api/v3/{certificateType}/krl api path removed without deprecation`).
+  - Group the entries for each change under a `#` comment that names the latest ssh-ca-client release at the time they were added (eg `# ssh-ca-client v0.23.0: ...`).
   - Only add entries for the specific approved change. Never use the file to silence an unapproved break.
-  - Entries are temporary: remove them once a client release includes the updated schema, and delete the file when it is empty. The file is optional and is not published to npm.
+  - Entries are temporary. If an ssh-ca-client release newer than the one named in a group's comment exists, flag that group for removal.
+  - To remove entries, delete the lines. Putting `#` in front of an entry does not turn it off, because oasdiff matches any line that contains the method, path and message.
+  - Delete the file once it has no entries. The file is optional and is not published to npm.
