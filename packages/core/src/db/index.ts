@@ -2,30 +2,10 @@ import type { Certificate, Format, Identity } from "sshpk"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { D1QB } from "workers-qb"
+import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
-
-export enum CertificateType {
-	User,
-	Host
-}
-
-export type CertificateRecord = {
-	id: number
-	serial: string
-	key_id: string
-	principals: string
-	extensions: string | null
-	valid_after: Date
-	valid_before: Date
-	revoked_at: Date | null
-	certificate_type: CertificateType
-	public_key: string | null
-}
-
-export type DatabaseSchema = {
-	certificates: CertificateRecord
-}
+import { CertificateType, type CertificateRecord, type DatabaseSchema, type KrlRecord } from "./types.js"
 
 const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 	const l = logger(env)
@@ -146,7 +126,9 @@ export const revocationStatus = async (env: SshCaBindings, serial: bigint, publi
 
 export const getRevocationList = async (env: SshCaBindings, certificateType: CertificateType): Promise<string[]> => {
 	const qb = await connect(env)
-	const res = await qb.fetchAll({
+	// fetchAll cannot infer the table from its parameters, so it is given explicitly
+	// as otherwise the result is untyped once the schema has more than one table
+	const res = await qb.fetchAll<"certificates", "serial">({
 		tableName: "certificates",
 		fields: ["serial"],
 		where: {
@@ -191,4 +173,71 @@ export const revokeCertificate = async (env: SshCaBindings, serial: bigint): Pro
 	}
 
 	return res.results
+}
+
+const KrlVersionRow = z.object({
+	version: z.number().int().nonnegative(),
+	digest: z.string().nullable(),
+})
+
+// the number of times to retry when another request updates the KRL version concurrently
+const KRL_VERSION_ATTEMPTS = 5
+
+/**
+ * Get the version of the KRL for a certificate type, incrementing it if the
+ * content of the KRL has changed since the version was last returned.
+ *
+ * The version is only ever incremented, so clients can use it to detect a
+ * newer KRL. When several requests see the same change concurrently the
+ * version is incremented once.
+ *
+ * @param env The bindings for the CA, see {@link SshCaBindings}
+ * @param certificateType The type of certificates in the KRL, see {@link CertificateType}
+ * @param digest A digest of the content of the KRL, which changes whenever the content does
+ * @returns The version to use for the KRL
+ */
+export const getKrlVersion = async (env: SshCaBindings, certificateType: CertificateType, digest: string): Promise<bigint> => {
+	const qb = await connect(env)
+
+	for (let attempt = 0; attempt < KRL_VERSION_ATTEMPTS; attempt++) {
+		const res = await qb.fetchOne({
+			tableName: "krl",
+			fields: ["version", "digest"],
+			where: {
+				conditions: "certificate_type = ?",
+				params: certificateType
+			}
+		}).execute()
+
+		const current = KrlVersionRow.parse(res.results)
+		if (current.digest === digest) {
+			return BigInt(current.version)
+		}
+
+		// only update if the version has not been changed by another request
+		const next = current.version + 1
+		const updated = await qb.update<Pick<KrlRecord, "version">>({
+			tableName: "krl",
+			data: {
+				version: next,
+				digest: digest,
+				updated_at: (new Date).toISOString()
+			},
+			where: {
+				conditions: "certificate_type = ? AND version = ?",
+				params: [certificateType, current.version]
+			},
+			returning: ["version"]
+		}).execute()
+
+		if (!updated.success) {
+			throw new Error("error during query")
+		}
+
+		if (updated.results !== undefined && updated.results.length > 0) {
+			return BigInt(next)
+		}
+	}
+
+	throw new Error("unable to update KRL version due to concurrent updates")
 }

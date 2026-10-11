@@ -299,6 +299,29 @@ export class KRLBuilder {
     }
 
     /**
+     * Return a hex encoded SHA-256 digest of the content of the KRL.
+     *
+     * The digest covers the CA public key and the revoked serials and key IDs,
+     * but not the order they were added in or the header, so it only changes
+     * when the set of revoked certificates or the CA does.
+     */
+    async digest(): Promise<string> {
+        const serials = [...this._serials].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+        const keyIds = [...this._keyIds].sort()
+
+        const content = concat(
+            encodeString(caKeyWireBytes(this._caKey)),
+            encodeUint32(serials.length),
+            ...serials.map(encodeUint64),
+            encodeUint32(keyIds.length),
+            ...keyIds.map((id) => encodeString(id)),
+        )
+
+        const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", content))
+        return Array.from(hash, (b) => b.toString(16).padStart(2, "0")).join("")
+    }
+
+    /**
      * Generate the binary KRL
      *
      * @param krlVersion  Optional KRL version number (default: 1).

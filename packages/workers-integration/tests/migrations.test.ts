@@ -14,6 +14,6 @@ describe("database migrations", () => {
 		expect(responses.map(r => r.status)).toEqual(Array.from({ length: 10 }, () => 200))
 
 		const { results } = await env.DB.prepare("SELECT name FROM migrations").all()
-		expect(results).toEqual([{ name: "0001_initial_schema" }])
+		expect(results).toEqual([{ name: "0001_initial_schema" }, { name: "0002_krl_version" }])
 	})
 })
