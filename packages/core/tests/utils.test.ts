@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest"
 import { InternalServerErrorException } from "chanfana"
-import { createCertificate, identityForHost, identityFromDN, KeyParseError } from "sshpk"
+import { KeyParseError } from "../src/ssh/keys.js"
+import { SshCertificate } from "../src/ssh/certificate.js"
+import { pub } from "./helpers/keys.js"
+import { generateKey, signCertificate } from "./helpers/ssh-keygen.js"
 import { RenewalProofOfPossession } from "../src/proof.js"
 import { generateProof } from "./helpers/proof.js"
 import type { z } from "zod"
@@ -106,23 +109,25 @@ describe("identityPrincipals", () => {
 
 describe("getPrivateKey", () => {
     it("should load an ECDSA CA key", async () => {
-        const key = await getPrivateKey(makeEnv({ PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().toString("openssh")) }))
+        const key = await getPrivateKey(makeEnv({ PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey) }))
         expect(key.type).toBe("ecdsa")
     })
 
     it("should load an Ed25519 CA key", async () => {
-        const key = await getPrivateKey(makeEnv({ PRIVATE_KEY: new MockSecretStore(ed25519Key.ca().toString("openssh")) }))
+        const key = await getPrivateKey(makeEnv({ PRIVATE_KEY: new MockSecretStore(ed25519Key.ca().privateKey) }))
         expect(key.type).toBe("ed25519")
     })
 
-    it.each([
-        ["OpenSSH", "openssh"],
-        ["PKCS#1", "pkcs1"],
-        ["PKCS#8", "pkcs8"],
-    ] as const)("should reject an RSA CA key in %s format", async (_, format) => {
-        const result = getPrivateKey(makeEnv({ PRIVATE_KEY: new MockSecretStore(rsaKey.ca().toString(format)) }))
+    it("should reject an RSA CA key", async () => {
+        const result = getPrivateKey(makeEnv({ PRIVATE_KEY: new MockSecretStore(rsaKey.ca().privateKey) }))
         await expect(result).rejects.toBeInstanceOf(UnsupportedKeyError)
         await expect(result).rejects.toThrow("CA key type rsa is not supported, the CA key must be Ed25519 or ECDSA")
+    })
+
+    it("should reject a key that is not in OpenSSH format", async () => {
+        const result = getPrivateKey(makeEnv({ PRIVATE_KEY: new MockSecretStore(generateKey("ecdsa", 256, ["-m", "PEM"]).privateKey) }))
+        await expect(result).rejects.toBeInstanceOf(KeyParseError)
+        await expect(result).rejects.toThrow("private key was not in OpenSSH format")
     })
 
     it("should throw KeyParseError for an invalid key", async () => {
@@ -132,14 +137,14 @@ describe("getPrivateKey", () => {
 
 describe("getPublic", () => {
     it("should reject an RSA CA key", async () => {
-        await expect(getPublic(makeEnv({ PRIVATE_KEY: new MockSecretStore(rsaKey.ca().toString("openssh")) })))
+        await expect(getPublic(makeEnv({ PRIVATE_KEY: new MockSecretStore(rsaKey.ca().privateKey) })))
             .rejects.toBeInstanceOf(UnsupportedKeyError)
     })
 })
 
 describe("refineHostCertificateRenewal", () => {
     it("should throw a server error rather than a validation issue for an RSA CA key", async () => {
-        const rsaEnv = makeEnv({ PRIVATE_KEY: new MockSecretStore(rsaKey.ca().toString("openssh")) })
+        const rsaEnv = makeEnv({ PRIVATE_KEY: new MockSecretStore(rsaKey.ca().privateKey) })
         const issues: unknown[] = []
         // the CA key is checked before any field of the request is used, so
         // neither the request nor the context need to be complete
@@ -155,35 +160,34 @@ describe("refineHostCertificateRenewal", () => {
 describe("refineHostCertificateRenewal validity period", () => {
     const ca = ecdsaKey.ca()
     const host = ecdsaKey.host()
-    const caEnv = makeEnv({ PRIVATE_KEY: new MockSecretStore(ca.toString("openssh")) })
+    const caEnv = makeEnv({ PRIVATE_KEY: new MockSecretStore(ca.privateKey) })
     const isRevoked = async (): Promise<boolean> => false
 
-    const refine = async (validFrom: Date, validUntil: Date): Promise<unknown[]> => {
-        const certificate = createCertificate([identityForHost("test_host")], host.toPublic(), identityFromDN(caEnv.ISSUER_DN), ca, { validFrom, validUntil })
+    // validity is an interval as passed to ssh-keygen -V
+    const refine = async (validity: string): Promise<unknown[]> => {
+        const certificate = SshCertificate.parse(signCertificate(ca, host.publicKey, { kind: "host", keyId: "host_test_host", principals: ["test_host"], validity }))
         const issues: unknown[] = []
         const ctx = { issues } as unknown as z.RefinementCtx
         await refineHostCertificateRenewal(caEnv, isRevoked, {
             certificate,
             proof: new RenewalProofOfPossession(generateProof(host)),
-            public_key: host.toPublic(),
+            public_key: pub(host),
             lifetime: 3600,
         }, ctx)
         return issues
     }
 
-    const at = (offsetSeconds: number): Date => new Date(Date.now() + offsetSeconds * 1000)
-
     it("should accept a certificate whose validity starts a second in the future", async () => {
-        expect(await refine(at(1), at(3600))).toEqual([])
+        expect(await refine("+1s:+1h")).toEqual([])
     })
 
     it("should reject a certificate whose validity starts beyond the allowed skew", async () => {
-        const issues = await refine(at(3600), at(7200))
+        const issues = await refine("+1h:+2h")
         expect(issues).toMatchObject([{ message: "the provided certificate is not yet valid" }])
     })
 
     it("should reject an expired certificate", async () => {
-        const issues = await refine(at(-7200), at(-3600))
+        const issues = await refine("-2h:-1h")
         expect(issues).toMatchObject([{ message: "the provided certificate is expired" }])
     })
 })

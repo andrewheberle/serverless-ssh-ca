@@ -1,13 +1,12 @@
 import { ms } from "itty-time"
-import sshpk from "sshpk"
-import type { Fingerprint, Key } from "sshpk"
+import { KeyParseError, PublicKey } from "./ssh/keys.js"
 import { verify } from "./sshsig/index.js"
 import { parse } from "./sshsig/sig_parser.js"
 import { Sig } from "./sshsig/sig.js"
 import { group, Logger, LogLevel } from "@andrewheberle/ts-slog"
 
-// sshpk is CommonJS and Node's ESM loader cannot detect most of its named exports, so values are taken from the default import
-const { FingerprintFormatError, parseFingerprint, parseKey } = sshpk
+// a SHA256 fingerprint as shown by ssh-keygen -l, which is unpadded base64
+const FingerprintFormat = /^SHA256:[A-Za-z0-9+/]{43}$/
 
 export const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 
@@ -38,9 +37,10 @@ export class PossessionParseError extends Error {
  */
 export class ProofOfPossession {
 	readonly timestamp: number
-	readonly fingerprint: Fingerprint
+	/** The SHA256 fingerprint of the key, for example "SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs" */
+	readonly fingerprint: string
 	readonly signature: Sig
-	readonly signaturePubkey: Key
+	readonly signaturePubkey: PublicKey
 	readonly logger: Logger
 	private readonly data: string
 
@@ -69,10 +69,9 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 			throw new PossessionParseError("timestamp was from the future")
 		}
 		try {
-			// parse fingerprint
-			const fingerprint = parseFingerprint(fingerprintString!)
-			if (fingerprint === undefined) {
-				throw new PossessionParseError("fingerprint did not parse")
+			// check fingerprint
+			if (!FingerprintFormat.test(fingerprintString!)) {
+				throw new PossessionParseError("proof of possession fingerprint was an invalid format")
 			}
 
 			// convert siganture from base64
@@ -86,26 +85,26 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 				throw new PossessionParseError("proof of possession signature could not be parsed", err)
 			}
 
-			this.fingerprint = fingerprint
+			this.fingerprint = fingerprintString!
 			this.data = `${timestamp}.${fingerprintString}`
-			this.signaturePubkey = parseKey(this.signature.publickey.toString())
+			this.signaturePubkey = PublicKey.parse(this.signature.publickey.toString())
 
 			// ensure the provided fingerprint matches the signature public key
-			if (!this.fingerprint.matches(this.signaturePubkey)) {
+			if (this.fingerprint !== this.signaturePubkey.fingerprint()) {
 				throw new PossessionParseError("proof of possession fingerprint does not match signature public key")
 			}
 
 			this.logger.debug("constructor completed",
 				...group("this",
 					"timestamp", this.timestamp,
-					"fingerprint", this.fingerprint.toString("base64"),
-					"signaturePubkey.fingerprint()", this.signaturePubkey.fingerprint().toString("base64"),
+					"fingerprint", this.fingerprint,
+					"signaturePubkey.fingerprint()", this.signaturePubkey.fingerprint(),
 				),
 			)
 		} catch (err) {
 			switch (true) {
-				case (err instanceof FingerprintFormatError):
-					throw new PossessionParseError("proof of possession fingerprint was an invalid format", err)
+				case (err instanceof KeyParseError):
+					throw new PossessionParseError(`proof of possession signature key could not be used: ${err.message}`, err)
 				default:
 					throw err
 			}
@@ -125,21 +124,21 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 	 * @param keys array of keys to verify finterprint against
 	 * @returns true if the proof of possession fingerprint matches any of the provided keys, false otherwise
 	 */
-	matches(key: Key): boolean
-	matches(...keys: Key[]): boolean
+	matches(key: PublicKey): boolean
+	matches(...keys: PublicKey[]): boolean
 
-	matches(...keys: Key[]): boolean {
+	matches(...keys: PublicKey[]): boolean {
 		this.logger.debug("matches() called", "in", "ProofOfPossession", "keys", keys.length)
 		try {
 			for (const key of keys) {
 				// confirm proof of possession fingerprint matches keys
-				this.logger.debug("this.fingerprint.matches()", "in", "ProofOfPossession", "fingerprint", this.fingerprint.toString("base64"), "key", key.toString("ssh"))
-				if (!this.fingerprint.matches(key))
+				this.logger.debug("comparing fingerprint", "in", "ProofOfPossession", "fingerprint", this.fingerprint, "key", key.toString())
+				if (this.fingerprint !== key.fingerprint())
 					return false
 
 				// also confirm key used to sign proof of possession matches
-				this.logger.debug("this.signaturePubkey.fingerprint().matches()", "in", "ProofOfPossession", "signaturePubkey", this.signaturePubkey.fingerprint().toString("base64"), "key", key.toString("ssh"))
-				if (!this.signaturePubkey.fingerprint().matches(key))
+				this.logger.debug("comparing signature public key", "in", "ProofOfPossession", "signaturePubkey", this.signaturePubkey.fingerprint(), "key", key.toString())
+				if (!this.signaturePubkey.equals(key))
 					return false
 			}
 			this.logger.debug("matches() completed", "in", "ProofOfPossession", "keys", keys.length)
@@ -163,10 +162,10 @@ export class PossessionMatchError extends Error {
 }
 
 export class RenewalProofOfPossession extends ProofOfPossession {
-	override matches(key: Key): never
-	override matches(...keys: Key[]): boolean
+	override matches(key: PublicKey): never
+	override matches(...keys: PublicKey[]): boolean
 
-	override matches(...keys: Key[]): boolean {
+	override matches(...keys: PublicKey[]): boolean {
 		this.logger.debug("matches() called", "in", "RenewalProofOfPossession", "keys", keys.length)
 		if (keys.length === 1) {
 			throw new PossessionMatchError("must verify both public key and certificate")
@@ -174,11 +173,11 @@ export class RenewalProofOfPossession extends ProofOfPossession {
 
 		try {
 			for (const key of keys) {
-				this.logger.debug("this.fingerprint.matches()", "in", "RenewalProofOfPossession", "fingerprint", this.fingerprint.toString("base64"), "key", key.toString("ssh"))
-				if (!this.fingerprint.matches(key))
+				this.logger.debug("comparing fingerprint", "in", "RenewalProofOfPossession", "fingerprint", this.fingerprint, "key", key.toString())
+				if (this.fingerprint !== key.fingerprint())
 					return false
-				this.logger.debug("this.signaturePubkey.fingerprint().matches()", "in", "RenewalProofOfPossession", "signaturePubkey", this.signaturePubkey.fingerprint().toString("base64"), "key", key.toString("ssh"))
-				if (!this.signaturePubkey.fingerprint().matches(key))
+				this.logger.debug("comparing signature public key", "in", "RenewalProofOfPossession", "signaturePubkey", this.signaturePubkey.fingerprint(), "key", key.toString())
+				if (!this.signaturePubkey.equals(key))
 					return false
 			}
 			this.logger.debug("matches() completed", "in", "RenewalProofOfPossession", "keys", keys.length)

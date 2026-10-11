@@ -1,5 +1,3 @@
-import { parsePrivateKey, PrivateKey } from "sshpk"
-
 export const privateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
 1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQTrh5Brsk2pEY/l1HUv9iB633qsuPzf
@@ -9,10 +7,6 @@ dS/2IHrfeqy4/N8bFVtlSLstcqK0m5ri/iZkSm5B8IZdrZlgm0ggNeb6bdh0uRsBgESVZx
 IAAAAgenwTB1kprsmfs3e2PWGfZ4JDi+d5PTEMg6Rf3WgLZ+sAAAAA
 -----END OPENSSH PRIVATE KEY-----
 `
-
-export const privateKey = (): PrivateKey => {
-    return parsePrivateKey(privateKeyString)
-}
 
 const userPrivateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
@@ -25,6 +19,8 @@ ZS5jb20BAgMEBQYH
 -----END OPENSSH PRIVATE KEY-----
 `
 
-export const userPrivateKey = (): PrivateKey => {
-    return parsePrivateKey(userPrivateKeyString)
+// the user key, with its public key as written by ssh-keygen -y
+export const userKey = {
+    privateKey: userPrivateKeyString,
+    publicKey: "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGMpSJttf0IttNCVc28TzXFR1D0xvO3np67VzeAQsbdZskrDcYjSlwJ6HPDmTpXaU0lEaX9L4Yhc/cCf1Me9FTk= user@example.com",
 }

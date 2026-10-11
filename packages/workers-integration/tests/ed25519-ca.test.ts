@@ -6,8 +6,8 @@ import {
 import { describe, it, expect } from "vitest"
 import { leadingZeroPrivateKeyString } from "./keys/ed25519"
 
-// an Ed25519 CA key that sshpk cannot export as valid PKCS#8 must still be
-// able to sign KRLs
+// an Ed25519 CA key whose seed starts with a zero byte must still be able to
+// sign KRLs
 const admin = adminSecretsStore(env.PRIVATE_KEY)
 await admin.create(leadingZeroPrivateKeyString)
 

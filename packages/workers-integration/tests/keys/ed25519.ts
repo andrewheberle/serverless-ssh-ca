@@ -1,5 +1,3 @@
-import { parsePrivateKey, PrivateKey } from "sshpk"
-
 export const privateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACDFbUIeQIJ5vZ5Jz9vXLnVCyXNhXadKJOubbov/hifMfwAAAIhKaQBeSmkA
@@ -8,10 +6,6 @@ AAAED8pydCkvNrysAmDUbVnT5goaFlepU9kjmIyP/O5G9HOMVtQh5Agnm9nknP29cudULJ
 c2Fdp0ok65tui/+GJ8x/AAAAAAECAwQF
 -----END OPENSSH PRIVATE KEY-----
 `
-
-export const privateKey = (): PrivateKey => {
-    return parsePrivateKey(privateKeyString)
-}
 
 const userPrivateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -22,12 +16,14 @@ gKLq7bj9fYWLuUXmvsaHAAAAEHVzZXJAZXhhbXBsZS5jb20BAgMEBQ==
 -----END OPENSSH PRIVATE KEY-----
 `
 
-export const userPrivateKey = (): PrivateKey => {
-    return parsePrivateKey(userPrivateKeyString)
+// the user key, with its public key as written by ssh-keygen -y
+export const userKey = {
+    privateKey: userPrivateKeyString,
+    publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPYBPqsUTVz/viPaS5SbSQ1rgKLq7bj9fYWLuUXmvsaH user@example.com",
 }
 
 // a CA key whose seed starts with 0x00 followed by a byte below 0x80, which
-// sshpk writes to PKCS#8 with the leading zero dropped
+// must be kept when the seed is given to WebCrypto
 export const leadingZeroPrivateKeyString = `-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACCID/KNdIMcAOAkNTKYgXBmzI3Fz2Z7N1+Ea8AmcRHK7wAAAIi7BqbYuwam

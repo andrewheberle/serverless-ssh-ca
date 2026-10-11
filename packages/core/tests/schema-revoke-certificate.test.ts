@@ -11,7 +11,7 @@ describe("revoke certificate schema", () => {
 	describe("body", () => {
 		const schema = revokeCertificateEndpointBodySchema(env)
 		const key = ecdsaKey.user()
-		const publicKey = Buffer.from(key.toPublic().toString("ssh")).toString("base64")
+		const publicKey = Buffer.from(key.publicKey).toString("base64")
 		const proof = generateProof(key)
 
 		it("should fail with no body", async () => {

@@ -1,7 +1,7 @@
 import * as P from "micro-packed"
-import type { AlgorithmPart, PrivateKey } from "sshpk"
 import { toFixedWidth } from "../sshsig/sig_parser.js"
-import { SSHBytes, SSHText, SSHUnsignedMpint } from "./encoding.js"
+import { decodePublicKey, SSHBytes, SSHText, SSHUnsignedMpint } from "./encoding.js"
+import type { EcdsaCurve, PrivateKey, PublicKey } from "./keys.js"
 
 /**
  * Signs data with a CA key using WebCrypto, returning signatures in the SSH
@@ -34,78 +34,24 @@ const EcdsaSignature = P.struct({
 	})),
 })
 
-type EcdsaCurve = {
-	namedCurve: string
-	hash: string
-	// the size in bytes of each coordinate and of the private key
-	size: number
-}
-
-const EcdsaCurves: Readonly<Record<string, EcdsaCurve>> = {
+const EcdsaCurves: Readonly<Record<EcdsaCurve, { namedCurve: string, hash: string, size: number }>> = {
 	nistp256: { namedCurve: "P-256", hash: "SHA-256", size: 32 },
 	nistp384: { namedCurve: "P-384", hash: "SHA-384", size: 48 },
 	nistp521: { namedCurve: "P-521", hash: "SHA-512", size: 66 },
 }
 
 /**
- * Returns the wire encoding of the public key of an sshpk key
- */
-export const publicKeyBlob = (key: PrivateKey): Uint8Array => {
-	return new Uint8Array(key.toPublic().toBuffer("rfc4253"))
-}
-
-/**
- * Get the raw bytes of a named part of an sshpk key.
- */
-const keyPart = (key: PrivateKey, name: AlgorithmPart): Uint8Array => {
-	const part = key.parts.find((p) => p.name === name)
-	if (part === undefined) {
-		throw new Error(`Missing ${name} part in ${key.type} key`)
-	}
-
-	return part.data
-}
-
-/**
- * Base64url-encode bytes without padding, as used for JWK values.
- */
-const base64url = (bytes: Uint8Array): string => {
-	let binary = ""
-	for (const byte of bytes) {
-		binary += String.fromCharCode(byte)
-	}
-
-	return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
-}
-
-/**
  * Creates a {@link Signer} for an Ed25519 or ECDSA (P-256, P-384 or P-521)
- * sshpk private key.
- *
- * The key is imported from its raw parts as a JWK rather than from sshpk's
- * PKCS#8 output, which drops leading zero bytes from private key values so
- * that some keys are rejected by WebCrypto.
+ * private key
  *
  * @param key The private key to sign with
  * @returns The signer
- * @throws Error when the key type or curve is not supported
  */
 export const createSigner = async (key: PrivateKey): Promise<Signer> => {
-	const publicKey = publicKeyBlob(key)
+	const publicKey = key.publicKey.blob
 
 	if (key.type === "ed25519") {
-		const seed = keyPart(key, "k")
-		const point = keyPart(key, "A")
-		if (seed.length !== 32 || point.length !== 32) {
-			throw new Error(`Unexpected Ed25519 key part lengths: k=${seed.length} A=${point.length}`)
-		}
-		const cryptoKey = await crypto.subtle.importKey(
-			"jwk",
-			{ kty: "OKP", crv: "Ed25519", d: base64url(seed), x: base64url(point) },
-			{ name: "Ed25519" },
-			false,
-			["sign"],
-		)
+		const cryptoKey = await crypto.subtle.importKey("jwk", key.jwk, { name: "Ed25519" }, false, ["sign"])
 
 		return {
 			publicKey,
@@ -116,50 +62,68 @@ export const createSigner = async (key: PrivateKey): Promise<Signer> => {
 		}
 	}
 
-	if (key.type === "ecdsa") {
-		const curve = key.curve === undefined ? undefined : EcdsaCurves[key.curve]
-		if (curve === undefined) {
-			throw new Error(`Unsupported ECDSA curve: ${key.curve}`)
-		}
+	const curve = EcdsaCurves[key.curve]
+	const cryptoKey = await crypto.subtle.importKey("jwk", key.jwk, { name: "ECDSA", namedCurve: curve.namedCurve }, false, ["sign"])
 
-		const point = keyPart(key, "Q")
-		if (point.length !== 1 + curve.size * 2 || point[0] !== 0x04) {
-			throw new Error(`Unexpected ECDSA public key encoding for ${key.curve}`)
-		}
-		// d is an SSH mpint, so may be short or have a leading sign byte
-		const d = toFixedWidth(keyPart(key, "d"), curve.size)
-		const cryptoKey = await crypto.subtle.importKey(
-			"jwk",
-			{
-				kty: "EC",
-				crv: curve.namedCurve,
-				d: base64url(d),
-				x: base64url(point.subarray(1, 1 + curve.size)),
-				y: base64url(point.subarray(1 + curve.size)),
-			},
-			{ name: "ECDSA", namedCurve: curve.namedCurve },
-			false,
-			["sign"],
-		)
+	return {
+		publicKey,
+		sign: async (data) => {
+			// WebCrypto returns r || s, each the size of the curve
+			const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: { name: curve.hash } }, cryptoKey, data))
 
-		return {
-			publicKey,
-			sign: async (data) => {
-				// WebCrypto returns r || s, each the size of the curve
-				const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: { name: curve.hash } }, cryptoKey, data))
-
-				return EcdsaSignature.encode({
-					// the algorithm is named for the curve of the key, never
-					// worked out from the signature
-					algorithm: `ecdsa-sha2-${key.curve}`,
-					signature: {
-						r: signature.subarray(0, curve.size),
-						s: signature.subarray(curve.size),
-					},
-				})
-			},
-		}
+			return EcdsaSignature.encode({
+				// the algorithm is named for the curve of the key, never
+				// worked out from the signature
+				algorithm: `ecdsa-sha2-${key.curve}`,
+				signature: {
+					r: signature.subarray(0, curve.size),
+					s: signature.subarray(curve.size),
+				},
+			})
+		},
 	}
+}
 
-	throw new Error(`Unsupported key type: ${key.type}`)
+/**
+ * Verifies a signature in the SSH wire format made with an Ed25519 or ECDSA
+ * key
+ *
+ * @param publicKey The key the signature must have been made with
+ * @param signature The signature in the SSH wire format
+ * @param data The data that was signed
+ * @returns true if the signature is valid, false if it is not or the key type is not supported
+ */
+export const verify = async (publicKey: PublicKey, signature: Uint8Array, data: Uint8Array<ArrayBuffer>): Promise<boolean> => {
+	try {
+		const { type, fields } = decodePublicKey(publicKey.blob)
+
+		if (type === "ssh-ed25519") {
+			const { algorithm, signature: raw } = Ed25519Signature.decode(signature)
+			if (algorithm !== type) {
+				return false
+			}
+			const cryptoKey = await crypto.subtle.importKey("raw", new Uint8Array(fields[0]!), { name: "Ed25519" }, false, ["verify"])
+
+			return await crypto.subtle.verify({ name: "Ed25519" }, cryptoKey, new Uint8Array(raw), data)
+		}
+
+		const curveName = type.replace(/^ecdsa-sha2-/, "") as EcdsaCurve
+		const curve = EcdsaCurves[curveName]
+		if (curve !== undefined && type === `ecdsa-sha2-${curveName}`) {
+			const { algorithm, signature: { r, s } } = EcdsaSignature.decode(signature)
+			if (algorithm !== type || r.length > curve.size || s.length > curve.size) {
+				return false
+			}
+			// fields are the curve name and the public point
+			const cryptoKey = await crypto.subtle.importKey("raw", new Uint8Array(fields[1]!), { name: "ECDSA", namedCurve: curve.namedCurve }, false, ["verify"])
+			const raw = P.utils.concatBytes(toFixedWidth(r, curve.size), toFixedWidth(s, curve.size))
+
+			return await crypto.subtle.verify({ name: "ECDSA", hash: { name: curve.hash } }, cryptoKey, new Uint8Array(raw), data)
+		}
+
+		return false
+	} catch {
+		// a signature or key that cannot be decoded or imported is not valid
+		return false
+	}
 }

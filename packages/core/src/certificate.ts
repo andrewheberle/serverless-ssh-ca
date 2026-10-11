@@ -1,5 +1,5 @@
 import { seconds } from "itty-time"
-import type { Key, PrivateKey } from "sshpk"
+import type { PrivateKey, PublicKey } from "./ssh/keys.js"
 import { getPrivateKey, split } from "./utils.js"
 import type { SshCaBindings } from "./types.js"
 import { signCertificate, type CertificateFields, type SshCertificate } from "./ssh/certificate.js"
@@ -49,7 +49,7 @@ const sign = async (key: PrivateKey, fields: Omit<CertificateFields, "validAfter
 	return await signCertificate({ ...fields, validAfter, validBefore }, await createSigner(key))
 }
 
-export const generateCertificate = async (env: SshCaBindings, email: string, key: PrivateKey, public_key: Key, options?: GenerateCertificateOptions): Promise<SshCertificate> => {
+export const generateCertificate = async (env: SshCaBindings, email: string, key: PrivateKey, public_key: PublicKey, options?: GenerateCertificateOptions): Promise<SshCertificate> => {
 	const { lifetime, principals, extensions, serial } = options ?? {}
 
 	// add principals
@@ -96,7 +96,7 @@ export const generateCertificate = async (env: SshCaBindings, email: string, key
 
 	return await sign(key, {
 		kind: "user",
-		publicKey: new Uint8Array(public_key.toBuffer("rfc4253")),
+		publicKey: public_key,
 		serial: serial ?? generateSerial(),
 		keyId: email,
 		principals: certificatePrincipals,
@@ -105,7 +105,7 @@ export const generateCertificate = async (env: SshCaBindings, email: string, key
 	}, certificateLifetime)
 }
 
-export async function createSignedCertificate(env: SshCaBindings, email: string, public_key: Key, options?: CreateCertificateOptions): Promise<SshCertificate> {
+export async function createSignedCertificate(env: SshCaBindings, email: string, public_key: PublicKey, options?: CreateCertificateOptions): Promise<SshCertificate> {
 	// grab private key from secret store
 	const key = await getPrivateKey(env)
 
@@ -134,7 +134,7 @@ export class BadIssuerError extends Error {
 	}
 }
 
-export async function createSignedHostCertificate(env: SshCaBindings, public_key: Key, options?: CreateHostCertificateOptions): Promise<SshCertificate> {
+export async function createSignedHostCertificate(env: SshCaBindings, public_key: PublicKey, options?: CreateHostCertificateOptions): Promise<SshCertificate> {
 	const principals = options?.principals ?? []
 
 	// grab private key from secret store
@@ -147,7 +147,7 @@ export async function createSignedHostCertificate(env: SshCaBindings, public_key
 
 	return await sign(key, {
 		kind: "host",
-		publicKey: new Uint8Array(public_key.toBuffer("rfc4253")),
+		publicKey: public_key,
 		serial: generateSerial(),
 		keyId: `host_${principals[0]}`,
 		principals,

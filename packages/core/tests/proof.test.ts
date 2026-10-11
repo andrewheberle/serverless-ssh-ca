@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { ProofOfPossession } from "../src/proof.js"
-import { Key, parseKey } from "sshpk"
+import { PublicKey } from "../src/ssh/keys.js"
 
 type testSig = {
     name: string
@@ -122,8 +122,8 @@ describe("ProofOfPossession", async () => {
 
                 // check matches for keys
                 if (tt.matches !== undefined) {
-                    const keys = tt.matches.map((k: string): Key => {
-                        return parseKey(k)
+                    const keys = tt.matches.map((k: string): PublicKey => {
+                        return PublicKey.parse(k)
                     })
 
                     expect(proof.matches(...keys)).toBe(tt.wantMatches !== undefined ? tt.wantMatches : false)

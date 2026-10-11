@@ -244,7 +244,9 @@ sequenceDiagram
 ### CA Private Key
 
 The CA private key is read from the `PRIVATE_KEY` Secrets Store binding and
-must be an Ed25519 or ECDSA (`nistp256`, `nistp384` or `nistp521`) key:
+must be an unencrypted Ed25519 or ECDSA (`nistp256`, `nistp384` or
+`nistp521`) key in OpenSSH format, which is what `ssh-keygen` creates by
+default:
 
 ```sh
 ssh-keygen -t ed25519 -N "" -C "" -f ssh-ca
