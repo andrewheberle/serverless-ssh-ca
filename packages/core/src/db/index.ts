@@ -24,8 +24,16 @@ export type CertificateRecord = {
 	public_key: string | null
 }
 
+export type KrlRecord = {
+	certificate_type: CertificateType
+	version: number
+	digest: string | null
+	updated_at: Date
+}
+
 export type DatabaseSchema = {
 	certificates: CertificateRecord
+	krl: KrlRecord
 }
 
 const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
@@ -147,7 +155,9 @@ export const revocationStatus = async (env: SshCaBindings, serial: bigint, publi
 
 export const getRevocationList = async (env: SshCaBindings, certificateType: CertificateType): Promise<string[]> => {
 	const qb = await connect(env)
-	const res = await qb.fetchAll({
+	// fetchAll cannot infer the table from its parameters, so it is given explicitly
+	// as otherwise the result is untyped once the schema has more than one table
+	const res = await qb.fetchAll<"certificates", "serial">({
 		tableName: "certificates",
 		fields: ["serial"],
 		where: {
@@ -194,8 +204,6 @@ export const revokeCertificate = async (env: SshCaBindings, serial: bigint): Pro
 	return res.results
 }
 
-// the krl table is not part of DatabaseSchema as workers-qb then fails to infer
-// the result types of queries on the certificates table, so rows are validated here
 const KrlVersionRow = z.object({
 	version: z.number().int().nonnegative(),
 	digest: z.string().nullable(),
@@ -237,7 +245,7 @@ export const getKrlVersion = async (env: SshCaBindings, certificateType: Certifi
 
 		// only update if the version has not been changed by another request
 		const next = current.version + 1
-		const updated = await qb.update({
+		const updated = await qb.update<Pick<KrlRecord, "version">>({
 			tableName: "krl",
 			data: {
 				version: next,
