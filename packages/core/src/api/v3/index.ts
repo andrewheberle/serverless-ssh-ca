@@ -1,43 +1,21 @@
 import { group } from "@andrewheberle/ts-slog"
 import {
-	ApiException,
-	ConflictException,
 	ForbiddenException,
 	fromHono,
-	InternalServerErrorException,
-	NotFoundException,
 	OpenAPIRoute,
 	UnauthorizedException,
-	UnprocessableEntityException,
 } from "chanfana"
 import { Hono } from "hono"
 import { AppContext } from "../../router.js"
-import { CertificateSignerResponse } from "../../types.js"
 import {
-	BadIssuerError,
 	CreateCertificateOptions,
 	CreateHostCertificateOptions,
 	createSignedCertificate,
 	createSignedHostCertificate,
-
 } from "../../certificate.js"
-import {
-	getPrivateKey,
-	getPublic,
-	split,
-	UnsupportedKeyError,
-} from "../../utils.js"
+import { split } from "../../utils.js"
 import { CertificateType } from "../../db/types.js"
-import {
-	getKrlVersion,
-	getRevocationList,
-	recordCertificate,
-	RevocationStatus,
-	revocationStatus,
-	revokeCertificate,
-} from "../../db/index.js"
-import { KRLBuilder } from "../../krl.js"
-import { KeyParseError } from "../../ssh/keys.js"
+import { caPublicKey, issueCertificate, revocationList, revoke } from "../operations.js"
 import {
 	CaPublicKeyEndpointSchema,
 	createUserCertificateRequestEndpointSchema,
@@ -50,7 +28,6 @@ import {
 import { logger } from "../../logger.js"
 import type { SshCaBindings } from "../../types.js"
 
-
 const CaPublicKeyEndpoint = (env: SshCaBindings) => {
 	return class extends OpenAPIRoute {
 		override schema = CaPublicKeyEndpointSchema
@@ -59,27 +36,7 @@ const CaPublicKeyEndpoint = (env: SshCaBindings) => {
 			const l = logger(env).with(
 				...group("request", "action", "ca"),
 			)
-			try {
-				const pub = await getPublic(c.env)
-
-				return c.text(`${pub.toString()}\n`)
-			} catch (err) {
-				switch (true) {
-					case (err instanceof UnsupportedKeyError):
-						l.error(err.message)
-						throw new InternalServerErrorException(err.message)
-					case (err instanceof KeyParseError):
-						l.error("error parsing private key")
-						throw new InternalServerErrorException("error parsing private key")
-					case (err instanceof ApiException):
-						// re-throw any exisiting chanfana error
-						throw err
-					default:
-						// otherwise throw as InternalServerErrorException
-						l.error("unhandled error", "error", err)
-						throw new InternalServerErrorException("internal server error")
-				}
-			}
+			return await caPublicKey(c, l)
 		}
 	}
 }
@@ -116,42 +73,10 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 				extensions: data.body.extensions,
 			}
 
-			try {
-				const certificate = await createSignedCertificate(c.env, data.headers.Authorization.email, data.body.public_key, opts)
-				const response: CertificateSignerResponse = {
-					certificate: btoa(certificate.toString())
-				}
-
-				try {
-					await recordCertificate(c.env, certificate, data.headers.Authorization.email)
-				} catch (err) {
-					// a certificate that is not recorded cannot be revoked, so do not issue it
-					l.error("there was a problem adding issued certificate to database", "error", err)
-					throw new InternalServerErrorException("there was a problem recording the issued certificate")
-				}
-
-				l.info("completed issuing certificate",
-					...group(
-						"certificate", "principals",
-						certificate.principals.join(","), "serial", certificate.serial,
-					),
-				)
-
-				return c.json(response)
-			} catch (err) {
-				switch (true) {
-					case (err instanceof UnsupportedKeyError):
-						l.error(err.message)
-						throw new InternalServerErrorException(err.message)
-					case (err instanceof ApiException):
-						// re-throw any exisiting chanfana error
-						throw err
-					default:
-						// otherwise throw as InternalServerErrorException
-						l.error("unhandled error", "error", err)
-						throw new InternalServerErrorException("internal server error")
-				}
-			}
+			return await issueCertificate(c, l,
+				() => createSignedCertificate(c.env, data.headers.Authorization.email, data.body.public_key, opts),
+				CertificateType.User,
+			)
 		}
 	}
 }
@@ -168,53 +93,7 @@ const RevocationListEndpoint = (env: SshCaBindings, certificateType: Certificate
 				),
 			)
 
-			try {
-				// get revoked serials
-				const serials = (await getRevocationList(c.env, certificateType)).map(v => BigInt(v))
-
-				// grab private key from secret store
-				const key = await getPrivateKey(c.env)
-
-				// generate KRL
-				const krl = new KRLBuilder(key)
-					.addSerials(serials)
-
-				// the version only changes when the content of the KRL does
-				const version = await getKrlVersion(c.env, certificateType, await krl.digest())
-
-				const krlBytes = krl.generate(version)
-
-				// convert to base64
-				const bytes = new Uint8Array(krlBytes)
-				let binary = ""
-				for (const byte of bytes) {
-					binary += String.fromCharCode(byte)
-				}
-				const base64Krl = btoa(binary)
-
-				const signature = await krl.signature()
-
-				return c.json({
-					krl: base64Krl,
-					signature: signature,
-				})
-			} catch (err) {
-				switch (true) {
-					case (err instanceof UnsupportedKeyError):
-						l.error(err.message)
-						throw new InternalServerErrorException(err.message)
-					case (err instanceof KeyParseError):
-						l.error("error parsing private key")
-						throw new InternalServerErrorException("error parsing private key")
-					case (err instanceof ApiException):
-						// re-throw any exisiting chanfana error
-						throw err
-					default:
-						// otherwise throw as InternalServerErrorException
-						l.error("unhandled error", "error", err)
-						throw new InternalServerErrorException("internal server error")
-				}
-			}
+			return await revocationList(c, l, certificateType)
 		}
 	}
 }
@@ -257,42 +136,10 @@ const HostCertificateRequestEndpoint = (env: SshCaBindings) => {
 				principals: data.body.principals,
 			}
 
-			try {
-				const certificate = await createSignedHostCertificate(c.env, data.body.public_key, opts)
-				const response: CertificateSignerResponse = {
-					certificate: btoa(certificate.toString())
-				}
-
-				try {
-					await recordCertificate(c.env, certificate, certificate.keyId, CertificateType.Host)
-				} catch (err) {
-					// a certificate that is not recorded cannot be revoked, so do not issue it
-					l.error("there was a problem adding issued certificate to database", "error", err)
-					throw new InternalServerErrorException("there was a problem recording the issued certificate")
-				}
-
-				l.info("completed issuing certificate",
-					...group(
-						"certificate", "principals",
-						certificate.principals.join(","), "serial", certificate.serial,
-					),
-				)
-
-				return c.json(response)
-			} catch (err) {
-				switch (true) {
-					case (err instanceof UnsupportedKeyError):
-						l.error(err.message)
-						throw new InternalServerErrorException(err.message)
-					case (err instanceof ApiException):
-						// re-throw any exisiting chanfana error
-						throw err
-					default:
-						// otherwise throw as InternalServerErrorException
-						l.error("unhandled error", "error", err)
-						throw new InternalServerErrorException("internal server error")
-				}
-			}
+			return await issueCertificate(c, l,
+				() => createSignedHostCertificate(c.env, data.body.public_key, opts),
+				CertificateType.Host,
+			)
 		}
 	}
 }
@@ -324,44 +171,10 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 				principals: data.body.certificate.principals,
 			}
 
-			try {
-				const certificate = await createSignedHostCertificate(c.env, data.body.public_key, opts)
-				const response: CertificateSignerResponse = {
-					certificate: btoa(certificate.toString())
-				}
-
-				try {
-					await recordCertificate(c.env, certificate, certificate.keyId, CertificateType.Host)
-				} catch (err) {
-					// a certificate that is not recorded cannot be revoked, so do not issue it
-					l.error("there was a problem adding issued certificate to database", "error", err)
-					throw new InternalServerErrorException("there was a problem recording the issued certificate")
-				}
-
-				l.info("completed issuing certificate",
-					...group(
-						"certificate", "principals",
-						certificate.principals.join(","), "serial", certificate.serial,
-					),
-				)
-
-				return c.json(response)
-			} catch (err) {
-				switch (true) {
-					case (err instanceof UnsupportedKeyError):
-						l.error(err.message)
-						throw new InternalServerErrorException(err.message)
-					case (err instanceof ApiException):
-						// re-throw any exisiting chanfana error
-						throw err
-					case (err instanceof BadIssuerError):
-						throw new UnprocessableEntityException(err.message)
-					default:
-						// otherwise throw as InternalServerErrorException
-						l.error("unhandled error", "error", err)
-						throw new InternalServerErrorException("internal server error")
-				}
-			}
+			return await issueCertificate(c, l,
+				() => createSignedHostCertificate(c.env, data.body.public_key, opts),
+				CertificateType.Host,
+			)
 		}
 	}
 }
@@ -377,43 +190,7 @@ const RevokeCertificateEndpoint = (env: SshCaBindings, certificateType: Certific
 				...group("request", "type", certificateTypeName(certificateType), "action", "revoke", "serial", data.body.serial),
 			)
 
-			// ensure certificate can be revoked
-			const status = await revocationStatus(c.env, data.body.serial, data.body.public_key, certificateType)
-			switch (status) {
-				case RevocationStatus.Revoked:
-					l.warn("certificate is already revoked")
-					throw new ConflictException("certificate is already revoked")
-				case RevocationStatus.NotFound:
-					l.warn("certificate not found")
-					throw new NotFoundException("certificate not found")
-			}
-
-			try {
-				const res = await revokeCertificate(c.env, data.body.serial)
-
-				if (res.length === 0) {
-					throw new InternalServerErrorException("no results were returned for revocation")
-				}
-
-				if (res.length > 1) {
-					l.warn("more than one revocation result was returned", "count", res.length)
-				}
-
-				l.info("completed revocation")
-				return c.json({
-					revoked_at: res[0]!.revoked_at
-				})
-			} catch (err) {
-				switch (true) {
-					case (err instanceof ApiException):
-						// re-throw any exisiting chanfana error
-						throw err
-					default:
-						// otherwise throw as InternalServerErrorException
-						l.error("unhandled error", "error", err)
-						throw new InternalServerErrorException("internal server error")
-				}
-			}
+			return await revoke(c, l, data.body.serial, data.body.public_key, certificateType)
 		}
 	}
 }

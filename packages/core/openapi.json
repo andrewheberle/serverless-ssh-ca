@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Serverless SSH CA API",
-    "version": "3.0.0"
+    "version": "4.0.0"
   },
   "components": {
     "securitySchemes": {
@@ -202,6 +202,103 @@
           "certificate",
           "public_key",
           "proof"
+        ]
+      },
+      "User Certificate Issue Request": {
+        "type": "object",
+        "properties": {
+          "public_key": {
+            "type": "string",
+            "format": "byte",
+            "description": "SSH public key to sign",
+            "example": "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
+          },
+          "identity": {
+            "type": "string",
+            "description": "Identity Token JWT from OIDC IdP",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "permit-X11-forwarding",
+              "permit-agent-forwarding",
+              "permit-port-forwarding",
+              "permit-pty",
+              "permit-user-rc"
+            ],
+            "description": "Extensions to include in the issued SSH certificate"
+          },
+          "lifetime": {
+            "type": "integer",
+            "minimum": 300,
+            "maximum": 86400,
+            "default": 86400,
+            "description": "Lifetime of issued SSH certificate"
+          }
+        },
+        "required": [
+          "public_key",
+          "identity"
+        ]
+      },
+      "Host Certificate Issue Request": {
+        "type": "object",
+        "properties": {
+          "public_key": {
+            "type": "string",
+            "format": "byte",
+            "description": "SSH public key to sign",
+            "example": "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
+          },
+          "identity": {
+            "type": "string",
+            "description": "Identity Token JWT from OIDC IdP",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
+          },
+          "principals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "List of principals to include on the issued certificate"
+          },
+          "lifetime": {
+            "type": "integer",
+            "minimum": 86400,
+            "maximum": 2592000,
+            "default": 2592000,
+            "description": "Lifetime of issued Host SSH certificate"
+          }
+        },
+        "required": [
+          "public_key",
+          "identity",
+          "principals"
+        ]
+      },
+      "Host Certificate Renewal Request": {
+        "type": "object",
+        "properties": {
+          "certificate": {
+            "type": "string",
+            "format": "byte",
+            "description": "SSH certificate to renew, which must have the serial number in the path"
+          },
+          "lifetime": {
+            "type": "integer",
+            "minimum": 86400,
+            "maximum": 2592000,
+            "default": 2592000,
+            "description": "Lifetime of renewed Host SSH certificate"
+          }
+        },
+        "required": [
+          "certificate"
         ]
       }
     },
@@ -1688,6 +1785,1438 @@
                     "success",
                     "errors"
                   ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/ca": {
+      "get": {
+        "tags": [
+          "CA"
+        ],
+        "summary": "Get the CA public key",
+        "description": "Returns the public key of the SSH Certificate Authority in OpenSSH format, for use in `TrustedUserCAKeys` on SSH servers or `@cert-authority` entries in `known_hosts` on SSH clients.",
+        "operationId": "get_ca_public_key",
+        "responses": {
+          "200": {
+            "description": "Returns SSH Certificate Authority Public Key",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/user/certificates": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "operationId": "issue_user_certificate",
+        "summary": "Request a user certificate",
+        "description": "Issues a signed SSH user certificate for the provided public key. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key for `public_key` in the `Proof-Of-Possession` header made for this request. Principals on the issued certificate are derived from the identity token.",
+        "security": [
+          {
+            "oidcAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Access Token JWT from OIDC IdP",
+              "example": "Bearer eyJ..."
+            },
+            "required": true,
+            "description": "Access Token JWT from OIDC IdP",
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+              "example": "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0K..."
+            },
+            "required": true,
+            "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+            "name": "Proof-Of-Possession",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User Certificate Issue Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSH User Certificate issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Certificate Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/user/certificates/{serial}": {
+      "delete": {
+        "tags": [
+          "User"
+        ],
+        "operationId": "revoke_user_certificate",
+        "summary": "Revoke a user certificate",
+        "description": "Revokes a user certificate issued by this CA and adds it to the user Key Revocation List. The `Proof-Of-Possession` header must contain a proof of possession of the private key for the public key that the certificate was issued for, made for this request. A certificate issued for a different public key is reported as not found.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9]\\d*)$",
+              "description": "Serial number of the certificate",
+              "example": "12345678901234567890"
+            },
+            "required": true,
+            "description": "Serial number of the certificate",
+            "name": "serial",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+              "example": "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0K..."
+            },
+            "required": true,
+            "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+            "name": "Proof-Of-Possession",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSH user certificate revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Revocation Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/user/krl": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get the Key Revocation List for user certificates",
+        "description": "Returns the OpenSSH Key Revocation List (KRL) of revoked user certificates issued by this CA, along with an SSHSIG signature made by the CA key so the KRL can be verified before use.",
+        "operationId": "get_user_revocation_list",
+        "responses": {
+          "200": {
+            "description": "Returns an Open SSH Key Revocation List of revoked user certificates as BASE64 and an SSHSIG signature for verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Key Revocation List Response"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/host/certificates": {
+      "post": {
+        "tags": [
+          "Host"
+        ],
+        "operationId": "issue_host_certificate",
+        "summary": "Request a host certificate",
+        "description": "Issues a signed SSH host certificate for the provided public key and principals. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key for `public_key` in the `Proof-Of-Possession` header made for this request. The user must be permitted to request host certificates by email address or role.",
+        "security": [
+          {
+            "oidcAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Access Token JWT from OIDC IdP",
+              "example": "Bearer eyJ..."
+            },
+            "required": true,
+            "description": "Access Token JWT from OIDC IdP",
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+              "example": "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0K..."
+            },
+            "required": true,
+            "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+            "name": "Proof-Of-Possession",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Host Certificate Issue Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSH Host Certificate issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Certificate Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/host/certificates/{serial}/renew": {
+      "post": {
+        "tags": [
+          "Host"
+        ],
+        "operationId": "renew_host_certificate",
+        "summary": "Renew a host certificate",
+        "description": "Issues a new SSH host certificate for the same public key and principals as an existing, unexpired and unrevoked host certificate issued by this CA. No OIDC authentication is required; instead the `Proof-Of-Possession` header must contain a proof of possession of the private key for the existing certificate made for this request. The lifetime of the renewed certificate is no longer than that of the existing certificate.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9]\\d*)$",
+              "description": "Serial number of the certificate",
+              "example": "12345678901234567890"
+            },
+            "required": true,
+            "description": "Serial number of the certificate",
+            "name": "serial",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+              "example": "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0K..."
+            },
+            "required": true,
+            "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+            "name": "Proof-Of-Possession",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Host Certificate Renewal Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSH Host Certificate renewed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Certificate Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/host/certificates/{serial}": {
+      "delete": {
+        "tags": [
+          "Host"
+        ],
+        "operationId": "revoke_host_certificate",
+        "summary": "Revoke a host certificate",
+        "description": "Revokes a host certificate issued by this CA and adds it to the host Key Revocation List. The `Proof-Of-Possession` header must contain a proof of possession of the private key for the public key that the certificate was issued for, made for this request. A certificate issued for a different public key is reported as not found.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9]\\d*)$",
+              "description": "Serial number of the certificate",
+              "example": "12345678901234567890"
+            },
+            "required": true,
+            "description": "Serial number of the certificate",
+            "name": "serial",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+              "example": "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0K..."
+            },
+            "required": true,
+            "description": "Proof of possession of the private key comprising of `${timestamp}.${fingerprint}.${signature}`. The signature is a BASE64 encoded armored SSHSIG signature, made with the `request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle` namespace, of `${timestamp}.${fingerprint}.${METHOD} ${path}` where `${METHOD} ${path}` is the request the proof is for, for example `DELETE /api/v4/user/certificates/12345678901234567890`. The timestamp is in milliseconds since the Unix epoch.",
+            "name": "Proof-Of-Possession",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSH host certificate revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Revocation Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message",
+                          "path"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v4/host/krl": {
+      "get": {
+        "tags": [
+          "Host"
+        ],
+        "summary": "Get the Key Revocation List for host certificates",
+        "description": "Returns the OpenSSH Key Revocation List (KRL) of revoked host certificates issued by this CA, along with an SSHSIG signature made by the CA key so the KRL can be verified before use.",
+        "operationId": "get_host_revocation_list",
+        "responses": {
+          "200": {
+            "description": "Returns an Open SSH Key Revocation List of revoked host certificates as BASE64 and an SSHSIG signature for verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Key Revocation List Response"
                 }
               }
             }
