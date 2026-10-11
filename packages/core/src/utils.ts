@@ -364,6 +364,12 @@ export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked
 			return fatalIssue(ctx, "the provided certificate was not signed by this CA", val)
 		}
 
+		// only host certificates can be renewed, as renewal does not need the
+		// OIDC authentication a user certificate is issued with
+		if (val.certificate.subjects.length === 0 || !val.certificate.subjects.every((s) => s.type === "host")) {
+			return fatalIssue(ctx, "the provided certificate is not a host certificate", val)
+		}
+
 		// check certificate is within its validity period, allowing for clock
 		// skew at the start as a certificate issued moments ago may have a
 		// validity start up to a second in the future
