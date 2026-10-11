@@ -4,7 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import sshpk from "sshpk"
-import type { Certificate, PrivateKey } from "sshpk"
+import type { PrivateKey } from "sshpk"
+import type { SshCertificate } from "../src/ssh/certificate.js"
 import { createSignedCertificate, createSignedHostCertificate } from "../src/certificate.js"
 import { makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
@@ -19,8 +20,8 @@ const curves = [
 
 // whether the r value of the certificate signature is shorter than the size
 // of the curve, which is when sshpk cannot work out the curve from its length
-const hasShortR = (certificate: Certificate, size: number): boolean => {
-	const r = certificate.signatures.openssh!.signature.part.r.data
+const hasShortR = (certificate: SshCertificate, size: number): boolean => {
+	const r = sshpk.parseCertificate(Buffer.from(certificate.toString()), "openssh").signatures.openssh!.signature.part.r.data
 	const value = BigInt(`0x${r.toString("hex") || "0"}`)
 
 	return value < 1n << BigInt((size - 1) * 8)
@@ -41,8 +42,8 @@ const sshKeygenList = (certificate: string): { status: number | null, output: st
 	}
 }
 
-const expectValid = (certificate: Certificate, ca: PrivateKey) => {
-	const text = certificate.toString("openssh")
+const expectValid = (certificate: SshCertificate, ca: PrivateKey) => {
+	const text = certificate.toString()
 
 	const parsed = sshpk.parseCertificate(Buffer.from(text), "openssh")
 	expect(parsed.isSignedByKey(ca.toPublic())).toBe(true)

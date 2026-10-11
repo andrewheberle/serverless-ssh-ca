@@ -7,10 +7,14 @@ import { seconds } from "itty-time"
 import { split, UnsupportedKeyError } from "../src/utils.js"
 import { makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
-import { Format, Identity, identityForUser, PrivateKey } from "sshpk"
+import sshpk, { Format, Identity, identityForUser, PrivateKey } from "sshpk"
+import type { SshCertificate } from "../src/ssh/certificate.js"
 import { SshCaBindings } from "../src/types.js"
 
 const lifetimeString = "24 hours"
+
+// parse an issued certificate with sshpk, so it is checked independently of how it was encoded
+const parse = (certificate: SshCertificate) => sshpk.parseCertificate(Buffer.from(certificate.toString()), "openssh")
 
 type Tests = {
     name: string
@@ -31,7 +35,7 @@ const tests: Tests[] = [
             "group1",
             "group2",
         ],
-        serial: generateSerial().readBigUInt64BE(0),
+        serial: generateSerial(),
         caKey: ecdsaKey.ca(),
     },
     {
@@ -42,7 +46,7 @@ const tests: Tests[] = [
             "group1",
             "group2",
         ],
-        serial: generateSerial().readBigUInt64BE(0),
+        serial: generateSerial(),
         caKey: ed25519Key.ca(),
     },
 	{
@@ -60,7 +64,7 @@ const tests: Tests[] = [
 			SSH_CERTIFICATE_INCLUDE_SELF: true,
 			SSH_CERTIFICATE_PRINCIPALS: undefined
 		},
-        serial: generateSerial().readBigUInt64BE(0),
+        serial: generateSerial(),
         caKey: ed25519Key.ca(),
     },
 	{
@@ -79,7 +83,7 @@ const tests: Tests[] = [
 			SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: true,
 			SSH_CERTIFICATE_PRINCIPALS: undefined
 		},
-        serial: generateSerial().readBigUInt64BE(0),
+        serial: generateSerial(),
         caKey: ed25519Key.ca(),
     },
 	{
@@ -99,7 +103,7 @@ const tests: Tests[] = [
 			SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: true,
 			SSH_CERTIFICATE_PRINCIPALS: undefined
 		},
-        serial: generateSerial().readBigUInt64BE(0),
+        serial: generateSerial(),
         caKey: ed25519Key.ca(),
     }
 ]
@@ -109,8 +113,8 @@ for (const tt of tests) {
 
     describe(`generateCertificate (${tt.name})`, async () => {
 		const defaultPrincipals = tt.defaultPrincipals === undefined ? split(env.SSH_CERTIFICATE_PRINCIPALS) : tt.defaultPrincipals
-        it(`${tt.name}: handle RSA user key`, () => {
-            const certificate = generateCertificate(env, tt.email, tt.caKey, rsaKey.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
+        it(`${tt.name}: handle RSA user key`, async () => {
+            const certificate = parse(await generateCertificate(env, tt.email, tt.caKey, rsaKey.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
 
             // check its signed by the CA
             expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -141,8 +145,8 @@ for (const tt of tests) {
             expect(lifetime).toBe(seconds(lifetimeString))
         })
 
-        it(`${tt.name}: handle ECDSA user key`, () => {
-            const certificate = generateCertificate(env, tt.email, tt.caKey, ecdsaKey.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
+        it(`${tt.name}: handle ECDSA user key`, async () => {
+            const certificate = parse(await generateCertificate(env, tt.email, tt.caKey, ecdsaKey.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
 
             // check its signed by the CA
             expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -173,8 +177,8 @@ for (const tt of tests) {
             expect(lifetime).toBe(seconds(lifetimeString))
         })
 
-        it(`${tt.name}: handle ED25519 user key`, () => {
-            const certificate = generateCertificate(env, tt.email, tt.caKey, ed25519Key.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial })
+        it(`${tt.name}: handle ED25519 user key`, async () => {
+            const certificate = parse(await generateCertificate(env, tt.email, tt.caKey, ed25519Key.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, serial: tt.serial }))
 
             // check its signed by the CA
             expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -205,8 +209,8 @@ for (const tt of tests) {
             expect(lifetime).toBe(seconds(lifetimeString))
         })
 
-        it(`${tt.name}: user key with less extensions`, () => {
-            const certificate = generateCertificate(env, tt.email, tt.caKey, ed25519Key.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["permit-user-rc"], serial: tt.serial})
+        it(`${tt.name}: user key with less extensions`, async () => {
+            const certificate = parse(await generateCertificate(env, tt.email, tt.caKey, ed25519Key.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["permit-user-rc"], serial: tt.serial}))
 
             // check its signed by the CA
             expect(certificate.isSignedByKey(tt.caKey.toPublic())).toBe(true)
@@ -237,9 +241,9 @@ for (const tt of tests) {
             expect(lifetime).toBe(seconds(lifetimeString))
         })
 
-        it(`${tt.name}: user key with extra extensions`, () => {
-            expect(() => generateCertificate(env, tt.email, tt.caKey, ed25519Key.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
-                .toThrow("no-touch-required is not allowed")
+        it(`${tt.name}: user key with extra extensions`, async () => {
+            await expect(generateCertificate(env, tt.email, tt.caKey, ed25519Key.user().toPublic(), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
+                .rejects.toThrow("no-touch-required is not allowed")
         })
     })
 }

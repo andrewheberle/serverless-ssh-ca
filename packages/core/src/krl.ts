@@ -1,5 +1,5 @@
-import type { AlgorithmPart, PrivateKey } from "sshpk"
-import { toFixedWidth } from "./sshsig/sig_parser.js"
+import type { PrivateKey } from "sshpk"
+import { createSigner, publicKeyBlob } from "./ssh/signer.js"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,188 +59,12 @@ function encodeSection(sectionType: number, data: Uint8Array): Uint8Array {
     return concat(new Uint8Array([sectionType]), encodeString(data))
 }
 
-// ── CA public-key extraction ─────────────────────────────────────────────────
-
-/**
- * Extract the SSH wire-format public key bytes from an sshpk PrivateKey.
- *
- * sshpk's "ssh" format produces a string like:
- *   ssh-ed25519 AAAA...base64... [comment]
- *
- * The base64 blob *is* the SSH wire encoding of the public key, so we just
- * decode it.  This works for both Ed25519 and ECDSA keys.
- */
-function caKeyWireBytes(caKey: PrivateKey): Uint8Array {
-    const sshString = caKey.toPublic().toString("ssh")
-    // Format: "<type> <base64> [<comment>]"  — we want the second token.
-    const base64 = sshString.trim().split(/\s+/)[1]
-    if (!base64) {
-        throw new Error("Unexpected sshpk 'ssh' format output: " + sshString)
-    }
-    const binary = atob(base64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i)
-    }
-    return bytes
-}
-
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const SSHSIG_MAGIC = new TextEncoder().encode("SSHSIG")
 const SIG_VERSION = 1
 const NAMESPACE = "krl@com.github.serverless-ssh-ca.andrewheberle"
 const HASH_ALGORITHM = "sha512"
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Get the raw bytes of a named part of an sshpk key.
- */
-function keyPart(key: PrivateKey, name: AlgorithmPart): Uint8Array {
-    const part = key.parts.find((p) => p.name === name)
-    if (part === undefined) {
-        throw new Error(`Missing ${name} part in ${key.type} key`)
-    }
-    return part.data
-}
-
-/**
- * Base64url-encode bytes without padding, as used for JWK values.
- */
-function base64url(bytes: Uint8Array): string {
-    let binary = ""
-    for (const byte of bytes) {
-        binary += String.fromCharCode(byte)
-    }
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
-}
-
-/**
- * Import an sshpk PrivateKey into a WebCrypto CryptoKey.
- * Supports Ed25519 and ECDSA (P-256 / P-384 / P-521).
- */
-async function importPrivateKey(caKey: PrivateKey): Promise<{
-    cryptoKey: CryptoKey
-    sigAlgo: string // SSH signature algorithm name
-    webCryptoAlgo: Parameters<SubtleCrypto["sign"]>[0]
-}> {
-    const type = caKey.type // "ed25519" | "ecdsa" | etc.
-    const curve = (caKey as unknown as { curve?: string }).curve
-
-    if (type === "ed25519") {
-        // import from the raw key parts as a JWK rather than via sshpk's PKCS#8
-        // output, which drops a leading zero byte from the seed (about 1 key in
-        // 512) and is then rejected by WebCrypto
-        const seed = keyPart(caKey, "k")
-        const publicKey = keyPart(caKey, "A")
-        if (seed.length !== 32 || publicKey.length !== 32) {
-            throw new Error(`Unexpected Ed25519 key part lengths: k=${seed.length} A=${publicKey.length}`)
-        }
-        const cryptoKey = await crypto.subtle.importKey(
-            "jwk",
-            { kty: "OKP", crv: "Ed25519", d: base64url(seed), x: base64url(publicKey) },
-            { name: "Ed25519" },
-            false,
-            ["sign"],
-        )
-        return {
-            cryptoKey,
-            sigAlgo: "ssh-ed25519",
-            webCryptoAlgo: { name: "Ed25519" },
-        }
-    } else if (type === "ecdsa") {
-        let namedCurve: string
-        let sigAlgo: string
-        let hash: string
-        let size: number // bytes in each coordinate and the private key
-
-        if (curve === "nistp256") {
-            namedCurve = "P-256"
-            sigAlgo = "ecdsa-sha2-nistp256"
-            hash = "SHA-256"
-            size = 32
-        } else if (curve === "nistp384") {
-            namedCurve = "P-384"
-            sigAlgo = "ecdsa-sha2-nistp384"
-            hash = "SHA-384"
-            size = 48
-        } else if (curve === "nistp521") {
-            namedCurve = "P-521"
-            sigAlgo = "ecdsa-sha2-nistp521"
-            hash = "SHA-512"
-            size = 66
-        } else {
-            throw new Error(`Unsupported ECDSA curve: ${curve}`)
-        }
-
-        // import from the raw key parts as a JWK rather than via sshpk's PKCS#8
-        // output, which drops leading zero bytes from the private key so it is
-        // shorter than RFC 5915 requires (about half of P-521 keys)
-        const point = keyPart(caKey, "Q")
-        if (point.length !== 1 + size * 2 || point[0] !== 0x04) {
-            throw new Error(`Unexpected ECDSA public key encoding for ${curve}`)
-        }
-        // d is an SSH mpint, so may be short or have a leading sign byte
-        const d = toFixedWidth(keyPart(caKey, "d"), size)
-        const cryptoKey = await crypto.subtle.importKey(
-            "jwk",
-            {
-                kty: "EC",
-                crv: namedCurve,
-                d: base64url(d),
-                x: base64url(point.subarray(1, 1 + size)),
-                y: base64url(point.subarray(1 + size)),
-            },
-            { name: "ECDSA", namedCurve },
-            false,
-            ["sign"],
-        )
-        return {
-            cryptoKey,
-            sigAlgo,
-            webCryptoAlgo: { name: "ECDSA", hash: { name: hash } },
-        }
-    } else {
-        throw new Error(`Unsupported key type: ${type}`)
-    }
-}
-
-/**
- * Convert a WebCrypto ECDSA signature (IEEE P1363: raw r||s) to the SSH wire
- * encoding: string(algo) + string(mpint(r) + mpint(s)).
- *
- * SSH mpints are big-endian, with a leading 0x00 byte if the high bit is set.
- */
-function p1363ToSshEcdsaSig(
-    p1363: Uint8Array,
-    sigAlgo: string,
-): Uint8Array {
-    const half = p1363.length / 2
-    const r = p1363.slice(0, half)
-    const s = p1363.slice(half)
-
-    function encodeMpint(n: Uint8Array): Uint8Array {
-        // Strip leading zero bytes, then re-pad if high bit set.
-        let start = 0
-        while (start < n.length - 1 && n[start] === 0) start++
-        const trimmed = n.slice(start)
-        const padded =
-            trimmed[0]! & 0x80 ? concat(new Uint8Array([0x00]), trimmed) : trimmed
-        return encodeString(padded)
-    }
-
-    const innerSig = concat(encodeMpint(r), encodeMpint(s))
-    return concat(encodeString(sigAlgo), encodeString(innerSig))
-}
-
-/**
- * Wrap an Ed25519 WebCrypto signature into SSH wire encoding:
- * string(algo) + string(sig_bytes)
- */
-function wrapEd25519Sig(sig: Uint8Array): Uint8Array {
-    return concat(encodeString("ssh-ed25519"), encodeString(sig))
-}
 
 /**
  * Base64-encode bytes and wrap in SSH signature armor at 76 chars per line.
@@ -310,7 +134,7 @@ export class KRLBuilder {
         const keyIds = [...this._keyIds].sort()
 
         const content = concat(
-            encodeString(caKeyWireBytes(this._caKey)),
+            encodeString(publicKeyBlob(this._caKey)),
             encodeUint32(serials.length),
             ...serials.map(encodeUint64),
             encodeUint32(keyIds.length),
@@ -375,7 +199,7 @@ export class KRLBuilder {
         //   <one or more cert sub-sections>
         //
         const certSectionData = concat(
-            encodeString(caKeyWireBytes(this._caKey)), // ca_key
+            encodeString(publicKeyBlob(this._caKey)), // ca_key
             encodeString(""), // reserved
             ...certSubSections
         )
@@ -409,7 +233,7 @@ export class KRLBuilder {
         } else {
             krl = this._krl
         }
-        const { cryptoKey, sigAlgo, webCryptoAlgo } = await importPrivateKey(this._caKey)
+        const signer = await createSigner(this._caKey)
 
         // 1. Hash the KRL bytes with SHA-512.
         const krlHash = new Uint8Array(
@@ -431,18 +255,10 @@ export class KRLBuilder {
             encodeString(krlHash),
         )
 
-        // 3. Sign the blob.
-        const rawSig = new Uint8Array(
-            await crypto.subtle.sign(webCryptoAlgo, cryptoKey, signedData),
-        )
+        // 3. Sign the blob, which returns the signature in SSH wire format.
+        const sshSig = await signer.sign(signedData)
 
-        // 4. Encode the signature into SSH wire format.
-        const sshSig =
-            sigAlgo === "ssh-ed25519"
-                ? wrapEd25519Sig(rawSig)
-                : p1363ToSshEcdsaSig(rawSig, sigAlgo)
-
-        // 5. Assemble the outer SSHSIG blob.
+        // 4. Assemble the outer SSHSIG blob.
         //
         //   byte[6]  "SSHSIG"
         //   uint32   SIG_VERSION (1)
@@ -451,18 +267,17 @@ export class KRLBuilder {
         //   string   reserved  (empty)
         //   string   hash_algorithm
         //   string   signature
-        const publicKeyWire = caKeyWireBytes(this._caKey)
         const sigBlob = concat(
             SSHSIG_MAGIC,
             encodeUint32(SIG_VERSION),
-            encodeString(publicKeyWire),
+            encodeString(signer.publicKey),
             encodeString(NAMESPACE),
             encodeString(""),      // reserved
             encodeString(HASH_ALGORITHM),
             encodeString(sshSig),
         )
 
-        // 6. Armor and return.
+        // 5. Armor and return.
         return armorSignature(sigBlob)
     }
 }

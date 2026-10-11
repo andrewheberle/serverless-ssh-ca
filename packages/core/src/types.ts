@@ -20,12 +20,6 @@ export type CertificateRequestJWTPayload = {
     [key: string]: string | string[]
 } & JWTPayload
 
-export type SSHExtension = {
-    critical: boolean;
-    name: string;
-    data: Buffer<ArrayBuffer>
-}
-
 /**
  * The result of executing a statement via {@link CaPreparedStatement.run} or
  * {@link CaDatabase.batch}, modelled on a Cloudflare D1 result.

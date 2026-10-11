@@ -1,5 +1,6 @@
 import sshpk from "sshpk"
-import type { Certificate, Format, Identity, Key } from "sshpk"
+import type { Key } from "sshpk"
+import type { SshCertificate } from "../ssh/certificate.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { D1QB } from "workers-qb"
@@ -52,27 +53,22 @@ export const dbCleanup = async (env: SshCaBindings) => {
 	}
 }
 
-export const recordCertificate = async (env: SshCaBindings, certificate: Certificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
-	const serial = certificate.serial.readBigUInt64BE(0)
-	const subjects = certificate.subjects.map((v: Identity): string => {
-		return v.toString()
-	}).join(",")
-	const extensions = certificate.getExtensions().map((v: Format.OpenSshSignatureExt | Format.x509SignatureExt): string => {
-		// @ts-expect-error: the name property does exist
-		return v.name as string
-	}).join(",")
+export const recordCertificate = async (env: SshCaBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
+	// principals are recorded as distinguished names, as they were when
+	// certificates were created with sshpk
+	const principals = certificate.principals.map((p) => `${certificate.kind === "host" ? "CN" : "UID"}=${p}`).join(",")
 	const qb = await connect(env)
 	const res = await qb.insert({
 		tableName: "certificates",
 		data: {
-			serial: `${serial}`,
+			serial: `${certificate.serial}`,
 			key_id: keyid,
-			principals: subjects,
-			extensions: extensions,
-			valid_after: certificate.validFrom.toISOString(),
-			valid_before: certificate.validUntil.toISOString(),
+			principals: principals,
+			extensions: certificate.extensions.join(","),
+			valid_after: certificate.validAfter.toISOString(),
+			valid_before: certificate.validBefore.toISOString(),
 			certificate_type: certificateType,
-			public_key: certificate.subjectKey.toString("ssh")
+			public_key: certificate.publicKeyString()
 		},
 	}).execute()
 
