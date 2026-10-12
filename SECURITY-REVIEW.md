@@ -156,10 +156,42 @@ lifetimes short.
   only). This goes against the repository's own rule to validate data that
   crosses a trust boundary with Zod.
 
-**Recommendations:** Validate the claims with Zod (`email: z.email()`,
-`sub: z.string().min(1)`). Reject `email_verified === false`. Optionally add
-`SSH_CERTIFICATE_ALLOWED_EMAIL_DOMAINS`. Document that `INCLUDE_SELF` is only
-safe with a single-domain IdP.
+**Claim types.** `verifyJWT<CertificateRequestJWTPayload>` only tells the
+TypeScript compiler what shape to assume. jose checks the signature and the
+registered claims (`iss`, `aud`, `exp`, `nbf`), but nothing else. The only
+runtime check on `email` is `!== undefined`, and `sub` is not checked at all.
+Results with `SSH_CERTIFICATE_INCLUDE_SELF=true`:
+
+| `email` claim | Result |
+|---|---|
+| `42`, `true`, `["a@x.com","b@x.com"]`, `{"a":1}` | `500 Internal Error` (fails while encoding the key ID or splitting the email) |
+| `""` | `200`, key ID `""` |
+| `"root"` (not an email address) | `200`, key ID `root`, **principal `root`** |
+
+Wrong types fail closed, but as 500 errors that look like server faults. A
+string that isn't an email address is accepted, and with `INCLUDE_SELF` the
+whole string becomes a principal. Whether that can be exploited depends on
+whether the IdP lets users set the claim. A missing or non-string `sub` leads
+to finding 6.
+
+**`email_verified`.** This is a standard OIDC claim (OpenID Connect Core
+§5.1): a boolean that is `true` when the IdP has confirmed the user controls
+the address. IdPs that allow self-registration or user-edited profiles (for
+example Auth0 database connections, or Keycloak with self-registration) can
+issue tokens with `email_verified: false` for an address the user doesn't
+own. Not every IdP sends the claim. Microsoft Entra ID doesn't by default, and
+Microsoft advises against using `email` for authorization. Check a real token
+from your IdP (including Cloudflare Access) before deciding how strict to be.
+
+**Recommendations:**
+- Validate the verified payload with a Zod schema:
+  `sub: z.string().min(1)`, `email: z.email()`, and
+  `email_verified: z.boolean().optional()`. Return 401 or 403 on failure,
+  not 500.
+- Reject `email_verified === false`. Optionally add a setting that also
+  requires it to be present and `true`, for IdPs that send it.
+- Optionally add `SSH_CERTIFICATE_ALLOWED_EMAIL_DOMAINS`.
+- Document that `INCLUDE_SELF` is only safe with a single-domain IdP.
 
 ### 6. Low: the subject-match check passes when `sub` is missing
 
@@ -277,6 +309,17 @@ client has moved to v4, add an option to turn v3 off.
 2. Supersede certificates on renewal and add administrator or by-key revocation (findings 3 and 4).
 3. Validate token claims with Zod (findings 5 and 6).
 4. Cache the JWKS, add rate limiting and tighten configuration validation (findings 7 and 8).
+
+## Maintainer decisions
+
+| # | Decision | Planned change |
+|---|---|---|
+| 1 | Accepted risk, partly fixed. Hosts are reached by IP address, bare hostname or FQDN, so the CA won't restrict which names it issues for. Wildcard names will be refused. | Reject host principals containing `*`, `?` or `!` (also worth refusing `,`, whitespace and control characters). |
+| 2 | Fix. The audience becomes required. | Make `JWT_AUD` required (Node.js start-up and Workers request time), and check it on the access token as well as the identity token. |
+| 3 | Fix. Renewing a host certificate revokes the certificate presented. | Revoke the presented certificate as part of renewal, so the KRL lists it and it can't be renewed again. |
+| 4 | Deferred. An admin UI is on the roadmap. | None for now. Keep host lifetimes short in the meantime. |
+| 5 | Needs review. | See the claim type and `email_verified` notes under finding 5. |
+| 6 | Fix. A missing `sub` is a failure, not a skipped check. | Reject the request when either token lacks a non-empty string `sub` (part of the Zod claim validation in finding 5). |
 
 ## Appendix: proof-of-concept tests
 
