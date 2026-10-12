@@ -1,6 +1,7 @@
 import z from "zod"
 import type { SshCaBindings } from "../types.js"
 import {
+	refineSubjectKey,
 	transformAuthorizationHeader,
 	transformPublicKey,
 	transformIdentityToken,
@@ -66,6 +67,14 @@ export const proofOfPossession = z.string()
 
 export const publicKey = openapiStringByte
 	.transform(transformPublicKey)
+	.meta({
+		description: "SSH public key to sign",
+		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
+	})
+
+export const subjectPublicKey = openapiStringByte
+	.transform(transformPublicKey)
+	.superRefine(refineSubjectKey)
 	.meta({
 		description: "SSH public key to sign",
 		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="

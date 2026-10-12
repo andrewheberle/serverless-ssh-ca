@@ -267,6 +267,11 @@ format at `/docs` and in [openapi.json](openapi.json):
 | Revoke host certificate  | `POST /api/v3/host/revoke`      | `DELETE /api/v4/host/certificates/{serial}`     |
 | Get host KRL             | `GET /api/v3/host/krl`          | `GET /api/v4/host/krl`                          |
 
+Certificates are issued for Ed25519, ECDSA and RSA keys. RSA keys must be at
+least 2048 bits; a request for a smaller key is refused with a `400` error,
+and a certificate for a smaller key cannot be renewed. Certificates for
+smaller keys can still be revoked.
+
 ### Proof of Possession
 
 Requests that use an SSH key prove possession of its private key by including
