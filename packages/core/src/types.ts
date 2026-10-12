@@ -89,8 +89,25 @@ export interface CaSecret {
 }
 
 /**
- * The bindings (environment) the CA expects, see {@link CaDatabase} and
- * {@link CaSecret} for the non-string bindings.
+ * A rate limiter, with the same shape as a Cloudflare Workers rate limit
+ * binding.
+ *
+ * A Workers `RateLimit` binding satisfies this structurally. On other
+ * runtimes any limiter with the same shape may be used.
+ */
+export interface CaRateLimiter {
+    /**
+     * Counts a request against the limit for a key
+     *
+     * @param options The key the request is counted against, for example the client IP address
+     * @returns Whether the request is within the limit
+     */
+    limit(options: { key: string }): Promise<{ success: boolean }>
+}
+
+/**
+ * The bindings (environment) the CA expects, see {@link CaDatabase},
+ * {@link CaSecret} and {@link CaRateLimiter} for the non-string bindings.
  */
 export interface SshCaBindings {
 	CERTIFICATE_REQUEST_TIME_SKEW_MAX: string
@@ -107,6 +124,11 @@ export interface SshCaBindings {
     DB: CaDatabase
     ISSUER_DN: string
     PRIVATE_KEY: CaSecret
+    /**
+     * Limits requests to issue, renew and revoke certificates, see
+     * {@link CaRateLimiter}. Requests are not limited when this is not set.
+     */
+    RATE_LIMITER?: CaRateLimiter
     SSH_CERTIFICATE_EXTENSIONS: string
     SSH_CERTIFICATE_INCLUDE_SELF_EMAIL?: string | boolean
     SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean

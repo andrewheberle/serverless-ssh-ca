@@ -365,6 +365,47 @@ As the local part does not include the domain, `alice@example.com` and
 `SSH_CERTIFICATE_INCLUDE_SELF`. Only enable it when the IdP only allows users
 from domains you control.
 
+### Rate Limiting
+
+Requests to issue, renew and revoke certificates can be rate limited by
+adding a [rate limit binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+named `RATE_LIMITER` to `wrangler.jsonc`:
+
+```jsonc
+"ratelimits": [
+	{
+		"name": "RATE_LIMITER",
+		"namespace_id": "1001",
+		"simple": { "limit": 10, "period": 60 }
+	}
+]
+```
+
+Requests are counted by the client IP address in the `CF-Connecting-IP`
+header, and requests over the limit receive a `429` response. Requests to get
+the CA public key and the KRLs are not limited, as many hosts may fetch them
+from the same address. When no `RATE_LIMITER` binding is configured, requests
+are not limited. If the rate limiter fails, the request is allowed and the
+error is logged, so certificates can still be issued and revoked.
+
+On Node.js, pass any limiter with the same shape (a `limit({ key })` method
+returning `{ success }`, see `CaRateLimiter`) as `RATE_LIMITER`, and choose
+the key requests are counted by with the `rateLimitKey` option, as there is no
+`CF-Connecting-IP` header:
+
+```ts
+const ca = createSshCa(bindingsFromEnv({
+    DB: fromNodeSqlite(new DatabaseSync("/var/lib/ssh-ca/ssh-ca.sqlite")),
+    PRIVATE_KEY: secretFromFile("/etc/ssh-ca/ca_key"),
+    RATE_LIMITER: myLimiter,
+}), {
+    // the client address as set by your reverse proxy
+    rateLimitKey: (req) => req.headers.get("X-Real-IP") ?? undefined,
+})
+```
+
+Requests for which `rateLimitKey` returns `undefined` are not limited.
+
 ### Client
 
 Please visit the ssh-ca-client repository for further information:

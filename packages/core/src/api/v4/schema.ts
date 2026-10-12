@@ -12,6 +12,7 @@ import {
 	contentJson,
 	InputValidationException,
 	InternalServerErrorException,
+	TooManyRequestsException,
 	NotFoundException,
 	UnauthorizedException,
 	ForbiddenException,
@@ -131,6 +132,7 @@ export const createIssueUserCertificateEndpointSchema = (env: SshCaBindings) => 
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 	}
 })
 
@@ -169,6 +171,7 @@ export const createIssueHostCertificateEndpointSchema = (env: SshCaBindings) => 
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 	}
 })
 
@@ -207,6 +210,7 @@ export const createRenewHostCertificateEndpointSchema = (env: SshCaBindings) => 
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 	}
 })
 
@@ -232,5 +236,6 @@ export const createRevokeCertificateEndpointSchema = (env: SshCaBindings, certif
 		...NotFoundException.schema(),
 		...ConflictException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 	}
 })
