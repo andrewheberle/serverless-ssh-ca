@@ -4,6 +4,7 @@
 |---|---|
 | Date | 2026-10-12 |
 | Version reviewed | v0.23.0 (`95c586d`) |
+| Status updated | 2026-10-12, after #472, #473, #474, #475 and #476 were merged |
 | Scope | `packages/core` (API v3 and v4, OIDC token handling, proof of possession, certificate issuance and renewal, revocation and KRL, SSH and SSHSIG parsing, database layer, Node.js helpers), example Workers configuration, GitHub Actions workflows |
 | Out of scope | `ssh-ca-client` (Go client), Cloudflare platform configuration, the IdP itself |
 | Method | Manual code review, plus proof-of-concept tests run against the real request handlers (see [Appendix](#appendix-proof-of-concept-tests)) |
@@ -16,18 +17,22 @@ careful and well tested. Most findings are about **authorization policy**:
 who can get a certificate for which principals, and how a certificate can
 be withdrawn once issued.
 
-| # | Severity | Finding | Verified |
-|---|---|---|---|
-| 1 | **High** | Host certificate principals are not restricted, so wildcards and other hosts' names are accepted | PoC |
-| 2 | **Medium/High** | The access token's audience is never checked, and the identity token's audience is optional | PoC |
-| 3 | **Medium** | Renewal does not replace the old certificate, so revoking the renewed one can be undone by renewing again | PoC |
-| 4 | **Medium** | Only the key holder can revoke a certificate; there is no administrator revocation | Code |
-| 5 | **Medium** | `SSH_CERTIFICATE_INCLUDE_SELF` uses the email local-part as a principal, which can collide across domains, and `email_verified` is not checked | Code |
-| 6 | Low | The subject-match check passes when neither token has a `sub` claim | PoC |
-| 7 | Low | No rate limiting, and the JWKS is fetched again on every request | Code |
-| 8 | Low | Configuration validation gaps (HTTP JWKS URL, negative retention, Workers vars not validated) | Code |
-| 9 | Low | v3 proofs of possession can be replayed against other endpoints (already documented) | Code |
-| 10 | Info | Smaller hardening and robustness items | Code |
+| # | Severity | Finding | Verified | Status |
+|---|---|---|---|---|
+| 1 | **High** | Host certificate principals are not restricted, so wildcards and other hosts' names are accepted | PoC | Wildcards fixed in #472; other names accepted by design |
+| 2 | **Medium/High** | The access token's audience is never checked, and the identity token's audience is optional | PoC | Fixed in #473 |
+| 3 | **Medium** | Renewal does not replace the old certificate, so revoking the renewed one can be undone by renewing again | PoC | Fixed in #474 |
+| 4 | **Medium** | Only the key holder can revoke a certificate; there is no administrator revocation | Code | Open, planned with an admin UI |
+| 5 | **Medium** | `SSH_CERTIFICATE_INCLUDE_SELF` uses the email local-part as a principal, which can collide across domains, and `email_verified` is not checked | Code | Claims validated in #476; collision documented |
+| 6 | Low | The subject-match check passes when neither token has a `sub` claim | PoC | Fixed in #475 |
+| 7 | Low | No rate limiting, and the JWKS is fetched again on every request | Code | Open |
+| 8 | Low | Configuration validation gaps (HTTP JWKS URL, negative retention, Workers vars not validated) | Code | Open |
+| 9 | Low | v3 proofs of possession can be replayed against other endpoints (already documented) | Code | Open |
+| 10 | Info | Smaller hardening and robustness items | Code | Open |
+
+The findings below describe the code as reviewed in v0.23.0. See
+[Maintainer decisions and changes](#maintainer-decisions-and-changes) for
+what was changed and what remains.
 
 ---
 
@@ -303,37 +308,50 @@ client has moved to v4, add an option to turn v3 off.
   default, `persist-credentials: false` is set, and npm trusted publishing
   with attestations is used.
 
-## Suggested priority
+## Maintainer decisions and changes
 
-1. Restrict host principals (finding 1) and require and check the audience on both tokens (finding 2).
-2. Supersede certificates on renewal and add administrator or by-key revocation (findings 3 and 4).
-3. Validate token claims with Zod (findings 5 and 6).
-4. Cache the JWKS, add rate limiting and tighten configuration validation (findings 7 and 8).
-
-## Maintainer decisions
-
-| # | Decision | Planned change |
+| # | Decision | Change |
 |---|---|---|
-| 1 | Accepted risk, partly fixed. Hosts are reached by IP address, bare hostname or FQDN, so the CA won't restrict which names it issues for. Wildcard names will be refused. | Reject host principals containing `*`, `?` or `!` (also worth refusing `,`, whitespace and control characters). |
-| 2 | Fix. The audience becomes required. | Make `JWT_AUD` required (Node.js start-up and Workers request time), and check it on the access token as well as the identity token. |
-| 3 | Fix. Renewing a host certificate revokes the certificate presented. | Revoke the presented certificate as part of renewal, so the KRL lists it and it can't be renewed again. |
-| 4 | Deferred. An admin UI is on the roadmap. | None for now. Keep host lifetimes short in the meantime. |
-| 5 | Needs review. | See the claim type and `email_verified` notes under finding 5. |
-| 6 | Fix. A missing `sub` is a failure, not a skipped check. | Reject the request when either token lacks a non-empty string `sub` (part of the Zod claim validation in finding 5). |
+| 1 | Accepted risk, partly fixed. Hosts are reached by IP address, bare host name or FQDN, so the CA doesn't restrict which names it issues for, but wildcard names are refused. | #472: host certificate requests refuse principals containing `*`, `?`, `!` or `,`, whitespace or control characters, or that are empty. Renewal refuses a certificate with such a principal, so earlier certificates can't be carried forward. |
+| 2 | Fix. The audience is required. | #473 (breaking): `JWT_AUD` is required, and both the access token and the identity token must be issued for it. `JWT_ACCESS_TOKEN_AUD` can be set when access tokens use a different audience. Node.js fails at start up without `JWT_AUD`; Workers returns a 500 for requests that need a token. |
+| 3 | Fix. Renewing a host certificate revokes the certificate presented. | #474: renewal revokes the presented certificate in the same transaction that records the new one, so it is added to the host KRL and can't be renewed again, and concurrent renewals of one certificate produce a single new certificate. `sshd` must be reloaded to present the renewed certificate to clients that check the KRL. |
+| 4 | Deferred. An admin UI is on the roadmap. | None yet. Until then, host certificate lifetime is the only control over a lost host key, so keep it short. |
+| 5 | Fix the claim handling and document the collision. | #476: the access token's `email` claim must be an email address, and `email_verified` must be `true` when the IdP includes it. The README explains that `SSH_CERTIFICATE_INCLUDE_SELF` gives users with the same local part in different domains the same principal. Requiring `email_verified` to be present is not configurable yet. |
+| 6 | Fix. A missing `sub` is a failure, not a skipped check. | #475: both tokens must have a `sub` claim that is a non-empty string, or the request is rejected with a 400. |
+
+Findings 7 to 10 have not been addressed yet. In priority order:
+
+1. Cache the JWKS and add rate limiting (finding 7).
+2. Tighten configuration validation: require an `https` JWKS URL, refuse negative retention, and validate the Workers vars (finding 8).
+3. Set a deprecation date for the v3 API (finding 9).
+4. The informational items (finding 10).
 
 ## Appendix: proof-of-concept tests
 
 These tests were run against `createSshCa` with the existing test helpers.
 Save the file as `packages/core/tests/security-poc.test.ts` and run
 `npx vitest run tests/security-poc.test.ts` (this needs `ssh-keygen` on
-`PATH`). Results observed:
+`PATH`). They print the responses rather than asserting on them, so they
+pass either way.
+
+Results against v0.23.0, where every request succeeded:
 
 ```
-WILDCARD   status 200, kind host, principals ["*"], keyId "host_*"
-ACCESS_AUD 200   (access token aud = "some-other-app")
-NO_AUD     200   (JWT_AUD unset, both tokens aud = "some-other-app")
-NO_SUB     200   (keyId "victim@example.com", tokens for different users, no sub)
-RENEW_AFTER_REVOKE 200 200   (revoke B succeeds, then renewing A succeeds)
+1:  200, principals ["*"] (keyId "host_*")
+2a: 200   (access token aud = "some-other-app")
+2b: 200   (JWT_AUD unset, both tokens aud = "some-other-app")
+6:  200   (keyId "victim@example.com", tokens for different users, no sub)
+3:  200 200   (revoking B succeeds, then renewing A succeeds)
+```
+
+Results after #472 to #476, where each request is refused:
+
+```
+1:  400
+2a: 400
+2b: 500   (JWT_AUD is required)
+6:  400
+3:  200 400   (A was revoked when it was renewed, so it can't be renewed again)
 ```
 
 ```ts
@@ -370,7 +388,8 @@ describe("security PoC", () => {
 		const r = await req(ca, "POST", "/api/v4/host/certificates",
 			{ public_key: pk(hostKey), identity: await getIdentityToken(claims), principals: ["*"] },
 			generateRequestProof(hostKey, "POST", "/api/v4/host/certificates"), await getAccessToken(claims))
-		console.log(r.status, listCertificate(Buffer.from((await r.json()).certificate, "base64").toString()).principals)
+		const body = await r.json() as { certificate?: string }
+		console.log(r.status, body.certificate === undefined ? "" : listCertificate(Buffer.from(body.certificate, "base64").toString()).principals)
 	})
 
 	it("2a: access token for another audience", async () => {
