@@ -166,6 +166,13 @@ describe("running on Node.js with node:sqlite", () => {
 		expect(renewed.kind).toBe("host")
 		expect(renewed.principals).toEqual(["renewed_host"])
 		expect(renewed.publicKey).toBe(fingerprint(key.publicKey))
+
+		// the certificate that was renewed is revoked, so cannot be renewed again
+		const previous = listCertificate(Buffer.from(certificate, "base64").toString())
+		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${previous.serial}`)).toEqual({ revoked_at: expect.any(String) })
+		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${renewed.serial}`)).toEqual({ revoked_at: null })
+		const repeated = await post(ca, "/api/v3/host/renew", { certificate, public_key: publicKey(key), proof: generateProof(key) })
+		expect(repeated.status).toBe(400)
 	})
 
 	it("should not renew a user certificate", async () => {
@@ -204,8 +211,14 @@ describe("running on Node.js with node:sqlite", () => {
 		expect(response.status).toBe(200)
 		expect(await response.json()).toEqual({ revoked_at: expect.any(String) })
 
+		// earlier tests also revoke host certificates, as renewal revokes the
+		// certificate that was renewed
+		const revoked = (sqlite.prepare("SELECT serial FROM certificates WHERE certificate_type = 1 AND revoked_at NOTNULL ORDER BY id").all() as { serial: string }[])
+			.map((row) => BigInt(row.serial))
+		expect(revoked).toContain(serial)
+
 		const { krl, version } = await getKrl(ca, "host")
-		expect(krl).toEqual(Buffer.from(new KRLBuilder(priv(ecdsaKey.ca())).addSerials([serial]).generate(version)))
+		expect(krl).toEqual(Buffer.from(new KRLBuilder(priv(ecdsaKey.ca())).addSerials(revoked).generate(version)))
 	})
 
 	it("should not serve endpoints for an unknown certificate type", async () => {

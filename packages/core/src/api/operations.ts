@@ -2,6 +2,7 @@ import { group, Logger } from "@andrewheberle/ts-slog"
 import {
 	ApiException,
 	ConflictException,
+	InputValidationException,
 	InternalServerErrorException,
 	NotFoundException,
 	UnprocessableEntityException,
@@ -18,6 +19,7 @@ import {
 	getKrlVersion,
 	getRevocationList,
 	recordCertificate,
+	recordRenewal,
 	RevocationStatus,
 	revocationStatus,
 	revokeCertificate,
@@ -116,21 +118,34 @@ export const revocationList = async (c: AppContext, l: Logger, certificateType: 
  * @param l The logger for the request
  * @param sign Signs and returns the certificate
  * @param certificateType The type of certificate being issued
+ * @param renews The host certificate being renewed, which is revoked when the new certificate is recorded
  * @returns The response containing the issued certificate
  */
-export const issueCertificate = async (c: AppContext, l: Logger, sign: () => Promise<SshCertificate>, certificateType: CertificateType): Promise<Response> => {
+export const issueCertificate = async (c: AppContext, l: Logger, sign: () => Promise<SshCertificate>, certificateType: CertificateType, renews?: SshCertificate): Promise<Response> => {
 	try {
 		const certificate = await sign()
 		const response: CertificateSignerResponse = {
 			certificate: btoa(certificate.toString())
 		}
 
+		let recorded: boolean
 		try {
-			await recordCertificate(c.env, certificate, certificate.keyId, certificateType)
+			if (renews === undefined) {
+				await recordCertificate(c.env, certificate, certificate.keyId, certificateType)
+				recorded = true
+			} else {
+				recorded = await recordRenewal(c.env, renews, certificate)
+			}
 		} catch (err) {
 			// a certificate that is not recorded cannot be revoked, so do not issue it
 			l.error("there was a problem adding issued certificate to database", "error", err)
 			throw new InternalServerErrorException("there was a problem recording the issued certificate")
+		}
+
+		if (!recorded) {
+			// the certificate was revoked, or renewed by another request, since it was checked
+			l.warn("certificate presented for renewal was revoked before the renewal was recorded")
+			throw new InputValidationException("the provided certificate is revoked", ["body", "certificate"])
 		}
 
 		l.info("completed issuing certificate",
@@ -138,6 +153,7 @@ export const issueCertificate = async (c: AppContext, l: Logger, sign: () => Pro
 				"certificate", "principals",
 				certificate.principals.join(","), "serial", certificate.serial,
 			),
+			...(renews === undefined ? [] : group("renewed", "serial", renews.serial)),
 		)
 
 		return c.json(response)

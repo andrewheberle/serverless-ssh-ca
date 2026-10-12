@@ -224,6 +224,12 @@ Renewals are done using the existing certificate and will succeed if:
 2. It was issued by the CA
 3. The public key used to obtain the certificate is the same as the one
 currently presented
+4. It has not been revoked, or already renewed
+
+The certificate that was renewed is revoked and added to the host KRL, so it
+cannot be used to renew again. SSH clients that check the host KRL will no
+longer accept it, so `sshd` must be reloaded to present the renewed
+certificate once it has been written to disk.
 
 This means the OIDC authentication flow is not required in this case as shown
 below when `ssh-ca-client-cli host --renew` is run:

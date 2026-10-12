@@ -49,28 +49,83 @@ export const dbCleanup = async (env: SshCaBindings) => {
 	}
 }
 
-export const recordCertificate = async (env: SshCaBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
+// the columns recorded for an issued certificate, in the order of the values
+// returned by certificateValues
+const CertificateColumns = ["serial", "key_id", "principals", "extensions", "valid_after", "valid_before", "certificate_type", "public_key"] as const
+
+const certificateRecord = (certificate: SshCertificate, keyid: string, certificateType: CertificateType) => {
 	// principals are recorded as distinguished names, as they were when
 	// certificates were created with sshpk
 	const principals = certificate.principals.map((p) => `${certificate.kind === "host" ? "CN" : "UID"}=${p}`).join(",")
+
+	return {
+		serial: `${certificate.serial}`,
+		key_id: keyid,
+		principals: principals,
+		extensions: certificate.extensions.join(","),
+		valid_after: certificate.validAfter.toISOString(),
+		valid_before: certificate.validBefore.toISOString(),
+		certificate_type: certificateType,
+		public_key: certificate.publicKey.toString()
+	}
+}
+
+const certificateValues = (certificate: SshCertificate, keyid: string, certificateType: CertificateType): (string | number)[] => {
+	const record = certificateRecord(certificate, keyid, certificateType)
+	return CertificateColumns.map((column) => record[column])
+}
+
+export const recordCertificate = async (env: SshCaBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
 	const qb = await connect(env)
 	const res = await qb.insert({
 		tableName: "certificates",
-		data: {
-			serial: `${certificate.serial}`,
-			key_id: keyid,
-			principals: principals,
-			extensions: certificate.extensions.join(","),
-			valid_after: certificate.validAfter.toISOString(),
-			valid_before: certificate.validBefore.toISOString(),
-			certificate_type: certificateType,
-			public_key: certificate.publicKey.toString()
-		},
+		data: certificateRecord(certificate, keyid, certificateType),
 	}).execute()
 
 	if (!res.success) {
 		throw new Error("error during query")
 	}
+}
+
+/**
+ * Records a host certificate issued by renewing another, revoking the
+ * certificate that was renewed so it cannot be used or renewed again.
+ *
+ * This is done in a single transaction, and the renewed certificate is only
+ * recorded if this call revoked the previous certificate, so when a
+ * certificate is renewed more than once concurrently only one renewal is
+ * recorded. A previous certificate that was never recorded (for example one
+ * signed with the CA key outside of the CA) is recorded so that it can be
+ * revoked.
+ *
+ * @param env The CA bindings
+ * @param previous The certificate that was presented for renewal
+ * @param certificate The certificate issued by the renewal
+ * @returns true if the renewal was recorded, or false if the previous certificate was already revoked
+ */
+export const recordRenewal = async (env: SshCaBindings, previous: SshCertificate, certificate: SshCertificate): Promise<boolean> => {
+	// ensure migrations have been applied
+	await connect(env)
+
+	const columns = CertificateColumns.join(", ")
+	const placeholders = CertificateColumns.map(() => "?").join(", ")
+	const revokedAt = (new Date).toISOString()
+
+	const results = await env.DB.batch([
+		env.DB.prepare(`INSERT INTO certificates (${columns}) VALUES (${placeholders}) ON CONFLICT (serial) DO NOTHING`)
+			.bind(...certificateValues(previous, previous.keyId, CertificateType.Host)),
+		env.DB.prepare("UPDATE certificates SET revoked_at = ? WHERE serial = ? AND certificate_type = ? AND revoked_at IS NULL")
+			.bind(revokedAt, `${previous.serial}`, CertificateType.Host),
+		// changes() is the number of rows revoked by the previous statement
+		env.DB.prepare(`INSERT INTO certificates (${columns}) SELECT ${placeholders} WHERE changes() = 1`)
+			.bind(...certificateValues(certificate, certificate.keyId, CertificateType.Host)),
+	])
+
+	if (results.some((res) => !res.success)) {
+		throw new Error("error during query")
+	}
+
+	return results[2]?.meta?.changes === 1
 }
 
 export const isRevoked = async (env: SshCaBindings, serial: bigint): Promise<boolean> => {
