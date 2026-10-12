@@ -16,6 +16,32 @@ export class MissingAudienceError extends Error {
 	}
 }
 
+type RemoteJWKSet = ReturnType<typeof createRemoteJWKSet>
+
+// the remote JWKS for each URL, kept between requests so the keys that jose
+// caches are reused rather than fetched again for every token
+const remoteJWKSets = new Map<string, RemoteJWKSet>()
+
+/**
+ * Returns the remote JWKS for a URL, creating it on first use.
+ *
+ * jose caches the keys it fetches for up to 10 minutes and fetches them again
+ * sooner when a token is signed with a key it does not have, so keys rotated
+ * by the IdP are still picked up.
+ *
+ * @param url The URL of the JWKS
+ * @returns The remote JWKS for the URL
+ */
+const remoteJWKSet = (url: string): RemoteJWKSet => {
+	let jwks = remoteJWKSets.get(url)
+	if (jwks === undefined) {
+		jwks = createRemoteJWKSet(new URL(url))
+		remoteJWKSets.set(url, jwks)
+	}
+
+	return jwks
+}
+
 /**
  * Verifies a JWT from the IdP, including that it was issued for one of the
  * audiences given.
@@ -31,9 +57,7 @@ export const verifyJWT = async (env: SshCaBindings, jwt: string, aud: string | s
 		throw new MissingAudienceError("no audience is configured for verifying tokens, set JWT_AUD")
 	}
 
-	const JWKS = createRemoteJWKSet(new URL(env.JWT_JWKS_URL))
-
-	return await jwtVerify<CertificateRequestJWTPayload>(jwt, JWKS, {
+	return await jwtVerify<CertificateRequestJWTPayload>(jwt, remoteJWKSet(env.JWT_JWKS_URL), {
 		issuer: env.JWT_ISSUER,
 		algorithms: split(env.JWT_ALGORITHMS),
 		audience: audience,
