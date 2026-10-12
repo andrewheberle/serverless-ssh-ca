@@ -3,7 +3,7 @@ import { JWKInvalid, JWKSInvalid, JWSInvalid, JWSSignatureVerificationFailed, JW
 import { CertificateParseError, SshCertificate } from "./ssh/certificate.js"
 import { KeyParseError, parsePrivateKey, PublicKey, UnsupportedKeyError, type PrivateKey } from "./ssh/keys.js"
 import z from "zod"
-import { verifyJWT } from "./verify.js"
+import { MissingAudienceError, verifyJWT } from "./verify.js"
 import { CertificateRequestJWTPayload } from "./types.js"
 import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
 import type { isRevoked as IsRevokedFn } from "./db/index.js"
@@ -69,8 +69,9 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 	}
 
 	try {
-		// verify jwt
-		const { payload } = await verifyJWT(env, jwt)
+		// verify jwt, which must be issued for this CA
+		const aud = split(env.JWT_ACCESS_TOKEN_AUD).length > 0 ? env.JWT_ACCESS_TOKEN_AUD : env.JWT_AUD
+		const { payload } = await verifyJWT(env, jwt, aud)
 
 		if (payload.email === undefined) {
 			return fatalIssue(ctx, "JWT was verified but was missing required email claim", val)
@@ -82,6 +83,10 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 		}
 	} catch (err) {
 		switch (true) {
+			case (err instanceof MissingAudienceError):
+				// a misconfigured CA is a server error, not a validation failure
+				l.error(err.message, "in", "transformAuthorizationHeader")
+				throw new InternalServerErrorException(err.message)
 			case (err instanceof JWSInvalid):
 				return fatalIssue(ctx, "the access token was invalid", val)
 			case (err instanceof JWTInvalid):
@@ -210,8 +215,7 @@ export const parseIdentity = async (env: SshCaBindings, jwt: string | undefined,
 		throw new Error("missing identity token")
 	}
 
-	const aud = split(env.JWT_AUD)
-	const { payload } = await verifyJWT(env, jwt, { aud: aud.length === 0 ? undefined : aud })
+	const { payload } = await verifyJWT(env, jwt, env.JWT_AUD)
 
 	const principals = identityPrincipals(env, payload, claim)
 
@@ -227,6 +231,11 @@ export const transformIdentityToken = async (env: SshCaBindings, val: string, ct
 
 		return identity
 	} catch (err) {
+		// a misconfigured CA is a server error, not a validation failure
+		if (err instanceof MissingAudienceError) {
+			logger(env).error(err.message, "in", "transformIdentityToken")
+			throw new InternalServerErrorException(err.message)
+		}
 		ctx.issues.push({
 			code: "custom",
 			message: err instanceof PrincipalsClaimError ? err.message : "problem parsing identity token",

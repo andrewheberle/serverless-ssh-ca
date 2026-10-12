@@ -340,6 +340,15 @@ Transfer the IdP settings as follows:
 The `openid` and `email` scopes are required, with enabling of refresh tokens
 (the `offline_access` scope) being optional, but recommended.
 
+`JWT_AUD` must be set to the audience the IdP issues tokens for this
+application with (for Cloudflare Access, the application's AUD tag). Both the
+access token and the identity token must be issued for this audience, so
+tokens the IdP issues for other applications are not accepted. If the IdP
+issues access tokens with a different audience to identity tokens, set
+`JWT_ACCESS_TOKEN_AUD` to the audience of the access token. Either value may
+be a comma separated list. If `JWT_AUD` is not set, requests that need a
+token fail with a `500` error.
+
 ### Client
 
 Please visit the ssh-ca-client repository for further information:
