@@ -220,6 +220,17 @@ export const getRevocationList = async (env: SshCaBindings, certificateType: Cer
 
 type RevokedCertificate = Pick<CertificateRecord, "revoked_at">
 
+/**
+ * Revokes a certificate that has not already been revoked.
+ *
+ * A certificate that is already revoked is left unchanged, so when several
+ * requests revoke the same certificate concurrently only one of them revokes
+ * it and the time it was first revoked is kept.
+ *
+ * @param env The CA bindings
+ * @param serial The serial of the certificate to revoke
+ * @returns The revocation time of the certificate, or an empty array if it was not revoked by this call
+ */
 export const revokeCertificate = async (env: SshCaBindings, serial: bigint): Promise<RevokedCertificate[]> => {
 	const qb = await connect(env)
 	const res = await qb.update<RevokedCertificate>({
@@ -228,7 +239,7 @@ export const revokeCertificate = async (env: SshCaBindings, serial: bigint): Pro
 			revoked_at: (new Date).toISOString()
 		},
 		where: {
-			conditions: "serial = ?",
+			conditions: "serial = ? AND revoked_at IS NULL",
 			params: `${serial}`
 		},
 		returning: ["revoked_at"]

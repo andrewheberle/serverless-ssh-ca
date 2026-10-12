@@ -208,7 +208,9 @@ export const revoke = async (c: AppContext, l: Logger, serial: bigint, publicKey
 		const res = await revokeCertificate(c.env, serial)
 
 		if (res.length === 0) {
-			throw new InternalServerErrorException("no results were returned for revocation")
+			// another request revoked the certificate after its status was checked
+			l.warn("certificate was revoked by another request")
+			throw new ConflictException("certificate is already revoked")
 		}
 
 		if (res.length > 1) {
