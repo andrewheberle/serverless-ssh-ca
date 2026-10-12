@@ -1,8 +1,9 @@
 import type { ExecutionContext } from "hono"
 import { dbCleanup } from "./db/index.js"
-import { createApp } from "./router.js"
+import { createApp, type SshCaOptions } from "./router.js"
 import type { SshCaBindings } from "./types.js"
-export type { CaDatabase, CaDatabaseQueryResult, CaDatabaseResult, CaPreparedStatement, CaSecret, SshCaBindings } from "./types.js"
+export type { CaDatabase, CaDatabaseQueryResult, CaDatabaseResult, CaPreparedStatement, CaRateLimiter, CaSecret, SshCaBindings } from "./types.js"
+export { cloudflareClientIp, type RateLimitKey, type SshCaOptions } from "./router.js"
 
 // the handlers the CA exposes, compatible with a Cloudflare Workers ExportedHandler
 type SshCaHandler = {
@@ -35,10 +36,11 @@ export interface SshCa {
  * the runtime on each request.
  *
  * @param env The bindings (configuration, database and private key) for the CA, see {@link SshCaBindings}
+ * @param options Options for the CA, such as the key requests are rate limited by, see {@link SshCaOptions}
  * @returns The CA's request handler and database cleanup task, see {@link SshCa}
  */
-export const createSshCa = (env: SshCaBindings): SshCa => {
-    const app = createApp(env)
+export const createSshCa = (env: SshCaBindings, options: SshCaOptions = {}): SshCa => {
+    const app = createApp(env, options)
 
     return {
         fetch: async (req: Request): Promise<Response> => await app.fetch(req, env),

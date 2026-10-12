@@ -17,6 +17,7 @@ import {
 	ForbiddenException,
 	InputValidationException,
 	InternalServerErrorException,
+	TooManyRequestsException,
 	UnauthorizedException,
 	UnprocessableEntityException,
 } from "chanfana"
@@ -86,6 +87,7 @@ export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) =
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 	}
 })
 
@@ -130,6 +132,7 @@ export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) =
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 	}
 })
 
@@ -172,6 +175,7 @@ export const createHostCertificateRenewEndpointSchema = (env: SshCaBindings) => 
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 	}
 })
 
@@ -213,6 +217,7 @@ export const createRevokeCertificateEndpointSchema = (env: SshCaBindings, certif
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
+		...TooManyRequestsException.schema(),
 		...ConflictException.schema()
 	}
 })

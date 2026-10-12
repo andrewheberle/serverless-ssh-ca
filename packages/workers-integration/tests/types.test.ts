@@ -1,4 +1,4 @@
-import type { CaDatabase, CaSecret, SshCaBindings } from "@andrewheberle/serverless-ssh-ca"
+import type { CaDatabase, CaRateLimiter, CaSecret, SshCaBindings } from "@andrewheberle/serverless-ssh-ca"
 import { describe, it, expectTypeOf } from "vitest"
 
 // these assertions are enforced by the type check run before the tests
@@ -13,5 +13,9 @@ describe("package types", () => {
 
 	it("accepts a Secrets Store binding as its secret", () => {
 		expectTypeOf<SecretsStoreSecret>().toExtend<CaSecret>()
+	})
+
+	it("accepts a rate limit binding as its rate limiter", () => {
+		expectTypeOf<RateLimit>().toExtend<CaRateLimiter>()
 	})
 })
