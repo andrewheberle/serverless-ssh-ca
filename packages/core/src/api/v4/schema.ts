@@ -1,6 +1,7 @@
 import z from "zod"
 import type { SshCaBindings } from "../../types.js"
 import {
+	refineHostPrincipal,
 	refineRenewableCertificate,
 	split,
 	transformCertificate,
@@ -137,7 +138,7 @@ export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 		public_key: publicKey,
 		identity: createIdentityTokenSchema(env),
-		principals: z.array(z.string()).min(1)
+		principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1)
 			.meta({ description: "List of principals to include on the issued certificate" }),
 		lifetime: z.int()
 			.min(seconds("24 hours"))

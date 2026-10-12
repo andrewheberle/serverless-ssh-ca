@@ -1,6 +1,7 @@
 import z from "zod"
 import type { SshCaBindings } from "../../types.js"
 import {
+	refineHostPrincipal,
 	split,
 	refineCertificateRequest,
 	transformProofOfPossession,
@@ -93,7 +94,7 @@ export const hostCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 				proof: proofOfPossession
 					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
 				identity: createIdentityTokenSchema(env),
-				principals: z.array(z.string()).min(1)
+				principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1)
 					.meta({ description: "List of principals to include on the issued certificate" }),
 				lifetime: z.int()
 					.min(seconds("24 hours"))

@@ -106,6 +106,18 @@ describe("running on Node.js with node:sqlite", () => {
 		])
 	})
 
+	it("should not issue a host certificate for a wildcard principal", async () => {
+		const key = ecdsaKey.host()
+		const response = await post(ca, "/api/v3/host/certificate", {
+			public_key: publicKey(key),
+			proof: generateProof(key),
+			identity: await getIdentityToken(claims),
+			principals: ["test_host", "*"],
+		}, await getAccessToken(claims))
+		expect(response.status).toBe(400)
+		expect(sqlite.prepare("SELECT serial FROM certificates WHERE principals LIKE '%*%'").all()).toEqual([])
+	})
+
 	it("should revoke a certificate and include it in the KRL", async () => {
 		const key = ecdsaKey.user()
 		const serial = await requestUserCertificate(ca, key)
