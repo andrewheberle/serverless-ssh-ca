@@ -18,6 +18,9 @@ vi.mock("../src/db", async (importOriginal) => {
 		recordCertificate: vi.fn(async () => {
 			throw new Error("database unavailable")
 		}),
+		recordRenewal: vi.fn(async () => {
+			throw new Error("database unavailable")
+		}),
 	}
 })
 

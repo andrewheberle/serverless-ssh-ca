@@ -191,7 +191,7 @@ export const createRenewHostCertificateEndpointSchema = (env: SshCaBindings) => 
 	tags: [certificateTypeTag(CertificateType.Host)],
 	operationId: "renew_host_certificate",
 	summary: "Renew a host certificate",
-	description: `Issues a new SSH host certificate for the same public key and principals as an existing, unexpired and unrevoked host certificate issued by this CA. No OIDC authentication is required; instead the \`${ProofHeader}\` header must contain a proof of possession of the private key for the existing certificate made for this request. The lifetime of the renewed certificate is no longer than that of the existing certificate.`,
+	description: `Issues a new SSH host certificate for the same public key and principals as an existing, unexpired and unrevoked host certificate issued by this CA. No OIDC authentication is required; instead the \`${ProofHeader}\` header must contain a proof of possession of the private key for the existing certificate made for this request. The lifetime of the renewed certificate is no longer than that of the existing certificate. The existing certificate is revoked, so it cannot be used or renewed again once the renewed certificate is installed.`,
 	request: {
 		params: serialParamSchema,
 		headers: createProofHeaderSchema(env),

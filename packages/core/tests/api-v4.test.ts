@@ -300,22 +300,32 @@ describe("v4 API", () => {
 			expect(renewed.listed.principals).toEqual(issued.listed.principals)
 			expect(renewed.listed.publicKey).toBe(fingerprint(hostKey.publicKey))
 
-			// a host certificate cannot be revoked through the user endpoint
-			expect((await revokeCertificate("user", serial, revokeProof(hostKey, "user", serial))).status).toBe(404)
-
-			const response = await revokeCertificate("host", serial, revokeProof(hostKey, "host", serial))
-			expect(response.status).toBe(200)
-
-			// ssh-keygen treats the revoked certificate as revoked by the KRL,
-			// but not the renewed one
+			// the renewed certificate was revoked by the renewal, so ssh-keygen
+			// treats it as revoked by the KRL, but not the new one
 			const krl = await getKrl(ca, "host")
 			expect(isRevoked(krl, issued.text)).toBe(true)
 			expect(isRevoked(krl, renewed.text)).toBe(false)
+			expect((await revokeCertificate("host", serial, revokeProof(hostKey, "host", serial))).status).toBe(409)
 
-			// a revoked certificate cannot be renewed
-			const revokedRenewal = await request(ca, "POST", `/api/v4/host/certificates/${serial}/renew`, {
+			// a renewed certificate cannot be renewed again
+			const repeatedRenewal = await request(ca, "POST", `/api/v4/host/certificates/${serial}/renew`, {
 				body: { certificate: Buffer.from(issued.text).toString("base64") },
 				proof: generateRequestProof(hostKey, "POST", `/api/v4/host/certificates/${serial}/renew`),
+			})
+			expect(repeatedRenewal.status).toBe(400)
+
+			// a host certificate cannot be revoked through the user endpoint
+			const renewedSerial = serialOf(renewed)
+			expect((await revokeCertificate("user", renewedSerial, revokeProof(hostKey, "user", renewedSerial))).status).toBe(404)
+
+			const response = await revokeCertificate("host", renewedSerial, revokeProof(hostKey, "host", renewedSerial))
+			expect(response.status).toBe(200)
+			expect(isRevoked(await getKrl(ca, "host"), renewed.text)).toBe(true)
+
+			// a revoked certificate cannot be renewed
+			const revokedRenewal = await request(ca, "POST", `/api/v4/host/certificates/${renewedSerial}/renew`, {
+				body: { certificate: Buffer.from(renewed.text).toString("base64") },
+				proof: generateRequestProof(hostKey, "POST", `/api/v4/host/certificates/${renewedSerial}/renew`),
 			})
 			expect(revokedRenewal.status).toBe(400)
 		})

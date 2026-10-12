@@ -174,6 +174,7 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 			return await issueCertificate(c, l,
 				() => createSignedHostCertificate(c.env, data.body.public_key, opts),
 				CertificateType.Host,
+				data.body.certificate,
 			)
 		}
 	}
