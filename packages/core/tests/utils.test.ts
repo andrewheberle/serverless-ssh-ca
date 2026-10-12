@@ -7,7 +7,7 @@ import { generateKey, signCertificate } from "./helpers/ssh-keygen.js"
 import { RenewalProofOfPossession } from "../src/proof.js"
 import { generateProof } from "./helpers/proof.js"
 import type { z } from "zod"
-import { getPrivateKey, getPublic, identityPrincipals, PrincipalsClaimError, refineHostCertificateRenewal, split, UnsupportedKeyError } from "../src/utils.js"
+import { getPrivateKey, getPublic, hostPrincipalIssue, identityPrincipals, PrincipalsClaimError, refineHostCertificateRenewal, split, UnsupportedKeyError } from "../src/utils.js"
 import type { CertificateRequestJWTPayload } from "../src/types.js"
 import { env, makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
@@ -189,5 +189,44 @@ describe("refineHostCertificateRenewal validity period", () => {
     it("should reject an expired certificate", async () => {
         const issues = await refine("-2h:-1h")
         expect(issues).toMatchObject([{ message: "the provided certificate is expired" }])
+    })
+})
+
+describe("hostPrincipalIssue", () => {
+    it.each(["host", "host.example.com", "192.0.2.10", "2001:db8::1", "[host.example.com]:2222"])("should allow %j", (principal) => {
+        expect(hostPrincipalIssue(principal)).toBeUndefined()
+    })
+
+    it.each(["", "*", "*.example.com", "host?", "!host", "a,b", "host name", "host\tname", "host\u0000"])("should not allow %j", (principal) => {
+        expect(hostPrincipalIssue(principal)).toEqual(expect.any(String))
+    })
+})
+
+describe("refineHostCertificateRenewal principals", () => {
+    const ca = ecdsaKey.ca()
+    const host = ecdsaKey.host()
+    const caEnv = makeEnv({ PRIVATE_KEY: new MockSecretStore(ca.privateKey) })
+    const isRevoked = async (): Promise<boolean> => false
+
+    const refine = async (principals: string[]): Promise<unknown[]> => {
+        const certificate = SshCertificate.parse(signCertificate(ca, host.publicKey, { kind: "host", keyId: "host_test_host", principals, validity: "-1m:+1h" }))
+        const issues: unknown[] = []
+        const ctx = { issues } as unknown as z.RefinementCtx
+        await refineHostCertificateRenewal(caEnv, isRevoked, {
+            certificate,
+            proof: new RenewalProofOfPossession(generateProof(host)),
+            public_key: pub(host),
+            lifetime: 3600,
+        }, ctx)
+        return issues
+    }
+
+    it("should renew a certificate with allowed principals", async () => {
+        expect(await refine(["test_host", "192.0.2.10"])).toEqual([])
+    })
+
+    it("should not renew a certificate with a wildcard principal", async () => {
+        const issues = await refine(["test_host", "*.example.com"])
+        expect(issues).toMatchObject([{ message: expect.stringContaining("the provided certificate cannot be renewed") }])
     })
 })

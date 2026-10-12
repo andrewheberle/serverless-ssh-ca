@@ -361,6 +361,30 @@ describe("v4 API", () => {
 			expect(await errorMessages(response)).toContain("certificate serial did not match the serial in the path")
 		})
 
+		it.each([
+			["*"],
+			["*.example.com"],
+			["host?.example.com"],
+			["!bad.example.com"],
+			["a.example.com,b.example.com"],
+			["host .example.com"],
+			["host\n.example.com"],
+			[""],
+		])("should not issue a host certificate for the principal %j", async (principal) => {
+			const response = await issueHostCertificate(hostKey, ["valid.example.com", principal])
+			expect(response.status).toBe(400)
+		})
+
+		it.each([
+			["192.0.2.10"],
+			["2001:db8::1"],
+			["host"],
+			["host.example.com"],
+		])("should issue a host certificate for the principal %j", async (principal) => {
+			const issued = await parseCertificate(await issueHostCertificate(hostKey, [principal]))
+			expect(issued.listed.principals).toEqual([principal])
+		})
+
 		it("should not issue a host certificate with a proof made for the user endpoint", async () => {
 			const response = await request(ca, "POST", "/api/v4/host/certificates", {
 				body: {

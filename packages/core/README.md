@@ -216,6 +216,12 @@ sequenceDiagram
     deactivate Client
 ```
 
+Host certificate principals may be IP addresses, bare host names or fully
+qualified domain names. As OpenSSH matches the principals of a host
+certificate as patterns, principals containing wildcard or pattern characters
+(`*`, `?`, `!` or `,`), whitespace or control characters are refused, as a
+principal such as `*` would make the certificate valid for every host.
+
 #### Renewals
 
 Renewals are done using the existing certificate and will succeed if:
