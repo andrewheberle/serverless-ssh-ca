@@ -118,6 +118,39 @@ export class PublicKey {
 	}
 }
 
+/**
+ * The smallest RSA key, in bits, that the CA will issue a certificate for.
+ * This matches the minimum accepted by ssh-ca-client.
+ */
+export const MinimumRsaKeyBits = 2048
+
+/**
+ * Returns the size in bits of the modulus of an RSA public key, or undefined
+ * if the key is not an RSA key.
+ *
+ * @param key The public key
+ */
+export const rsaKeyBits = (key: PublicKey): number | undefined => {
+	if (key.type !== "ssh-rsa") {
+		return undefined
+	}
+
+	// the fields of an RSA key are the exponent and the modulus, an mpint
+	// that may have a leading zero byte to keep it positive
+	const modulus = decodePublicKey(key.blob).fields[1]
+	if (modulus === undefined) {
+		return undefined
+	}
+
+	const start = modulus.findIndex((byte) => byte !== 0)
+	const first = modulus[start]
+	if (start === -1 || first === undefined) {
+		return 0
+	}
+
+	return (modulus.length - start - 1) * 8 + first.toString(2).length
+}
+
 /** The ECDSA curves that can be used to sign */
 export type EcdsaCurve = "nistp256" | "nistp384" | "nistp521"
 

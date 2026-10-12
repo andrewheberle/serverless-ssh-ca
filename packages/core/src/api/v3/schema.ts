@@ -32,6 +32,7 @@ import {
 	openapiStringByte,
 	proofOfPossession,
 	publicKey,
+	subjectPublicKey,
 } from "../schema.js"
 
 export {
@@ -45,7 +46,7 @@ export {
 
 export const userCertificateRequestEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
-		public_key: publicKey,
+		public_key: subjectPublicKey,
 		proof: proofOfPossession
 			.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
 		identity: createIdentityTokenSchema(env),
@@ -90,7 +91,7 @@ export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) =
 
 export const hostCertificateRequestEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
-				public_key: publicKey,
+				public_key: subjectPublicKey,
 				proof: proofOfPossession
 					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
 				identity: createIdentityTokenSchema(env),

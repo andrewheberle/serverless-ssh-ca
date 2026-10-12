@@ -29,7 +29,7 @@ import {
 	createIdentityTokenSchema,
 	createRevocationListEndpointSchema,
 	openapiStringByte,
-	publicKey,
+	subjectPublicKey,
 } from "../schema.js"
 
 /**
@@ -97,7 +97,7 @@ export const createGetRevocationListEndpointSchema = (certificateType: Certifica
 
 export const issueUserCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
-		public_key: publicKey,
+		public_key: subjectPublicKey,
 		identity: createIdentityTokenSchema(env),
 		extensions: z.array(z.string())
 			.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
@@ -136,7 +136,7 @@ export const createIssueUserCertificateEndpointSchema = (env: SshCaBindings) => 
 
 export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
-		public_key: publicKey,
+		public_key: subjectPublicKey,
 		identity: createIdentityTokenSchema(env),
 		principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1)
 			.meta({ description: "List of principals to include on the issued certificate" }),

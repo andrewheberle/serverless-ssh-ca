@@ -1,7 +1,7 @@
 import type { SshCaBindings } from "./types.js"
 import { JWKInvalid, JWKSInvalid, JWSInvalid, JWSSignatureVerificationFailed, JWTClaimValidationFailed, JWTExpired, JWTInvalid } from "jose/errors"
 import { CertificateParseError, SshCertificate } from "./ssh/certificate.js"
-import { KeyParseError, parsePrivateKey, PublicKey, UnsupportedKeyError, type PrivateKey } from "./ssh/keys.js"
+import { KeyParseError, MinimumRsaKeyBits, parsePrivateKey, PublicKey, rsaKeyBits, UnsupportedKeyError, type PrivateKey } from "./ssh/keys.js"
 import z from "zod"
 import { MissingAudienceError, verifyJWT } from "./verify.js"
 import { CertificateRequestJWTPayload } from "./types.js"
@@ -219,6 +219,36 @@ export const transformPublicKey = (val: string | Buffer<ArrayBufferLike>, ctx: z
 		}
 
 		return z.NEVER
+	}
+}
+
+/**
+ * Returns why a public key cannot be issued a certificate, or undefined if it
+ * can be.
+ *
+ * RSA keys must be at least {@link MinimumRsaKeyBits} bits, as smaller keys
+ * can be factored and are refused by current OpenSSH releases.
+ *
+ * @param key The public key a certificate would be issued for
+ * @returns The reason the key cannot be used, or undefined if it can be
+ */
+export const subjectKeyIssue = (key: PublicKey): string | undefined => {
+	const bits = rsaKeyBits(key)
+	if (bits !== undefined && bits < MinimumRsaKeyBits) {
+		return `RSA keys must be at least ${MinimumRsaKeyBits} bits, not ${bits}`
+	}
+
+	return undefined
+}
+
+/**
+ * Refines a public key so only one allowed by {@link subjectKeyIssue} is
+ * accepted for a certificate request.
+ */
+export const refineSubjectKey = (val: PublicKey, ctx: z.RefinementCtx): void => {
+	const issue = subjectKeyIssue(val)
+	if (issue !== undefined) {
+		fatalIssue(ctx, issue, val.toString())
 	}
 }
 
@@ -510,6 +540,13 @@ export const checkRenewableCertificate = async (env: SshCaBindings, isRevoked: t
 	// OIDC authentication a user certificate is issued with
 	if (certificate.kind !== "host") {
 		return "the provided certificate is not a host certificate"
+	}
+
+	// a certificate issued before small RSA keys were refused must not be
+	// renewed, as the renewal would keep its key
+	const keyIssue = subjectKeyIssue(certificate.publicKey)
+	if (keyIssue !== undefined) {
+		return `the provided certificate cannot be renewed: ${keyIssue}`
 	}
 
 	// a certificate issued before wildcard principals were refused must not
