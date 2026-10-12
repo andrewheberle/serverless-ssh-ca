@@ -97,7 +97,7 @@ describe("applyMigrations", () => {
 		const applied = await applyMigrations(db, migrations)
 
 		// only migrations added since are applied
-		expect(applied.map(m => m.name)).toEqual(["0002_krl_version"])
+		expect(applied.map(m => m.name)).toEqual(["0002_krl_version", "0003_krl_revision"])
 		expect(raw.prepare("SELECT name FROM sqlite_master WHERE name = 'certificates'").all()).toEqual([])
 	})
 
@@ -106,7 +106,7 @@ describe("applyMigrations", () => {
 
 		await applyMigrations(db, migrations)
 
-		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version"])
+		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version", "0003_krl_revision"])
 		expect(columns(raw, "certificates")).toEqual([
 			"id", "serial", "key_id", "principals", "extensions", "valid_after",
 			"valid_before", "revoked_at", "certificate_type", "public_key",
@@ -118,10 +118,10 @@ describe("applyMigrations", () => {
 
 		await applyMigrations(db, migrations)
 
-		expect(columns(raw, "krl")).toEqual(["certificate_type", "version", "digest", "updated_at"])
-		expect(raw.prepare("SELECT certificate_type, version, digest FROM krl ORDER BY certificate_type").all()).toEqual([
-			{ certificate_type: 0, version: 1, digest: null },
-			{ certificate_type: 1, version: 1, digest: null },
+		expect(columns(raw, "krl")).toEqual(["certificate_type", "version", "digest", "updated_at", "revision"])
+		expect(raw.prepare("SELECT certificate_type, version, digest, revision FROM krl ORDER BY certificate_type").all()).toEqual([
+			{ certificate_type: 0, version: 1, digest: null, revision: 0 },
+			{ certificate_type: 1, version: 1, digest: null, revision: 0 },
 		])
 	})
 })

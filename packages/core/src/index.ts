@@ -2,7 +2,7 @@ import type { ExecutionContext } from "hono"
 import { dbCleanup } from "./db/index.js"
 import { createApp, type SshCaOptions } from "./router.js"
 import type { SshCaBindings } from "./types.js"
-export type { CaDatabase, CaDatabaseQueryResult, CaDatabaseResult, CaPreparedStatement, CaRateLimiter, CaSecret, SshCaBindings } from "./types.js"
+export type { CaCache, CaDatabase, CaDatabaseQueryResult, CaDatabaseResult, CaPreparedStatement, CaRateLimiter, CaSecret, SshCaBindings } from "./types.js"
 export { cloudflareClientIp, type RateLimitKey, type SshCaOptions } from "./router.js"
 
 // the handlers the CA exposes, compatible with a Cloudflare Workers ExportedHandler

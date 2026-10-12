@@ -106,8 +106,24 @@ export interface CaRateLimiter {
 }
 
 /**
+ * A key-value cache, with the subset of a Cloudflare Workers KV namespace
+ * binding used by the CA.
+ *
+ * A Workers `KVNamespace` binding satisfies this structurally. On other
+ * runtimes any cache with the same shape may be used, such as the in-memory
+ * cache returned by `cacheInMemory` from `@andrewheberle/serverless-ssh-ca/node`.
+ */
+export interface CaCache {
+    /** Returns the value for a key, or null if there is none */
+    get(key: string): Promise<string | null>
+    /** Sets the value for a key, which may expire after `expirationTtl` seconds */
+    put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
+}
+
+/**
  * The bindings (environment) the CA expects, see {@link CaDatabase},
- * {@link CaSecret} and {@link CaRateLimiter} for the non-string bindings.
+ * {@link CaSecret}, {@link CaRateLimiter} and {@link CaCache} for the non-string
+ * bindings.
  */
 export interface SshCaBindings {
 	CERTIFICATE_REQUEST_TIME_SKEW_MAX: string
@@ -129,6 +145,11 @@ export interface SshCaBindings {
      * {@link CaRateLimiter}. Requests are not limited when this is not set.
      */
     RATE_LIMITER?: CaRateLimiter
+    /**
+     * Caches KRLs until a certificate is revoked, see {@link CaCache}. KRLs
+     * are generated for every request when this is not set.
+     */
+    CACHE?: CaCache
     SSH_CERTIFICATE_EXTENSIONS: string
     SSH_CERTIFICATE_INCLUDE_SELF_EMAIL?: string | boolean
     SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean

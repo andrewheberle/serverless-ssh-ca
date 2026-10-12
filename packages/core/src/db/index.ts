@@ -6,7 +6,7 @@ import { D1QB } from "workers-qb"
 import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
-import { CertificateType, type CertificateRecord, type DatabaseSchema, type KrlRecord } from "./types.js"
+import { CertificateType, type DatabaseSchema, type KrlRecord } from "./types.js"
 
 const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 	const l = logger(env)
@@ -24,6 +24,14 @@ const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
 		throw err
 	}
 }
+
+// statements that increment the KRL revision, so a KRL cached for an earlier
+// revision is not used again
+const BumpAllRevisions = "UPDATE krl SET revision = revision + 1"
+
+// increments the revision of the KRL for a certificate type, but only if the
+// previous statement in the same batch changed a row
+const BumpRevisionIfChanged = "UPDATE krl SET revision = revision + 1 WHERE certificate_type = ? AND changes() = 1"
 
 export const dbCleanup = async (env: SshCaBindings) => {
 	const l = logger(env).with("retention", env.DB_CERTIFICATE_RETENTION)
@@ -44,6 +52,12 @@ export const dbCleanup = async (env: SshCaBindings) => {
 			}
 		}).execute()
 		l.info("completed database cleanup", "changes", res.meta?.changes)
+
+		// revoked certificates may have been removed from the KRLs, so cached
+		// KRLs must not be used again
+		if ((res.meta?.changes ?? 0) > 0) {
+			await env.DB.prepare(BumpAllRevisions).run()
+		}
 	} catch (err) {
 		l.error("error during database cleanup", "retention", env.DB_CERTIFICATE_RETENTION, "error", err)
 	}
@@ -119,6 +133,8 @@ export const recordRenewal = async (env: SshCaBindings, previous: SshCertificate
 		// changes() is the number of rows revoked by the previous statement
 		env.DB.prepare(`INSERT INTO certificates (${columns}) SELECT ${placeholders} WHERE changes() = 1`)
 			.bind(...certificateValues(certificate, certificate.keyId, CertificateType.Host)),
+		// the previous certificate was revoked if the renewed one was recorded
+		env.DB.prepare(BumpRevisionIfChanged).bind(CertificateType.Host),
 	])
 
 	if (results.some((res) => !res.success)) {
@@ -218,7 +234,8 @@ export const getRevocationList = async (env: SshCaBindings, certificateType: Cer
 	return res.results.map(item => item.serial)
 }
 
-type RevokedCertificate = Pick<CertificateRecord, "revoked_at">
+/** The time a certificate was revoked, as an ISO 8601 string */
+type RevokedCertificate = { revoked_at: string }
 
 /**
  * Revokes a certificate that has not already been revoked.
@@ -232,34 +249,73 @@ type RevokedCertificate = Pick<CertificateRecord, "revoked_at">
  * @returns The revocation time of the certificate, or an empty array if it was not revoked by this call
  */
 export const revokeCertificate = async (env: SshCaBindings, serial: bigint): Promise<RevokedCertificate[]> => {
-	const qb = await connect(env)
-	const res = await qb.update<RevokedCertificate>({
-		tableName: "certificates",
-		data: {
-			revoked_at: (new Date).toISOString()
-		},
-		where: {
-			conditions: "serial = ? AND revoked_at IS NULL",
-			params: `${serial}`
-		},
-		returning: ["revoked_at"]
-	}).execute()
+	// ensure migrations have been applied
+	await connect(env)
 
-	if (!res.success) {
+	const revokedAt = (new Date).toISOString()
+
+	// the KRL revision is incremented in the same transaction, so a cached KRL
+	// that does not include this certificate is never used again
+	const results = await env.DB.batch([
+		env.DB.prepare("UPDATE certificates SET revoked_at = ? WHERE serial = ? AND revoked_at IS NULL")
+			.bind(revokedAt, `${serial}`),
+		env.DB.prepare("UPDATE krl SET revision = revision + 1 WHERE certificate_type = (SELECT certificate_type FROM certificates WHERE serial = ?) AND changes() = 1")
+			.bind(`${serial}`),
+	])
+
+	if (results.some((res) => !res.success)) {
 		throw new Error("error during query")
 	}
 
-	if (res.results === undefined) {
-		return []
-	}
+	return results[0]?.meta?.changes === 1 ? [{ revoked_at: revokedAt }] : []
+}
 
-	return res.results
+const KrlRevisionRow = z.object({
+	revision: z.number().int().nonnegative(),
+})
+
+/**
+ * Returns the revision of the KRL for a certificate type, which is
+ * incremented whenever a certificate of that type is revoked.
+ *
+ * @param env The CA bindings
+ * @param certificateType The type of certificates in the KRL
+ * @returns The current revision
+ */
+export const getKrlRevision = async (env: SshCaBindings, certificateType: CertificateType): Promise<bigint> => {
+	const qb = await connect(env)
+	const res = await qb.fetchOne({
+		tableName: "krl",
+		fields: ["revision"],
+		where: {
+			conditions: "certificate_type = ?",
+			params: certificateType
+		}
+	}).execute()
+
+	return BigInt(KrlRevisionRow.parse(res.results).revision)
 }
 
 const KrlVersionRow = z.object({
 	version: z.number().int().nonnegative(),
 	digest: z.string().nullable(),
+	updated_at: z.string(),
 })
+
+/**
+ * Parses a timestamp from the database, which is either an ISO 8601 string or,
+ * when set by SQLite's CURRENT_TIMESTAMP, "YYYY-MM-DD HH:MM:SS" in UTC.
+ */
+const parseTimestamp = (value: string): Date => {
+	return new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? `${value.replace(" ", "T")}Z` : value)
+}
+
+/** The version of a KRL and when that version was generated */
+export type KrlVersion = {
+	version: bigint
+	/** When the version was first generated, which is the same for every KRL with this version */
+	generatedAt: Date
+}
 
 // the number of times to retry when another request updates the KRL version concurrently
 const KRL_VERSION_ATTEMPTS = 5
@@ -275,15 +331,16 @@ const KRL_VERSION_ATTEMPTS = 5
  * @param env The bindings for the CA, see {@link SshCaBindings}
  * @param certificateType The type of certificates in the KRL, see {@link CertificateType}
  * @param digest A digest of the content of the KRL, which changes whenever the content does
- * @returns The version to use for the KRL
+ * @returns The version to use for the KRL, and when that version was first
+ * generated so that every KRL with the version has the same generation date
  */
-export const getKrlVersion = async (env: SshCaBindings, certificateType: CertificateType, digest: string): Promise<bigint> => {
+export const getKrlVersion = async (env: SshCaBindings, certificateType: CertificateType, digest: string): Promise<KrlVersion> => {
 	const qb = await connect(env)
 
 	for (let attempt = 0; attempt < KRL_VERSION_ATTEMPTS; attempt++) {
 		const res = await qb.fetchOne({
 			tableName: "krl",
-			fields: ["version", "digest"],
+			fields: ["version", "digest", "updated_at"],
 			where: {
 				conditions: "certificate_type = ?",
 				params: certificateType
@@ -292,17 +349,19 @@ export const getKrlVersion = async (env: SshCaBindings, certificateType: Certifi
 
 		const current = KrlVersionRow.parse(res.results)
 		if (current.digest === digest) {
-			return BigInt(current.version)
+			return { version: BigInt(current.version), generatedAt: parseTimestamp(current.updated_at) }
 		}
 
-		// only update if the version has not been changed by another request
+		// only update if the version has not been changed by another request,
+		// recording the time to the second as that is all a KRL records
 		const next = current.version + 1
+		const generatedAt = new Date(Math.floor(Date.now() / 1000) * 1000)
 		const updated = await qb.update<Pick<KrlRecord, "version">>({
 			tableName: "krl",
 			data: {
 				version: next,
 				digest: digest,
-				updated_at: (new Date).toISOString()
+				updated_at: generatedAt.toISOString()
 			},
 			where: {
 				conditions: "certificate_type = ? AND version = ?",
@@ -316,7 +375,7 @@ export const getKrlVersion = async (env: SshCaBindings, certificateType: Certifi
 		}
 
 		if (updated.results !== undefined && updated.results.length > 0) {
-			return BigInt(next)
+			return { version: BigInt(next), generatedAt }
 		}
 	}
 

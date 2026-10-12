@@ -31,6 +31,8 @@ export type KrlRecord = {
 	version: number
 	digest: string | null
 	updated_at: Date
+	/** Incremented whenever a certificate of this type is revoked */
+	revision: number
 }
 
 /** The tables in the database, used to type queries made with workers-qb */
