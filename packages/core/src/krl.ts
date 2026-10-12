@@ -150,14 +150,15 @@ export class KRLBuilder {
      *
      * @param krlVersion  Optional KRL version number (default: 1).
      * @param comment     Optional comment string embedded in the header.
+     * @param generatedAt Optional time the KRL was generated (default: now).
      */
-    generate(krlVersion: bigint = 1n, comment = ""): ArrayBuffer {
+    generate(krlVersion: bigint = 1n, comment = "", generatedAt?: Date): ArrayBuffer {
         if (this._krl !== null) {
             return this._krl
         }
 
         // ── Header ──────────────────────────────────────────────────────────────
-        const generatedDate = BigInt(Math.floor(Date.now() / 1000))
+        const generatedDate = BigInt(Math.floor((generatedAt?.getTime() ?? Date.now()) / 1000))
 
         const header = concat(
             encodeUint64(KRL_MAGIC),

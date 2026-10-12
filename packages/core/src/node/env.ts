@@ -1,6 +1,6 @@
 import { seconds } from "itty-time"
 import z from "zod"
-import type { CaDatabase, CaRateLimiter, CaSecret, SshCaBindings } from "../types.js"
+import type { CaCache, CaDatabase, CaRateLimiter, CaSecret, SshCaBindings } from "../types.js"
 
 const required = z.string().trim().min(1, { message: "must be set" })
 
@@ -73,13 +73,13 @@ export class InvalidConfigurationError extends Error {
  * })
  * ```
  *
- * @param bindings The database, private key and optional rate limiter, see {@link CaDatabase}, {@link CaSecret} and {@link CaRateLimiter}
+ * @param bindings The database, private key, optional rate limiter and optional cache, see {@link CaDatabase}, {@link CaSecret}, {@link CaRateLimiter} and {@link CaCache}
  * @param source The environment variables to read, `process.env` by default
  * @returns The bindings to pass to `createSshCa`
  * @throws {@link InvalidConfigurationError} if a variable is missing or invalid
  */
 export const bindingsFromEnv = (
-	bindings: { DB: CaDatabase, PRIVATE_KEY: CaSecret, RATE_LIMITER?: CaRateLimiter },
+	bindings: { DB: CaDatabase, PRIVATE_KEY: CaSecret, RATE_LIMITER?: CaRateLimiter, CACHE?: CaCache },
 	source: Record<string, string | undefined> = process.env,
 ): SshCaBindings => {
 	const result = EnvSchema.safeParse(source)
@@ -87,5 +87,5 @@ export const bindingsFromEnv = (
 		throw new InvalidConfigurationError(`invalid configuration:\n${z.prettifyError(result.error)}`)
 	}
 
-	return { ...result.data, DB: bindings.DB, PRIVATE_KEY: bindings.PRIVATE_KEY, RATE_LIMITER: bindings.RATE_LIMITER }
+	return { ...result.data, DB: bindings.DB, PRIVATE_KEY: bindings.PRIVATE_KEY, RATE_LIMITER: bindings.RATE_LIMITER, CACHE: bindings.CACHE }
 }

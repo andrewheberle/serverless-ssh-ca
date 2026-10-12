@@ -16,6 +16,7 @@
  *
  * @packageDocumentation
  */
+export { cacheInMemory } from "./cache.js"
 export { bindingsFromEnv, EnvSchema, InvalidConfigurationError } from "./env.js"
 export type { CaEnv } from "./env.js"
 export { secretFromFile, secretFromString } from "./secret.js"

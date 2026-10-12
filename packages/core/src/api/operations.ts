@@ -15,7 +15,10 @@ import { KeyParseError, type PublicKey } from "../ssh/keys.js"
 import { getPrivateKey, getPublic, UnsupportedKeyError } from "../utils.js"
 import { CertificateType } from "../db/types.js"
 import { KRLBuilder } from "../krl.js"
+import { z } from "zod"
+import { certificateTypeName } from "./schema.js"
 import {
+	getKrlRevision,
 	getKrlVersion,
 	getRevocationList,
 	recordCertificate,
@@ -73,20 +76,38 @@ export const caPublicKey = async (c: AppContext, l: Logger): Promise<Response> =
  */
 export const revocationList = async (c: AppContext, l: Logger, certificateType: CertificateType): Promise<Response> => {
 	try {
-		// get revoked serials
-		const serials = (await getRevocationList(c.env, certificateType)).map(v => BigInt(v))
-
 		// grab private key from secret store
 		const key = await getPrivateKey(c.env)
+
+		// a cached KRL is keyed by the revision it was generated for, which
+		// changes whenever a certificate is revoked, and by the CA key that
+		// signed it, so a cached KRL is never used once it is out of date. The
+		// revision is read before the revoked serials, so the KRL cached for a
+		// revision includes at least every certificate revoked by then
+		const cache = c.env.CACHE
+		const cacheKey = cache === undefined
+			? undefined
+			: `krl:${certificateTypeName(certificateType)}:${key.publicKey.fingerprint()}:${await getKrlRevision(c.env, certificateType)}`
+
+		if (cache !== undefined && cacheKey !== undefined) {
+			const cached = await readCachedKrl(cache, cacheKey, l)
+			if (cached !== undefined) {
+				return c.json(cached)
+			}
+		}
+
+		// get revoked serials
+		const serials = (await getRevocationList(c.env, certificateType)).map(v => BigInt(v))
 
 		// generate KRL
 		const krl = new KRLBuilder(key)
 			.addSerials(serials)
 
-		// the version only changes when the content of the KRL does
-		const version = await getKrlVersion(c.env, certificateType, await krl.digest())
+		// the version only changes when the content of the KRL does, and every
+		// KRL with the same version has the same generation date
+		const { version, generatedAt } = await getKrlVersion(c.env, certificateType, await krl.digest())
 
-		const krlBytes = krl.generate(version)
+		const krlBytes = krl.generate(version, "", generatedAt)
 
 		// convert to base64
 		const bytes = new Uint8Array(krlBytes)
@@ -98,13 +119,71 @@ export const revocationList = async (c: AppContext, l: Logger, certificateType: 
 
 		const signature = await krl.signature()
 
-		return c.json({
+		const response: KrlResponse = {
 			krl: base64Krl,
 			signature: signature,
-		})
+		}
+
+		if (cache !== undefined && cacheKey !== undefined) {
+			try {
+				await cache.put(cacheKey, JSON.stringify(response), { expirationTtl: KrlCacheTtl })
+			} catch (err) {
+				// the KRL is still returned, it is generated again next time
+				l.warn("could not cache KRL", "error", err)
+			}
+		}
+
+		return c.json(response)
 	} catch (err) {
 		throw caKeyError(l, err)
 	}
+}
+
+const KrlResponseSchema = z.object({
+	krl: z.string(),
+	signature: z.string(),
+})
+
+type KrlResponse = z.infer<typeof KrlResponseSchema>
+
+// how long a cached KRL is kept, in seconds. A cached KRL is only used for
+// the revision it was generated for, so this only removes entries for earlier
+// revisions from the cache
+const KrlCacheTtl = 7 * 24 * 60 * 60
+
+/**
+ * Returns a cached KRL response, or undefined if there is none or it cannot be
+ * used, in which case the KRL is generated again.
+ */
+const readCachedKrl = async (cache: NonNullable<AppContext["env"]["CACHE"]>, key: string, l: Logger): Promise<KrlResponse | undefined> => {
+	let cached: string | null
+	try {
+		cached = await cache.get(key)
+	} catch (err) {
+		l.warn("could not read cached KRL", "error", err)
+		return undefined
+	}
+
+	if (cached === null) {
+		return undefined
+	}
+
+	let json: unknown
+	try {
+		json = JSON.parse(cached)
+	} catch {
+		l.warn("cached KRL was not valid JSON")
+		return undefined
+	}
+
+	const parsed = KrlResponseSchema.safeParse(json)
+	if (!parsed.success) {
+		l.warn("cached KRL was not a valid KRL response")
+		return undefined
+	}
+
+	l.debug("using cached KRL", "key", key)
+	return parsed.data
 }
 
 /**
