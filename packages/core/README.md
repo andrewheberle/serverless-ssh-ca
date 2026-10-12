@@ -349,6 +349,17 @@ issues access tokens with a different audience to identity tokens, set
 be a comma separated list. If `JWT_AUD` is not set, requests that need a
 token fail with a `500` error.
 
+The `email` claim of the access token must be an email address. It is used as
+the key ID of user certificates, and with `SSH_CERTIFICATE_INCLUDE_SELF` its
+local part (before the `@`) is added as a principal. If the IdP includes the
+`email_verified` claim it must be `true`, so tokens for an address the IdP has
+not verified are refused.
+
+As the local part does not include the domain, `alice@example.com` and
+`alice@example.net` are given the same principal with
+`SSH_CERTIFICATE_INCLUDE_SELF`. Only enable it when the IdP only allows users
+from domains you control.
+
 ### Client
 
 Please visit the ssh-ca-client repository for further information:

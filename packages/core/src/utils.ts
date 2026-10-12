@@ -88,6 +88,42 @@ export const tokenSubject = (payload: { sub?: unknown }): string => {
 	return parsed.data
 }
 
+/**
+ * The claims of an access token that identify the user's email address.
+ *
+ * `email_verified` is optional as not every IdP includes it, but when it is
+ * included it must be true, as an IdP may otherwise issue a token for an
+ * address the user has not shown they control.
+ */
+const EmailClaimsSchema = z.object({
+	email: z.email(),
+	email_verified: z.boolean().optional(),
+})
+
+/**
+ * Returns the email address of a verified access token, or why it cannot be
+ * used.
+ *
+ * @param payload The payload of a verified access token
+ * @returns The email address, or an error message if the claims are not acceptable
+ */
+export const tokenEmail = (payload: Record<string, unknown>): { ok: true, email: string } | { ok: false, error: string } => {
+	if (payload.email === undefined) {
+		return { ok: false, error: "JWT was verified but was missing required email claim" }
+	}
+
+	const parsed = EmailClaimsSchema.safeParse(payload)
+	if (!parsed.success) {
+		return { ok: false, error: "JWT was verified but the email or email_verified claim was not valid" }
+	}
+
+	if (parsed.data.email_verified === false) {
+		return { ok: false, error: "JWT was verified but the email address has not been verified by the IdP" }
+	}
+
+	return { ok: true, email: parsed.data.email }
+}
+
 export const transformAuthorizationHeader = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
 	if (!val.startsWith("Bearer ") || val.length <= 7) {
 		return fatalIssue(ctx, "authorization header must be a Bearer token", val)
@@ -105,12 +141,14 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 		const aud = split(env.JWT_ACCESS_TOKEN_AUD).length > 0 ? env.JWT_ACCESS_TOKEN_AUD : env.JWT_AUD
 		const { payload } = await verifyJWT(env, jwt, aud)
 
-		if (payload.email === undefined) {
-			return fatalIssue(ctx, "JWT was verified but was missing required email claim", val)
+		const email = tokenEmail(payload)
+		if (!email.ok) {
+			l.warn(email.error, "in", "transformAuthorizationHeader")
+			return fatalIssue(ctx, email.error, val)
 		}
 
 		return {
-			email: payload.email,
+			email: email.email,
 			sub: tokenSubject(payload),
 		}
 	} catch (err) {
