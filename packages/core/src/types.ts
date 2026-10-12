@@ -95,7 +95,10 @@ export interface CaSecret {
 export interface SshCaBindings {
 	CERTIFICATE_REQUEST_TIME_SKEW_MAX: string
 	JWT_ALGORITHMS: string | string[]
-	JWT_AUD?: string | string[]
+	/** The audience the identity token, and unless {@link SshCaBindings.JWT_ACCESS_TOKEN_AUD} is set the access token, must be issued for */
+	JWT_AUD: string | string[]
+	/** The audience the access token must be issued for, when it differs from {@link SshCaBindings.JWT_AUD} */
+	JWT_ACCESS_TOKEN_AUD?: string | string[]
 	JWT_ISSUER: string
 	JWT_JWKS_URL: string
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: string

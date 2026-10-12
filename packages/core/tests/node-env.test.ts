@@ -72,7 +72,7 @@ describe("bindingsFromEnv", () => {
 
 	it("should allow optional variables to be unset", () => {
 		const optional = [
-			"JWT_AUD", "SSH_CERTIFICATE_PRINCIPALS", "SSH_CERTIFICATE_INCLUDE_SELF", "SSH_CERTIFICATE_INCLUDE_SELF_EMAIL",
+			"JWT_ACCESS_TOKEN_AUD", "SSH_CERTIFICATE_PRINCIPALS", "SSH_CERTIFICATE_INCLUDE_SELF", "SSH_CERTIFICATE_INCLUDE_SELF_EMAIL",
 			"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS", "SSH_HOST_CERTIFICATE_ALLOWED_ROLES", "LOG_LEVEL",
 		]
 		const source = Object.fromEntries(Object.entries(valid).filter(([k]) => !optional.includes(k)))
@@ -91,6 +91,7 @@ describe("bindingsFromEnv", () => {
 	it.each([
 		"ISSUER_DN",
 		"JWT_JWKS_URL",
+		"JWT_AUD",
 		"JWT_ISSUER",
 		"JWT_ALGORITHMS",
 		"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM",
