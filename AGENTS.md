@@ -60,6 +60,8 @@ Prefer the scripts in `package.json` over invoking tools directly.
 - npm trusted publishing is tied to the `release.yml` filename, so don't rename it.
 - Don't edit `CHANGELOG.md`, `.release-please-manifest.json` or package versions by hand; release-please maintains them.
 - PRs are squash merged with the PR title as the commit message, so PR titles must be conventional commits (`feat:`, `fix(scope):`, `feat!:` for breaking changes); the PR title check enforces this. Only `feat`, `fix`, `perf`, `revert` and breaking changes trigger a release.
+- The PR description is used as the body of the squash commit, so write it as a commit message body: explain what changed and why in plain prose, without headings or checklists. Put any `BREAKING CHANGE:` footer in the last paragraph so release-please reads it.
+- Don't include links to Claude Code sessions (`https://claude.ai/code/session_...`) in PR descriptions.
 - Never delete, move, or force-push an existing tag; fix forward with a new patch version.
 - Do not create or push a tag unless specifically directed to as this triggers the release workflow.
 
