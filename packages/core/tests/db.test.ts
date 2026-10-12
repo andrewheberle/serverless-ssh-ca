@@ -97,3 +97,19 @@ describe("recordRenewal", () => {
 		expect(recorded(renewed.serial)).toEqual({ revoked_at: null })
 	})
 })
+
+describe("revokeCertificate", () => {
+	it("should only revoke a certificate once, keeping the first revocation time", async () => {
+		const sqlite = new DatabaseSync(":memory:")
+		const env = makeEnv({ DB: fromNodeSqlite(sqlite), PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey) })
+		const certificate = await createSignedHostCertificate(env, pub(ecdsaKey.host()), { principals: ["test_host"] })
+		await recordCertificate(env, certificate, certificate.keyId, CertificateType.Host)
+
+		const first = await revokeCertificate(env, certificate.serial)
+		expect(first).toHaveLength(1)
+
+		// a second revocation, as from a request that lost a race, changes nothing
+		expect(await revokeCertificate(env, certificate.serial)).toEqual([])
+		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${certificate.serial}`)).toEqual({ revoked_at: first[0]?.revoked_at })
+	})
+})
