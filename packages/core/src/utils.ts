@@ -56,6 +56,38 @@ type AccessToken = {
 	sub: string
 }
 
+/**
+ * Thrown when a claim of a verified token is missing or is not of the
+ * expected type.
+ */
+export class TokenClaimError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = "TokenClaimError"
+
+		Object.setPrototypeOf(this, TokenClaimError.prototype)
+	}
+}
+
+const SubjectClaimSchema = z.string().min(1)
+
+/**
+ * Returns the subject of a verified token, which is compared between the
+ * access and identity tokens so must always be present.
+ *
+ * @param payload The payload of a verified token
+ * @returns The `sub` claim of the token
+ * @throws {@link TokenClaimError} when the `sub` claim is missing, empty or not a string
+ */
+export const tokenSubject = (payload: { sub?: unknown }): string => {
+	const parsed = SubjectClaimSchema.safeParse(payload.sub)
+	if (!parsed.success) {
+		throw new TokenClaimError("JWT was verified but was missing required sub claim")
+	}
+
+	return parsed.data
+}
+
 export const transformAuthorizationHeader = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
 	if (!val.startsWith("Bearer ") || val.length <= 7) {
 		return fatalIssue(ctx, "authorization header must be a Bearer token", val)
@@ -79,7 +111,7 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 
 		return {
 			email: payload.email,
-			sub: payload.sub,
+			sub: tokenSubject(payload),
 		}
 	} catch (err) {
 		switch (true) {
@@ -87,6 +119,8 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 				// a misconfigured CA is a server error, not a validation failure
 				l.error(err.message, "in", "transformAuthorizationHeader")
 				throw new InternalServerErrorException(err.message)
+			case (err instanceof TokenClaimError):
+				return fatalIssue(ctx, err.message, val)
 			case (err instanceof JWSInvalid):
 				return fatalIssue(ctx, "the access token was invalid", val)
 			case (err instanceof JWTInvalid):
@@ -217,10 +251,11 @@ export const parseIdentity = async (env: SshCaBindings, jwt: string | undefined,
 
 	const { payload } = await verifyJWT(env, jwt, env.JWT_AUD)
 
+	const sub = tokenSubject(payload)
 	const principals = identityPrincipals(env, payload, claim)
 
 	return {
-		sub: payload.sub,
+		sub: sub,
 		principals: principals,
 	}
 }
@@ -238,7 +273,7 @@ export const transformIdentityToken = async (env: SshCaBindings, val: string, ct
 		}
 		ctx.issues.push({
 			code: "custom",
-			message: err instanceof PrincipalsClaimError ? err.message : "problem parsing identity token",
+			message: err instanceof PrincipalsClaimError || err instanceof TokenClaimError ? err.message : "problem parsing identity token",
 			input: val
 		})
 		return z.NEVER
