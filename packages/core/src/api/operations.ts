@@ -9,7 +9,7 @@ import {
 } from "chanfana"
 import type { AppContext } from "../router.js"
 import type { CertificateSignerResponse } from "../types.js"
-import { BadIssuerError } from "../certificate.js"
+import { BadIssuerError, CertificateError } from "../certificate.js"
 import type { SshCertificate } from "../ssh/certificate.js"
 import { KeyParseError, type PublicKey } from "../ssh/keys.js"
 import { getPrivateKey, getPublic, UnsupportedKeyError } from "../utils.js"
@@ -166,6 +166,12 @@ export const issueCertificate = async (c: AppContext, l: Logger, sign: () => Pro
 				// re-throw any exisiting chanfana error
 				throw err
 			case (err instanceof BadIssuerError):
+				throw new UnprocessableEntityException(err.message)
+			case (err instanceof CertificateError):
+				// the request was valid but asked for a certificate the CA's
+				// configuration does not allow, such as an extension that is
+				// not permitted or one without any principals
+				l.warn("certificate could not be issued", "error", err.message)
 				throw new UnprocessableEntityException(err.message)
 			default:
 				// otherwise throw as InternalServerErrorException
