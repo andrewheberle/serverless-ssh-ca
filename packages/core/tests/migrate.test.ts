@@ -124,6 +124,22 @@ describe("applyMigrations", () => {
 			{ certificate_type: 1, version: 1, digest: null, revision: 0 },
 		])
 	})
+
+	it("should start existing KRL versions again from when KRLs are cached", async () => {
+		const { raw, db } = fresh()
+		await applyMigrations(db, migrations.filter(m => m.name !== "0003_krl_revision"))
+		raw.exec("UPDATE krl SET version = 5, digest = 'digest', updated_at = '2020-01-01 00:00:00'")
+
+		const before = Math.floor(Date.now() / 1000) * 1000
+		await applyMigrations(db, migrations)
+
+		const rows = raw.prepare("SELECT version, digest, updated_at FROM krl").all() as { version: number, digest: string, updated_at: string }[]
+		expect(rows).toHaveLength(2)
+		for (const row of rows) {
+			expect(row).toMatchObject({ version: 5, digest: "digest" })
+			expect(new Date(`${row.updated_at.replace(" ", "T")}Z`).getTime()).toBeGreaterThanOrEqual(before)
+		}
+	})
 })
 
 describe("migrateOnce", () => {
