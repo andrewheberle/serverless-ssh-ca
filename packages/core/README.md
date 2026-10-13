@@ -351,15 +351,40 @@ The `openid` and `email` scopes are required, with enabling of refresh tokens
 (the `offline_access` scope) being optional, but recommended.
 
 `JWT_AUD` must be set to the audience the IdP issues tokens for this
-application with (for Cloudflare Access, the application's AUD tag). Both the
-access token and the identity token must be issued for this audience, so
+application with (for Cloudflare Access, the application's client ID). Both
+the access token and the identity token must be issued for this audience, so
 tokens the IdP issues for other applications are not accepted. If the IdP
 issues access tokens with a different audience to identity tokens, set
 `JWT_ACCESS_TOKEN_AUD` to the audience of the access token. Either value may
 be a comma separated list. If `JWT_AUD` is not set, requests that need a
 token fail with a `500` error.
 
-The `email` claim of the access token must be an email address. It is used as
+Cloudflare Access issues access tokens for the client's redirect URL (for
+example `http://localhost:3000/auth/callback`), so set `JWT_ACCESS_TOKEN_AUD`
+to it. This is safe because the issuer of an Access application includes its
+client ID, so tokens for other applications fail the `JWT_ISSUER` check. With
+IdPs where every application shares an issuer, `JWT_ACCESS_TOKEN_AUD` must be
+an audience that only tokens for this application are issued for.
+
+#### Opaque Access Tokens
+
+Some IdPs (such as Google) issue access tokens that are not JWTs, so they
+cannot be verified by the CA itself. For these IdPs set `OIDC_USERINFO_URL` to
+the IdP's OIDC userinfo endpoint (the `userinfo_endpoint` of its
+`/.well-known/openid-configuration`). Every access token is then sent to this
+endpoint, which returns the claims of the user the token was issued to,
+instead of being verified as a JWT, and `JWT_ACCESS_TOKEN_AUD` is not used.
+
+The userinfo endpoint does not say which application an access token was
+issued to, so with this method an access token is bound to the CA only by its
+`sub` claim matching that of the identity token, which is still verified as a
+JWT issued for `JWT_AUD`. Each certificate request makes a request to the
+userinfo endpoint. A token the endpoint does not accept is refused with a
+`400` error, and if the endpoint cannot be reached or does not respond with a
+JSON object the request fails with a `500` error and the cause is logged.
+
+The `email` claim of the access token (or of the userinfo response) must be an
+email address. It is used as
 the key ID of user certificates, and with `SSH_CERTIFICATE_INCLUDE_SELF` its
 local part (before the `@`) is added as a principal. If the IdP includes the
 `email_verified` claim it must be `true`, so tokens for an address the IdP has

@@ -8,6 +8,7 @@ import { CertificateRequestJWTPayload } from "./types.js"
 import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
 import type { isRevoked as IsRevokedFn } from "./db/index.js"
 import { logger } from "./logger.js"
+import { UserInfoClaimsError, userInfoIdentity, UserInfoRejectedError } from "./userinfo.js"
 import { ms } from "itty-time"
 import { InternalServerErrorException } from "chanfana"
 
@@ -131,6 +132,29 @@ const claimValidationAttributes = (err: JWTClaimValidationFailed): unknown[] => 
 	return ["claim", err.claim, "reason", err.reason, "value", err.payload[err.claim]]
 }
 
+// verifies an access token with the IdP's userinfo endpoint, for IdPs that
+// issue access tokens that are not JWTs
+const userInfoAccessToken = async (env: SshCaBindings, url: string, token: string, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
+	const l = logger(env)
+
+	try {
+		return await userInfoIdentity(url, token)
+	} catch (err) {
+		switch (true) {
+			case (err instanceof UserInfoRejectedError):
+				l.warn(err.message, "in", "transformAuthorizationHeader", "status", err.status, "authenticate", err.authenticate)
+				return fatalIssue(ctx, "the access token was not accepted by the userinfo endpoint", val)
+			case (err instanceof UserInfoClaimsError):
+				l.warn(err.message, "in", "transformAuthorizationHeader")
+				return fatalIssue(ctx, err.message, val)
+			default:
+				// the IdP being unavailable is a server error, not a validation failure
+				l.error("the access token could not be verified with the userinfo endpoint", "in", "transformAuthorizationHeader", "error", err)
+				throw new InternalServerErrorException("the access token could not be verified with the userinfo endpoint")
+		}
+	}
+}
+
 export const transformAuthorizationHeader = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
 	if (!val.startsWith("Bearer ") || val.length <= 7) {
 		return fatalIssue(ctx, "authorization header must be a Bearer token", val)
@@ -141,6 +165,13 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 
 	if (jwt === "") {
 		return fatalIssue(ctx, "request did not contain a JWT", val)
+	}
+
+	// when a userinfo endpoint is configured every access token is verified
+	// with it, rather than only those that are not JWTs, so a token cannot
+	// avoid the checks of either method by its format
+	if (env.OIDC_USERINFO_URL !== undefined && env.OIDC_USERINFO_URL !== "") {
+		return userInfoAccessToken(env, env.OIDC_USERINFO_URL, jwt, val, ctx)
 	}
 
 	try {

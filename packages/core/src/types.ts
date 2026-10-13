@@ -132,6 +132,13 @@ export interface SshCaBindings {
 	JWT_AUD: string | string[]
 	/** The audience the access token must be issued for, when it differs from {@link SshCaBindings.JWT_AUD} */
 	JWT_ACCESS_TOKEN_AUD?: string | string[]
+	/**
+	 * The URL of the IdP's OIDC userinfo endpoint. When set, access tokens are
+	 * verified by sending them to this endpoint instead of as JWTs, so IdPs
+	 * that issue opaque access tokens can be used. The access token's audience
+	 * is not checked, so {@link SshCaBindings.JWT_ACCESS_TOKEN_AUD} is not used.
+	 */
+	OIDC_USERINFO_URL?: string
 	JWT_ISSUER: string
 	JWT_JWKS_URL: string
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: string

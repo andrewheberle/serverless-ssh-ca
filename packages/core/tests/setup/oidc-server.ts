@@ -1,5 +1,5 @@
 import { createServer } from "node:http"
-import { generateKeyPairSync, createSign, createPublicKey } from "node:crypto"
+import { generateKeyPairSync, createSign, createPublicKey, randomBytes } from "node:crypto"
 
 // Generate RS256 keypair at startup
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -33,8 +33,45 @@ const makeJwt = (claims: Record<string, unknown>): string => {
     return `${data}.${sig}`
 }
 
+// the userinfo responses for opaque access tokens, by token
+const opaqueTokens = new Map<string, { status: number, body: string }>()
+
 export const setup = async () => {
     const server = createServer((req, res) => {
+        if (req.method === "GET" && req.url === "/userinfo") {
+            const token = req.headers.authorization?.replace(/^Bearer /, "") ?? ""
+            const userinfo = opaqueTokens.get(token)
+            if (userinfo === undefined) {
+                res.writeHead(401, { "WWW-Authenticate": "Bearer error=\"invalid_token\"" })
+                res.end()
+                return
+            }
+
+            res.writeHead(userinfo.status, { "Content-Type": "application/json" })
+            res.end(userinfo.body)
+            return
+        }
+
+        // issues an opaque access token, whose userinfo response is given
+        // either as claims or as a status and raw body
+        if (req.method === "POST" && req.url === "/opaque-token") {
+            let body = ""
+            req.on("data", chunk => { body += chunk })
+            req.on("end", () => {
+                try {
+                    const { claims, status, raw } = JSON.parse(body) as { claims?: Record<string, unknown>, status?: number, raw?: string }
+                    const token = randomBytes(32).toString("base64url")
+                    opaqueTokens.set(token, { status: status ?? 200, body: raw ?? JSON.stringify(claims) })
+                    res.writeHead(200, { "Content-Type": "application/json" })
+                    res.end(JSON.stringify({ token }))
+                } catch {
+                    res.writeHead(400)
+                    res.end()
+                }
+            })
+            return
+        }
+
         if (req.method === "GET" && req.url === "/jwks") {
             res.writeHead(200, { "Content-Type": "application/json" })
             res.end(JSON.stringify({

@@ -34,6 +34,7 @@ export const EnvSchema = z.object({
 	JWT_JWKS_URL: z.url({ protocol: /^https?$/, message: "must be an http or https URL" }),
 	JWT_AUD: required,
 	JWT_ACCESS_TOKEN_AUD: z.string().optional(),
+	OIDC_USERINFO_URL: z.url({ protocol: /^https?$/, message: "must be an http or https URL" }).optional(),
 	JWT_ISSUER: required,
 	JWT_ALGORITHMS: required,
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: required,
