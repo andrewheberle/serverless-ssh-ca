@@ -124,6 +124,13 @@ export const tokenEmail = (payload: Record<string, unknown>): { ok: true, email:
 	return { ok: true, email: parsed.data.email }
 }
 
+// the attributes logged when a claim of a token is not valid, so the cause of a
+// rejected token can be found without the token itself. The claims checked
+// (such as aud, iss and nbf) identify the IdP and application, not the user.
+const claimValidationAttributes = (err: JWTClaimValidationFailed): unknown[] => {
+	return ["claim", err.claim, "reason", err.reason, "value", err.payload[err.claim]]
+}
+
 export const transformAuthorizationHeader = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
 	if (!val.startsWith("Bearer ") || val.length <= 7) {
 		return fatalIssue(ctx, "authorization header must be a Bearer token", val)
@@ -168,6 +175,7 @@ export const transformAuthorizationHeader = async (env: SshCaBindings, val: stri
 			case (err instanceof JWKSInvalid):
 				return fatalIssue(ctx, "the access token JWKS was invalid", val)
 			case (err instanceof JWTClaimValidationFailed):
+				l.warn("claim validation of the access token failed", "in", "transformAuthorizationHeader", ...claimValidationAttributes(err))
 				return fatalIssue(ctx, "claim validation of the JWT failed", val)
 			case (err instanceof JWTExpired):
 				return fatalIssue(ctx, "the access token has expired", val)
@@ -338,6 +346,9 @@ export const transformIdentityToken = async (env: SshCaBindings, val: string, ct
 		if (err instanceof MissingAudienceError) {
 			logger(env).error(err.message, "in", "transformIdentityToken")
 			throw new InternalServerErrorException(err.message)
+		}
+		if (err instanceof JWTClaimValidationFailed) {
+			logger(env).warn("claim validation of the identity token failed", "in", "transformIdentityToken", ...claimValidationAttributes(err))
 		}
 		ctx.issues.push({
 			code: "custom",

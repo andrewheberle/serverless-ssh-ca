@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { afterEach, describe, it, expect, vi } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import { createSshCa, type SshCa } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
@@ -58,6 +58,10 @@ describe.each([
 	["v3", requestV3],
 	["v4", requestV4],
 ])("token audience (%s)", (_version, request) => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	it("should issue a certificate when both tokens are for the configured audience", async () => {
 		const response = await request(createCa(), { access: audience, identity: audience })
 		expect(response.status).toBe(200)
@@ -71,6 +75,24 @@ describe.each([
 	it("should not accept an identity token for another audience", async () => {
 		const response = await request(createCa(), { access: audience, identity: "another-application" })
 		expect(response.status).toBe(400)
+	})
+
+	it.each([
+		["access", { access: "another-application", identity: audience }],
+		["identity", { access: audience, identity: "another-application" }],
+	])("should log the audience of an %s token for another audience", async (token, aud) => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
+
+		const response = await request(createCa({ LOG_LEVEL: "warning" }), aud)
+
+		expect(response.status).toBe(400)
+		expect(log).toHaveBeenCalledWith(expect.objectContaining({
+			level: "WARNING",
+			message: `claim validation of the ${token} token failed`,
+			claim: "aud",
+			reason: "check_failed",
+			value: "another-application",
+		}))
 	})
 
 	it("should check the access token against JWT_ACCESS_TOKEN_AUD when it is set", async () => {
