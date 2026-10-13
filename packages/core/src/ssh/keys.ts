@@ -223,24 +223,97 @@ const keyTypeName = (type: string): string => {
 	return type.replace(/^ssh-/, "").replace(/^ecdsa-sha2-.*$/, "ecdsa")
 }
 
+// decodes the base64 body of a PEM block
+const decodePem = (body: string): Uint8Array<ArrayBuffer> => {
+	try {
+		return new Uint8Array(base64.decode(body.replace(/\s+/g, "")))
+	} catch (err) {
+		throw new KeyParseError("private key could not be decoded", err)
+	}
+}
+
+/** The algorithms that an unencrypted PKCS#8 private key is imported as, in the order they are tried */
+const Pkcs8Algorithms: readonly ({ type: "ed25519", algorithm: Algorithm } | { type: "ecdsa", curve: EcdsaCurve, algorithm: EcKeyImportParams })[] = [
+	{ type: "ed25519", algorithm: { name: "Ed25519" } },
+	...(["nistp256", "nistp384", "nistp521"] as const).map((curve) => ({ type: "ecdsa" as const, curve, algorithm: { name: "ECDSA", namedCurve: EcdsaCurves[curve].namedCurve } })),
+]
+
+// imports a PKCS#8 private key, returning undefined if it is not a key for
+// the algorithm
+const importPkcs8 = async (der: Uint8Array<ArrayBuffer>, algorithm: Algorithm | EcKeyImportParams | RsaHashedImportParams): Promise<CryptoKey | undefined> => {
+	try {
+		return await crypto.subtle.importKey("pkcs8", der, algorithm, true, ["sign"])
+	} catch {
+		return undefined
+	}
+}
+
+// returns a member of a JWK exported by WebCrypto, which is always present
+// for the key types that are exported
+const jwkMember = (jwk: JsonWebKey, name: "d" | "x" | "y"): string => {
+	const value = jwk[name]
+	if (value === undefined) {
+		throw new KeyParseError(`private key was missing "${name}" when exported`)
+	}
+
+	return value
+}
+
+/**
+ * Parses an unencrypted Ed25519 or ECDSA private key in PKCS#8 format, as
+ * created by `ssh-keygen -m PKCS8` or `openssl genpkey`
+ */
+const parsePkcs8PrivateKey = async (body: string): Promise<PrivateKey> => {
+	const der = decodePem(body)
+
+	for (const candidate of Pkcs8Algorithms) {
+		const cryptoKey = await importPkcs8(der, candidate.algorithm)
+		if (cryptoKey === undefined) {
+			continue
+		}
+
+		const jwk = await crypto.subtle.exportKey("jwk", cryptoKey)
+		const d = jwkMember(jwk, "d")
+		const x = jwkMember(jwk, "x")
+
+		if (candidate.type === "ed25519") {
+			return {
+				type: "ed25519",
+				publicKey: new PublicKey(P.struct({ type: SSHText, key: SSHBytes }).encode({ type: "ssh-ed25519", key: base64urlnopad.decode(x) })),
+				jwk: { kty: "OKP", crv: "Ed25519", d, x },
+			}
+		}
+
+		const y = jwkMember(jwk, "y")
+		const point = new Uint8Array([0x04, ...base64urlnopad.decode(x), ...base64urlnopad.decode(y)])
+
+		return {
+			type: "ecdsa",
+			curve: candidate.curve,
+			publicKey: new PublicKey(P.struct({ type: SSHText, curve: SSHText, key: SSHBytes }).encode({ type: `ecdsa-sha2-${candidate.curve}`, curve: candidate.curve, key: point })),
+			jwk: { kty: "EC", crv: EcdsaCurves[candidate.curve].namedCurve, d, x, y },
+		}
+	}
+
+	// RSA keys are recognised only to give a clearer error
+	if (await importPkcs8(der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }) !== undefined) {
+		throw new UnsupportedKeyError("CA key type rsa is not supported, the CA key must be Ed25519 or ECDSA")
+	}
+
+	// WebCrypto does not say why a key could not be imported, so a key of
+	// another type cannot be told apart from one that is corrupt
+	throw new KeyParseError("PKCS#8 private key could not be imported as an Ed25519 or ECDSA (nistp256, nistp384 or nistp521) key")
+}
+
 /**
  * Parses an unencrypted Ed25519 or ECDSA private key in OpenSSH format, as
  * created by `ssh-keygen`
- *
- * @param text The private key, starting with `-----BEGIN OPENSSH PRIVATE KEY-----`
- * @returns The private key
- * @throws {@link KeyParseError} when the key cannot be parsed or is encrypted
- * @throws {@link UnsupportedKeyError} when the key is not an Ed25519 or ECDSA key
  */
-export const parsePrivateKey = (text: string): PrivateKey => {
-	const match = /-----BEGIN OPENSSH PRIVATE KEY-----([\s\S]*?)-----END OPENSSH PRIVATE KEY-----/.exec(text)
-	if (match === null) {
-		throw new KeyParseError("private key was not in OpenSSH format, as created by ssh-keygen (starting with -----BEGIN OPENSSH PRIVATE KEY-----)")
-	}
-
+const parseOpenSshPrivateKey = (body: string): PrivateKey => {
+	const bytes = decodePem(body)
 	let container: P.UnwrapCoder<typeof OpenSshPrivateKey>
 	try {
-		container = OpenSshPrivateKey.decode(base64.decode(match[1]!.replace(/\s+/g, "")))
+		container = OpenSshPrivateKey.decode(bytes)
 	} catch (err) {
 		throw new KeyParseError("private key could not be decoded", err)
 	}
@@ -325,3 +398,30 @@ export const parsePrivateKey = (text: string): PrivateKey => {
 	throw new UnsupportedKeyError(`CA key type ${keyTypeName(start.type)} is not supported, the CA key must be Ed25519 or ECDSA`)
 }
 
+/**
+ * Parses an unencrypted Ed25519 or ECDSA private key, either in OpenSSH
+ * format, as created by `ssh-keygen`, or in PKCS#8 format, as created by
+ * `ssh-keygen -m PKCS8` or `openssl genpkey`
+ *
+ * @param text The private key, starting with `-----BEGIN OPENSSH PRIVATE KEY-----` or `-----BEGIN PRIVATE KEY-----`
+ * @returns The private key. A PKCS#8 key has no comment.
+ * @throws {@link KeyParseError} when the key cannot be parsed or is encrypted
+ * @throws {@link UnsupportedKeyError} when the key is not an Ed25519 or ECDSA key
+ */
+export const parsePrivateKey = async (text: string): Promise<PrivateKey> => {
+	const openssh = /-----BEGIN OPENSSH PRIVATE KEY-----([\s\S]*?)-----END OPENSSH PRIVATE KEY-----/.exec(text)
+	if (openssh?.[1] !== undefined) {
+		return parseOpenSshPrivateKey(openssh[1])
+	}
+
+	const pkcs8 = /-----BEGIN PRIVATE KEY-----([\s\S]*?)-----END PRIVATE KEY-----/.exec(text)
+	if (pkcs8?.[1] !== undefined) {
+		return parsePkcs8PrivateKey(pkcs8[1])
+	}
+
+	if (text.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----")) {
+		throw new KeyParseError("encrypted private keys are not supported")
+	}
+
+	throw new KeyParseError("private key was not in OpenSSH format, as created by ssh-keygen (starting with -----BEGIN OPENSSH PRIVATE KEY-----), or in PKCS#8 format (starting with -----BEGIN PRIVATE KEY-----)")
+}

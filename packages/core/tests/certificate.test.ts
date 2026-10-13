@@ -118,7 +118,7 @@ for (const tt of tests) {
             ["ED25519 user key", ed25519Key.user(), undefined, split(env.SSH_CERTIFICATE_EXTENSIONS)],
             ["user key with less extensions", ed25519Key.user(), ["permit-user-rc"], ["permit-user-rc"]],
         ])(`${tt.name}: handle %s`, async (_, userKey, extensions, wantExtensions) => {
-            const issued = await generateCertificate(env, tt.email, priv(tt.caKey), pub(userKey), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions, serial: tt.serial })
+            const issued = await generateCertificate(env, tt.email, await priv(tt.caKey), pub(userKey), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions, serial: tt.serial })
 
             // ssh-keygen verifies the signature
             const certificate = listCertificate(issued.toString())
@@ -133,7 +133,7 @@ for (const tt of tests) {
         })
 
         it(`${tt.name}: user key with extra extensions`, async () => {
-            await expect(generateCertificate(env, tt.email, priv(tt.caKey), pub(ed25519Key.user()), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
+            await expect(generateCertificate(env, tt.email, await priv(tt.caKey), pub(ed25519Key.user()), { lifetime: seconds(lifetimeString), principals: tt.useridenties, extensions: ["no-touch-required"], serial: tt.serial }))
                 .rejects.toThrow("no-touch-required is not allowed")
         })
     })

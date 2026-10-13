@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { afterEach, describe, it, expect, vi } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import { createSshCa, type SshCa } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
@@ -60,5 +60,30 @@ describe.each(requests)("certificate errors (%s)", (_name, request) => {
 		const response = await request(createCa({ SSH_CERTIFICATE_PRINCIPALS: undefined }), {})
 		expect(response.status).toBe(422)
 		expect(await errorMessages(response)).toContain("a certificate must have at least one principal")
+	})
+})
+
+describe.each(requests)("CA key errors (%s)", (_name, request) => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it("should return 500 and log why the CA key could not be parsed", async () => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
+		const ca = createCa({
+			PRIVATE_KEY: secretFromString("-----BEGIN PRIVATE KEY-----\n!!!\n-----END PRIVATE KEY-----\n"),
+			LOG_LEVEL: "error",
+		})
+
+		const response = await request(ca, {})
+
+		// chanfana hides the message of a 500 from clients, so the reason is
+		// only in the logs
+		expect(response.status).toBe(500)
+		expect(log).toHaveBeenCalledWith(expect.objectContaining({
+			level: "ERROR",
+			message: "error parsing private key: private key could not be decoded",
+			error: expect.objectContaining({ name: "KeyParseError", message: "private key could not be decoded", cause: expect.objectContaining({ message: expect.any(String) }) }),
+		}))
 	})
 })

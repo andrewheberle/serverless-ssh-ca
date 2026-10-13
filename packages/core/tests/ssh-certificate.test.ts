@@ -48,7 +48,7 @@ describe("signCertificate", () => {
 
 		it.each(subjects)("should be accepted by ssh-keygen for a %s user key", async (_, subjectKey) => {
 			const fields = fieldsFor(subjectKey())
-			const certificate = await signCertificate(fields, await createSigner(priv(ca)))
+			const certificate = await signCertificate(fields, await createSigner(await priv(ca)))
 
 			expect(listCertificate(certificate.toString())).toEqual({
 				type: certificate.type,
@@ -73,7 +73,7 @@ describe("signCertificate", () => {
 				keyId: "host_host.example.com",
 				principals: ["host.example.com"],
 				extensions: [],
-			}), await createSigner(priv(ca)))
+			}), await createSigner(await priv(ca)))
 
 			expect(listCertificate(certificate.toString())).toMatchObject({
 				type: certificate.type,
@@ -86,7 +86,7 @@ describe("signCertificate", () => {
 	})
 
 	it("should not be accepted by ssh-keygen with a modified signature", async () => {
-		const certificate = await signCertificate(fieldsFor(ed25519Key.user()), await createSigner(priv(ed25519Key.ca())))
+		const certificate = await signCertificate(fieldsFor(ed25519Key.user()), await createSigner(await priv(ed25519Key.ca())))
 		const bytes = new Uint8Array(certificate.bytes)
 		bytes[bytes.length - 1]! ^= 0x01
 
@@ -102,7 +102,7 @@ describe("signCertificate", () => {
 	it("should decode the fields it was signed with", async () => {
 		const key = ecdsaKey.user()
 		const fields = fieldsFor(key, { extensions: ["permit-pty", "permit-agent-forwarding", "permit-pty"] })
-		const certificate = await signCertificate(fields, await createSigner(priv(ed25519Key.ca())))
+		const certificate = await signCertificate(fields, await createSigner(await priv(ed25519Key.ca())))
 		const decoded = new SshCertificate(certificate.bytes)
 
 		expect(decoded.type).toBe("ecdsa-sha2-nistp256-cert-v01@openssh.com")
@@ -121,7 +121,7 @@ describe("signCertificate", () => {
 	})
 
 	it("should use a different nonce for each certificate", async () => {
-		const signer = await createSigner(priv(ed25519Key.ca()))
+		const signer = await createSigner(await priv(ed25519Key.ca()))
 		const first = await signCertificate(fieldsFor(ed25519Key.user()), signer)
 		const second = await signCertificate(fieldsFor(ed25519Key.user()), signer)
 

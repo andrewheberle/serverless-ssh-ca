@@ -37,7 +37,8 @@ const caKeyError = (l: Logger, err: unknown): ApiException => {
 			l.error(err.message)
 			return new InternalServerErrorException(err.message)
 		case (err instanceof KeyParseError):
-			l.error("error parsing private key")
+			// the reason is only logged, as it may describe the key
+			l.error(`error parsing private key: ${err.message}`, "error", err)
 			return new InternalServerErrorException("error parsing private key")
 		case (err instanceof ApiException):
 			// re-throw any exisiting chanfana error
@@ -238,9 +239,8 @@ export const issueCertificate = async (c: AppContext, l: Logger, sign: () => Pro
 		return c.json(response)
 	} catch (err) {
 		switch (true) {
-			case (err instanceof UnsupportedKeyError):
-				l.error(err.message)
-				throw new InternalServerErrorException(err.message)
+			case (err instanceof UnsupportedKeyError || err instanceof KeyParseError):
+				throw caKeyError(l, err)
 			case (err instanceof ApiException):
 				// re-throw any exisiting chanfana error
 				throw err

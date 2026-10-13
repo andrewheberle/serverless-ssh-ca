@@ -9,4 +9,4 @@ export const pub = (key: TestKey): PublicKey => PublicKey.parse(key.publicKey)
 /**
  * Returns a test key as a CA private key
  */
-export const priv = (key: TestKey): PrivateKey => parsePrivateKey(key.privateKey)
+export const priv = (key: TestKey): Promise<PrivateKey> => parsePrivateKey(key.privateKey)

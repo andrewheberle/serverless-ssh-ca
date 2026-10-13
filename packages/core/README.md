@@ -322,6 +322,10 @@ default:
 ssh-keygen -t ed25519 -N "" -C "" -f ssh-ca
 ```
 
+Unencrypted keys in PKCS#8 format (starting with `-----BEGIN PRIVATE KEY-----`),
+such as those created by `ssh-keygen -m PKCS8` or `openssl genpkey`, are also
+accepted.
+
 RSA CA keys are not supported. With an RSA CA key
 configured, every request that uses the CA key (including `/api/v3/ca` and
 the KRL endpoints) returns a `500` error, and the reason is logged:

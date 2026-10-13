@@ -1,10 +1,13 @@
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { generateKeyPairSync } from "node:crypto"
+import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { KeyParseError, parsePrivateKey, PublicKey, UnsupportedKeyError } from "../src/ssh/keys.js"
+import { KeyParseError, parsePrivateKey, PublicKey, UnsupportedKeyError, type PrivateKey } from "../src/ssh/keys.js"
 import { CertificateParseError, SshCertificate } from "../src/ssh/certificate.js"
+import { KRLBuilder } from "../src/krl.js"
+import { verifySignature } from "./helpers/ssh-keygen.js"
 
 // keys and certificates are created with ssh-keygen, so the parsers are
 // checked against what OpenSSH itself writes
@@ -46,9 +49,9 @@ afterAll(() => {
 })
 
 describe("parsePrivateKey", () => {
-	it.each(keyTypes)("should parse an %s key", (name, type) => {
+	it.each(keyTypes)("should parse an %s key", async (name, type) => {
 		const file = createKey(name.replace(/\s/g, "-"), type)
-		const key = parsePrivateKey(readFileSync(file, "utf8"))
+		const key = await parsePrivateKey(readFileSync(file, "utf8"))
 		const expected = PublicKey.parse(readFileSync(`${file}.pub`, "utf8"))
 
 		expect(key.publicKey.equals(expected)).toBe(true)
@@ -56,22 +59,22 @@ describe("parsePrivateKey", () => {
 		expect(key.type).toBe(name.startsWith("Ed25519") ? "ed25519" : "ecdsa")
 	})
 
-	it("should reject an RSA key", () => {
+	it("should reject an RSA key", async () => {
 		const file = createKey("rsa", ["-t", "rsa", "-b", "2048"])
 
-		expect(() => parsePrivateKey(readFileSync(file, "utf8"))).toThrow(UnsupportedKeyError)
-		expect(() => parsePrivateKey(readFileSync(file, "utf8"))).toThrow("CA key type rsa is not supported, the CA key must be Ed25519 or ECDSA")
+		await expect(parsePrivateKey(readFileSync(file, "utf8"))).rejects.toThrow(UnsupportedKeyError)
+		await expect(parsePrivateKey(readFileSync(file, "utf8"))).rejects.toThrow("CA key type rsa is not supported, the CA key must be Ed25519 or ECDSA")
 	})
 
-	it("should reject an encrypted key", () => {
+	it("should reject an encrypted key", async () => {
 		const file = join(dir, "encrypted")
 		sshKeygen("-q", "-t", "ed25519", "-N", "a passphrase", "-f", file)
 
-		expect(() => parsePrivateKey(readFileSync(file, "utf8"))).toThrow(KeyParseError)
-		expect(() => parsePrivateKey(readFileSync(file, "utf8"))).toThrow("encrypted private keys are not supported")
+		await expect(parsePrivateKey(readFileSync(file, "utf8"))).rejects.toThrow(KeyParseError)
+		await expect(parsePrivateKey(readFileSync(file, "utf8"))).rejects.toThrow("encrypted private keys are not supported")
 	})
 
-	it("should reject a key with mismatched check values", () => {
+	it("should reject a key with mismatched check values", async () => {
 		const file = createKey("corrupt", ["-t", "ed25519"])
 		const text = readFileSync(file, "utf8")
 		const body = Buffer.from(text.replace(/-----[^-]+-----/g, "").replace(/\s+/g, ""), "base64")
@@ -82,11 +85,127 @@ describe("parsePrivateKey", () => {
 		corrupted[offset]! ^= 0xff
 		const pem = `-----BEGIN OPENSSH PRIVATE KEY-----\n${corrupted.toString("base64")}\n-----END OPENSSH PRIVATE KEY-----\n`
 
-		expect(() => parsePrivateKey(pem)).toThrow("private key check values did not match")
+		await expect(parsePrivateKey(pem)).rejects.toThrow("private key check values did not match")
 	})
 
-	it("should reject text that is not a key", () => {
-		expect(() => parsePrivateKey("not a key")).toThrow(KeyParseError)
+	it("should reject text that is not a key", async () => {
+		await expect(parsePrivateKey("not a key")).rejects.toThrow(KeyParseError)
+	})
+})
+
+// signs a KRL with a CA key and verifies the signature with ssh-keygen
+const signsFor = async (key: PrivateKey, publicKey: string): Promise<boolean> => {
+	const krl = new KRLBuilder(key).addSerials([1n])
+	const namespace = "krl@com.github.serverless-ssh-ca.andrewheberle"
+
+	return verifySignature(publicKey, namespace, new Uint8Array(krl.generate()), await krl.signature())
+}
+
+// encodes a raw Ed25519 public key in OpenSSH format
+const ed25519PublicKey = (x: string): string => {
+	const length = (n: number) => [n >>> 24, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]
+	const type = new TextEncoder().encode("ssh-ed25519")
+	const key = Buffer.from(x, "base64url")
+
+	return `ssh-ed25519 ${Buffer.from([...length(type.length), ...type, ...length(key.length), ...key]).toString("base64")}`
+}
+
+describe("parsePrivateKey with a PKCS#8 key", () => {
+	// ssh-keygen writes ECDSA keys in PKCS#8 format with -m PKCS8, so the same
+	// key is parsed in both formats
+	it.each(keyTypes.filter(([name]) => name.startsWith("ECDSA")))("should parse an %s key the same as in OpenSSH format", async (name, type) => {
+		const file = createKey(`pkcs8-${name.replace(/\s/g, "-")}`, type)
+		const pkcs8 = `${file}-pkcs8`
+		copyFileSync(file, pkcs8)
+		sshKeygen("-q", "-p", "-N", "", "-m", "PKCS8", "-f", pkcs8)
+		const text = readFileSync(pkcs8, "utf8")
+		expect(text).toMatch(/^-----BEGIN PRIVATE KEY-----\n/)
+
+		const key = await parsePrivateKey(text)
+		const expected = await parsePrivateKey(readFileSync(file, "utf8"))
+		const publicKey = readFileSync(`${file}.pub`, "utf8")
+
+		expect(key).toEqual({ ...expected, publicKey: expected.publicKey.withComment(undefined) })
+		expect(key.publicKey.equals(PublicKey.parse(publicKey))).toBe(true)
+		expect(key.publicKey.comment).toBeUndefined()
+		expect(await signsFor(key, publicKey)).toBe(true)
+	})
+
+	// ssh-keygen neither reads nor writes Ed25519 keys in PKCS#8 format, so
+	// the key is created by Node.js (OpenSSL), as openssl genpkey does
+	it("should parse an Ed25519 key", async () => {
+		const { privateKey, publicKey } = generateKeyPairSync("ed25519")
+		const jwk = publicKey.export({ format: "jwk" })
+		if (jwk.x === undefined) {
+			throw new Error("Ed25519 public key was missing x")
+		}
+		const expected = ed25519PublicKey(jwk.x)
+
+		const key = await parsePrivateKey(privateKey.export({ type: "pkcs8", format: "pem" }).toString())
+
+		expect(key.type).toBe("ed25519")
+		expect(key.publicKey.toString()).toBe(expected)
+		expect(key.jwk).toEqual({ kty: "OKP", crv: "Ed25519", d: privateKey.export({ format: "jwk" }).d, x: jwk.x })
+		expect(await signsFor(key, expected)).toBe(true)
+	})
+
+	// keys exactly as they are found in a PEM file
+	it.each([
+		[
+			"an Ed25519 key from openssl genpkey",
+			`-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIC46HkVY/bKGJu5jNA1nYgR9RYc4GmyRi14c5SJRelvt
+-----END PRIVATE KEY-----
+`,
+			"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK1JQHS0+pLo8MMOcLJ8L7gDoKTy7y3y2djZkEUOyxza",
+		],
+		[
+			"an ECDSA nistp256 key from ssh-keygen -m PKCS8",
+			`-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgc/0ZTD32fon9JZnu
+Tm5SAmEroColGIRXbKyBugIe0RihRANCAATozLGNk+TxyvtJVjo62YRjqzYgM++P
+sluwnFhR9lPnDTo7NZmqsE1Go8VWfmkfsc98kTf/pSTxudY172PG0tsp
+-----END PRIVATE KEY-----
+`,
+			"ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOjMsY2T5PHK+0lWOjrZhGOrNiAz74+yW7CcWFH2U+cNOjs1maqwTUajxVZ+aR+xz3yRN/+lJPG51jXvY8bS2yk=",
+		],
+	])("should parse %s", async (_, pem, publicKey) => {
+		for (const text of [pem, pem.replace(/\n/g, "\r\n"), `\n  ${pem}\n`]) {
+			const key = await parsePrivateKey(text)
+
+			expect(key.publicKey.toString()).toBe(publicKey)
+			expect(await signsFor(key, publicKey)).toBe(true)
+		}
+	})
+
+	it("should reject an RSA key", async () => {
+		const file = createKey("pkcs8-rsa", ["-t", "rsa", "-b", "2048"], ["-m", "PKCS8"])
+		const text = readFileSync(file, "utf8")
+		expect(text).toMatch(/^-----BEGIN PRIVATE KEY-----\n/)
+
+		await expect(parsePrivateKey(text)).rejects.toThrow(UnsupportedKeyError)
+		await expect(parsePrivateKey(text)).rejects.toThrow("CA key type rsa is not supported, the CA key must be Ed25519 or ECDSA")
+	})
+
+	it("should reject an encrypted key", async () => {
+		const file = createKey("pkcs8-encrypted", ["-t", "ecdsa", "-b", "256"])
+		sshKeygen("-q", "-p", "-N", "a passphrase", "-m", "PKCS8", "-f", file)
+		const text = readFileSync(file, "utf8")
+		expect(text).toMatch(/^-----BEGIN ENCRYPTED PRIVATE KEY-----\n/)
+
+		await expect(parsePrivateKey(text)).rejects.toThrow(KeyParseError)
+		await expect(parsePrivateKey(text)).rejects.toThrow("encrypted private keys are not supported")
+	})
+
+	it("should reject a key that cannot be imported", async () => {
+		const pem = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VxBCIEIC46HkVY/bKGJu5jNA1nYgR9RYc4GmyRi14c5SJRelvt\n-----END PRIVATE KEY-----\n"
+
+		await expect(parsePrivateKey(pem)).rejects.toThrow(KeyParseError)
+		await expect(parsePrivateKey(pem)).rejects.toThrow("PKCS#8 private key could not be imported as an Ed25519 or ECDSA (nistp256, nistp384 or nistp521) key")
+	})
+
+	it("should reject a key that is not base64", async () => {
+		await expect(parsePrivateKey("-----BEGIN PRIVATE KEY-----\n!!!\n-----END PRIVATE KEY-----\n")).rejects.toThrow("private key could not be decoded")
 	})
 })
 
