@@ -17,6 +17,7 @@ const valid: Record<string, string> = {
 	ISSUER_DN: "CN=SSH CA,O=Internet Widgets Pty Ltd,C=US",
 	JWT_JWKS_URL: "https://idp.example.com/.well-known/jwks.json",
 	JWT_AUD: "audience",
+	OIDC_USERINFO_URL: "https://idp.example.com/userinfo",
 	JWT_ISSUER: "https://idp.example.com",
 	JWT_ALGORITHMS: "RS256",
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: "groups",
@@ -72,7 +73,7 @@ describe("bindingsFromEnv", () => {
 
 	it("should allow optional variables to be unset", () => {
 		const optional = [
-			"JWT_ACCESS_TOKEN_AUD", "SSH_CERTIFICATE_PRINCIPALS", "SSH_CERTIFICATE_INCLUDE_SELF", "SSH_CERTIFICATE_INCLUDE_SELF_EMAIL",
+			"JWT_ACCESS_TOKEN_AUD", "OIDC_USERINFO_URL", "SSH_CERTIFICATE_PRINCIPALS", "SSH_CERTIFICATE_INCLUDE_SELF", "SSH_CERTIFICATE_INCLUDE_SELF_EMAIL",
 			"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS", "SSH_HOST_CERTIFICATE_ALLOWED_ROLES", "LOG_LEVEL",
 		]
 		const source = Object.fromEntries(Object.entries(valid).filter(([k]) => !optional.includes(k)))
@@ -108,6 +109,8 @@ describe("bindingsFromEnv", () => {
 		["ISSUER_DN", " "],
 		["JWT_JWKS_URL", "not a url"],
 		["JWT_JWKS_URL", "file:///etc/jwks.json"],
+		["OIDC_USERINFO_URL", "not a url"],
+		["OIDC_USERINFO_URL", "file:///etc/userinfo.json"],
 		["SSH_CERTIFICATE_LIFETIME", "forever"],
 		["SSH_CERTIFICATE_LIFETIME", "0 seconds"],
 		["SSH_HOST_CERTIFICATE_LIFETIME", "-1 day"],
