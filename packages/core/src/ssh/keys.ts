@@ -238,11 +238,14 @@ const Pkcs8Algorithms: readonly ({ type: "ed25519", algorithm: Algorithm } | { t
 	...(["nistp256", "nistp384", "nistp521"] as const).map((curve) => ({ type: "ecdsa" as const, curve, algorithm: { name: "ECDSA", namedCurve: EcdsaCurves[curve].namedCurve } })),
 ]
 
-// imports a PKCS#8 private key, returning undefined if it is not a key for
-// the algorithm
-const importPkcs8 = async (der: Uint8Array<ArrayBuffer>, algorithm: Algorithm | EcKeyImportParams | RsaHashedImportParams): Promise<CryptoKey | undefined> => {
+// imports a PKCS#8 private key and exports it as a JWK, returning undefined if
+// it is not a key for the algorithm. workerd imports an ECDSA key as Ed25519
+// without checking its type and only fails on export, so a key is only
+// accepted for an algorithm once it has also been exported.
+const importPkcs8 = async (der: Uint8Array<ArrayBuffer>, algorithm: Algorithm | EcKeyImportParams | RsaHashedImportParams): Promise<JsonWebKey | undefined> => {
 	try {
-		return await crypto.subtle.importKey("pkcs8", der, algorithm, true, ["sign"])
+		const key = await crypto.subtle.importKey("pkcs8", der, algorithm, true, ["sign"])
+		return await crypto.subtle.exportKey("jwk", key)
 	} catch {
 		return undefined
 	}
@@ -267,12 +270,11 @@ const parsePkcs8PrivateKey = async (body: string): Promise<PrivateKey> => {
 	const der = decodePem(body)
 
 	for (const candidate of Pkcs8Algorithms) {
-		const cryptoKey = await importPkcs8(der, candidate.algorithm)
-		if (cryptoKey === undefined) {
+		const jwk = await importPkcs8(der, candidate.algorithm)
+		if (jwk === undefined) {
 			continue
 		}
 
-		const jwk = await crypto.subtle.exportKey("jwk", cryptoKey)
 		const d = jwkMember(jwk, "d")
 		const x = jwkMember(jwk, "x")
 
