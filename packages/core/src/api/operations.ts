@@ -12,8 +12,7 @@ import {
 } from "chanfana"
 import type { AppContext } from "../router.js"
 import type { CertificateSignerResponse } from "../types.js"
-import { BadIssuerError, CertificateError } from "../certificate.js"
-import type { SshCertificate } from "../ssh/certificate.js"
+import type { RenewResult } from "../authority.js"
 import { KeyParseError, type PublicKey } from "../ssh/keys.js"
 import { getPrivateKey, getPublic, UnsupportedKeyError } from "../utils.js"
 import { CertificateType } from "../db/types.js"
@@ -25,8 +24,6 @@ import {
 	getKrlRevision,
 	getKrlVersion,
 	getRevocationList,
-	recordCertificate,
-	recordRenewal,
 	RevocationStatus,
 	revocationStatus,
 	revokeCertificate,
@@ -260,74 +257,47 @@ const readCachedKrl = async (cache: NonNullable<AppContext["env"]["CACHE"]>, key
 }
 
 /**
- * Signs a certificate, records it so it can later be revoked and returns it
- * as the response to a certificate request or renewal.
- *
- * These are the steps shared by every API version once a request has been
- * validated and authorised.
+ * Returns the response for issuing or renewing a certificate, or throws the
+ * API error for why it was not.
  *
  * @param c The request context
  * @param l The logger for the request
- * @param sign Signs and returns the certificate
- * @param certificateType The type of certificate being issued
- * @param renews The host certificate being renewed, which is revoked when the new certificate is recorded
+ * @param result The result of issuing or renewing the certificate, see {@link RenewResult}
  * @returns The response containing the issued certificate
+ * @throws {@link InputValidationException} when the certificate presented for renewal cannot be renewed
+ * @throws {@link UnprocessableEntityException} when the CA's configuration does not allow the certificate asked for
+ * @throws {@link InternalServerErrorException} when the CA key or database could not be used
  */
-export const issueCertificate = async (c: AppContext, l: Logger, sign: () => Promise<SshCertificate>, certificateType: CertificateType, renews?: SshCertificate): Promise<Response> => {
+export const certificateResponse = async (c: AppContext, l: Logger, result: Promise<RenewResult>): Promise<Response> => {
+	let outcome: RenewResult
 	try {
-		const certificate = await sign()
-		const response: CertificateSignerResponse = {
-			certificate: btoa(certificate.toString())
-		}
-
-		let recorded: boolean
-		try {
-			if (renews === undefined) {
-				await recordCertificate(c.env, certificate, certificate.keyId, certificateType)
-				recorded = true
-			} else {
-				recorded = await recordRenewal(c.env, renews, certificate)
-			}
-		} catch (err) {
-			// a certificate that is not recorded cannot be revoked, so do not issue it
-			l.error("there was a problem adding issued certificate to database", "error", err)
-			throw new InternalServerErrorException("there was a problem recording the issued certificate")
-		}
-
-		if (!recorded) {
-			// the certificate was revoked, or renewed by another request, since it was checked
-			l.warn("certificate presented for renewal was revoked before the renewal was recorded")
-			throw new InputValidationException("the provided certificate is revoked", ["body", "certificate"])
-		}
-
-		l.info("completed issuing certificate",
-			...group(
-				"certificate", "principals",
-				certificate.principals.join(","), "serial", certificate.serial,
-			),
-			...(renews === undefined ? [] : group("renewed", "serial", renews.serial)),
-		)
-
-		return c.json(response)
+		outcome = await result
 	} catch (err) {
-		switch (true) {
-			case (err instanceof UnsupportedKeyError || err instanceof KeyParseError):
-				throw caKeyError(l, err)
-			case (err instanceof ApiException):
-				// re-throw any exisiting chanfana error
-				throw err
-			case (err instanceof BadIssuerError):
-				throw new UnprocessableEntityException(err.message)
-			case (err instanceof CertificateError):
-				// the request was valid but asked for a certificate the CA's
-				// configuration does not allow, such as an extension that is
-				// not permitted or one without any principals
-				l.warn("certificate could not be issued", "error", err.message)
-				throw new UnprocessableEntityException(err.message)
-			default:
-				// otherwise throw as InternalServerErrorException
-				l.error("unhandled error", "error", err)
-				throw new InternalServerErrorException("internal server error")
+		l.error("unhandled error", "error", err)
+		throw new InternalServerErrorException("internal server error")
+	}
+
+	switch (outcome.kind) {
+		case "issued": {
+			const response: CertificateSignerResponse = {
+				certificate: btoa(outcome.certificate.toString()),
+			}
+			return c.json(response)
+		}
+		case "notRenewable":
+			throw new InputValidationException(outcome.message, ["body"])
+		case "revokedDuringRenewal":
+			// the certificate was revoked, or renewed by another request, since it was checked
+			throw new InputValidationException("the provided certificate is revoked", ["body", "certificate"])
+		case "notAllowed":
+			throw new UnprocessableEntityException(outcome.message)
+		case "keyMisconfigured":
+		case "storeUnavailable":
+			// the reason was logged when the CA key or database was used
+			throw new InternalServerErrorException(outcome.message)
+		default: {
+			const unknownOutcome: never = outcome
+			throw new Error(`unknown certificate result: ${String(unknownOutcome)}`)
 		}
 	}
 }

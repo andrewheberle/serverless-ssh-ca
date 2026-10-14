@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import { dbCleanup, isRevoked, recordCertificate, recordRenewal, revokeCertificate } from "../src/db/index.js"
-import { createSignedHostCertificate } from "../src/certificate.js"
+import { hostCertificate } from "./helpers/certificate.js"
 import { fromNodeSqlite } from "../src/node/index.js"
 import { CertificateType } from "../src/db/types.js"
 import { makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
-import { pub } from "./helpers/keys.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import type { CaDatabase } from "../src/types.js"
 
@@ -44,7 +43,7 @@ describe("recordRenewal", () => {
 	const setup = () => {
 		const sqlite = new DatabaseSync(":memory:")
 		const env = makeEnv({ DB: fromNodeSqlite(sqlite), PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey) })
-		const issue = async () => await createSignedHostCertificate(env, pub(ecdsaKey.host()), { principals: ["test_host"] })
+		const issue = async () => hostCertificate(ecdsaKey.ca(), ecdsaKey.host())
 		const recorded = (serial: bigint) => sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${serial}`)
 		return { env, issue, recorded }
 	}
@@ -102,7 +101,7 @@ describe("revokeCertificate", () => {
 	it("should only revoke a certificate once, keeping the first revocation time", async () => {
 		const sqlite = new DatabaseSync(":memory:")
 		const env = makeEnv({ DB: fromNodeSqlite(sqlite), PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey) })
-		const certificate = await createSignedHostCertificate(env, pub(ecdsaKey.host()), { principals: ["test_host"] })
+		const certificate = hostCertificate(ecdsaKey.ca(), ecdsaKey.host())
 		await recordCertificate(env, certificate, certificate.keyId, CertificateType.Host)
 
 		const first = await revokeCertificate(env, certificate.serial)

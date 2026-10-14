@@ -3,10 +3,8 @@ import { CertificateParseError, SshCertificate } from "./ssh/certificate.js"
 import { KeyParseError, MinimumRsaKeyBits, parsePrivateKey, PublicKey, rsaKeyBits, UnsupportedKeyError, type PrivateKey } from "./ssh/keys.js"
 import z from "zod"
 import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
-import type { isRevoked as IsRevokedFn } from "./db/index.js"
 import { logger } from "./logger.js"
 import { ms } from "itty-time"
-import { InternalServerErrorException } from "chanfana"
 
 export { UnsupportedKeyError }
 
@@ -288,99 +286,18 @@ export const refineHostPrincipal = (val: string, ctx: z.RefinementCtx): void => 
 type ParsedHostCertificateRenewal = {
 	certificate: SshCertificate
 	proof: RenewalProofOfPossession
-} & HostCertificateRequest
-
-/**
- * Checks a certificate presented for renewal was issued by this CA, is a host
- * certificate whose principals are allowed (see {@link hostPrincipalIssue}),
- * is within its validity period and has not been revoked.
- *
- * @param env The CA bindings
- * @param isRevoked Returns whether a serial has been revoked
- * @param certificate The certificate presented for renewal
- * @returns The reason the certificate cannot be renewed, or undefined if it can be
- * @throws {@link UnsupportedKeyError} when the CA key is not supported
- */
-export const checkRenewableCertificate = async (env: SshCaBindings, isRevoked: typeof IsRevokedFn, certificate: SshCertificate): Promise<string | undefined> => {
-	// ensure certificate is signed by CA
-	const issuer = await getPublic(env)
-	if (!await certificate.isSignedBy(issuer)) {
-		return "the provided certificate was not signed by this CA"
-	}
-
-	// only host certificates can be renewed, as renewal does not need the
-	// OIDC authentication a user certificate is issued with
-	if (certificate.kind !== "host") {
-		return "the provided certificate is not a host certificate"
-	}
-
-	// a certificate issued before small RSA keys were refused must not be
-	// renewed, as the renewal would keep its key
-	const keyIssue = subjectKeyIssue(certificate.publicKey)
-	if (keyIssue !== undefined) {
-		return `the provided certificate cannot be renewed: ${keyIssue}`
-	}
-
-	// a certificate issued before wildcard principals were refused must not
-	// be renewed, as the renewal would keep its principals
-	for (const principal of certificate.principals) {
-		const issue = hostPrincipalIssue(principal)
-		if (issue !== undefined) {
-			return `the provided certificate cannot be renewed: ${issue}`
-		}
-	}
-
-	// check certificate is within its validity period, allowing for clock
-	// skew at the start as a certificate issued moments ago may have a
-	// validity start up to a second in the future
-	const now = Date.now()
-	if (now >= certificate.validBefore.getTime()) {
-		return "the provided certificate is expired"
-	}
-	if (certificate.validAfter.getTime() > now + ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
-		return "the provided certificate is not yet valid"
-	}
-
-	// ensure certificate presented for renewal is not revoked
-	if (await isRevoked(env, certificate.serial)) {
-		return "the provided certificate is revoked"
-	}
-
-	return undefined
+	public_key: PublicKey
 }
 
 /**
- * Refines a host certificate renewal so only a certificate that can be
- * renewed (see {@link checkRenewableCertificate}) is accepted.
+ * Refines a v3 host certificate renewal so it is only accepted with a proof of
+ * possession of the key of the certificate presented. Whether the certificate
+ * can be renewed is checked once possession of its key is proven, see
+ * `renewHostCertificate`.
  */
-export const refineRenewableCertificate = async (env: SshCaBindings, isRevoked: typeof IsRevokedFn, val: { certificate: SshCertificate }, ctx: z.RefinementCtx): Promise<never> => {
+export const refineRenewalProof = async (env: SshCaBindings, val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
 	const l = logger(env)
 	try {
-		const reason = await checkRenewableCertificate(env, isRevoked, val.certificate)
-		if (reason !== undefined) {
-			return fatalIssue(ctx, reason, val)
-		}
-
-		return z.NEVER
-	} catch (err) {
-		// a misconfigured CA key is a server error, not a validation failure
-		if (err instanceof UnsupportedKeyError) {
-			l.error(err.message, "in", "refineRenewableCertificate")
-			throw new InternalServerErrorException(err.message)
-		}
-		l.error("certificate renewal check unhandled error", "in", "refineRenewableCertificate", "error", err)
-		return fatalIssue(ctx, "certificate renewal check unhandled error", val)
-	}
-}
-
-export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked: typeof IsRevokedFn, val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
-	const l = logger(env)
-	try {
-		const reason = await checkRenewableCertificate(env, isRevoked, val.certificate)
-		if (reason !== undefined) {
-			return fatalIssue(ctx, reason, val)
-		}
-
 		// check proof of possession fingerprint matches public key and certificate subject key
 		if (!val.proof.matches(val.public_key, val.certificate.publicKey)) {
 			return fatalIssue(ctx, "proof of possession fingerprints did not match public_key and/or certificate", val)
@@ -394,12 +311,7 @@ export const refineHostCertificateRenewal = async (env: SshCaBindings, isRevoked
 
 		return z.NEVER
 	} catch (err) {
-		// a misconfigured CA key is a server error, not a validation failure
-		if (err instanceof UnsupportedKeyError) {
-			l.error(err.message, "in", "refineHostCertificateRenewal")
-			throw new InternalServerErrorException(err.message)
-		}
-		l.error("proof of possession verification unhandled error", "in", "refineHostCertificateRenewal", "error", err)
+		l.error("proof of possession verification unhandled error", "in", "refineRenewalProof", "error", err)
 		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
 	}
 }
@@ -450,7 +362,7 @@ export const split = (v?: string | string[]): string[] => {
  * @throws {@link KeyParseError} when the secret cannot be parsed.
  * @throws {@link UnsupportedKeyError} when the key is not Ed25519 or ECDSA.
  */
-export const getPrivateKey = async (env: SshCaBindings): Promise<PrivateKey> => {
+export const getPrivateKey = async (env: Pick<SshCaBindings, "PRIVATE_KEY">): Promise<PrivateKey> => {
 	// grab private key from secret store
 	const secret = await env.PRIVATE_KEY.get()
 
@@ -460,7 +372,7 @@ export const getPrivateKey = async (env: SshCaBindings): Promise<PrivateKey> => 
 /**
  * Returns the public key of the CA, with `ISSUER_DN` as its comment
  */
-export const getPublic = async (env: SshCaBindings, key?: PrivateKey): Promise<PublicKey> => {
+export const getPublic = async (env: Pick<SshCaBindings, "PRIVATE_KEY" | "ISSUER_DN">, key?: PrivateKey): Promise<PublicKey> => {
 	if (key === undefined) {
 		key = await getPrivateKey(env)
 	}

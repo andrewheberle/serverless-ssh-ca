@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest"
 import * as P from "micro-packed"
-import type { SshCertificate } from "../src/ssh/certificate.js"
-import { createSignedCertificate, createSignedHostCertificate } from "../src/certificate.js"
-import { makeEnv } from "./env.js"
-import { MockSecretStore } from "./helpers/secret.js"
+import { signCertificate, type SshCertificate } from "../src/ssh/certificate.js"
+import { createSigner } from "../src/ssh/signer.js"
 import { fingerprint, generateKey, listCertificate } from "./helpers/ssh-keygen.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import type { TestKey } from "./keys/types.js"
-import { pub } from "./helpers/keys.js"
+import { priv, pub } from "./helpers/keys.js"
 
 // the size in bits and the size in bytes of r for each curve
 const curves = [
@@ -43,11 +41,22 @@ describe("certificates signed by an ECDSA CA", () => {
 
 	describe.each(curves)("with a %s CA key", (curve, bits, size) => {
 		const ca = generateKey("ecdsa", bits)
-		const env = makeEnv({ PRIVATE_KEY: new MockSecretStore(ca.privateKey) })
+		const signer = priv(ca).then(createSigner)
+		const now = Math.floor(Date.now() / 1000) * 1000
+		const create = async (kind: "user" | "host"): Promise<SshCertificate> => await signCertificate({
+			kind,
+			publicKey,
+			serial: 1n,
+			keyId: "test",
+			principals: [kind === "user" ? "user" : "host.example.com"],
+			validAfter: new Date(now),
+			validBefore: new Date(now + 3_600_000),
+			extensions: [],
+		}, await signer)
 
 		it.each([
-			["user", () => createSignedCertificate(env, "user@example.com", publicKey)],
-			["host", () => createSignedHostCertificate(env, publicKey, { principals: ["host.example.com"] })],
+			["user", () => create("user")],
+			["host", () => create("host")],
 		])("should be valid for a %s certificate whose signature has a short r value", async (_, create) => {
 			// about 1 in 256 signatures for nistp256 and nistp384, so the chance
 			// of none in this many attempts is negligible
@@ -64,7 +73,7 @@ describe("certificates signed by an ECDSA CA", () => {
 
 		it("should be valid for a certificate whose signature has a full length r value", async () => {
 			for (let attempt = 0; attempt < 100; attempt++) {
-				const certificate = await createSignedCertificate(env, "user@example.com", publicKey)
+				const certificate = await create("user")
 				if (!hasShortR(certificate, size)) {
 					expectValid(certificate, ca, curve)
 					return

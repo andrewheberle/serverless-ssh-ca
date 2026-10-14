@@ -2,7 +2,6 @@ import z from "zod"
 import type { SshCaBindings } from "../../types.js"
 import {
 	refineHostPrincipal,
-	refineRenewableCertificate,
 	split,
 	transformCertificate,
 	transformProofOfPossession,
@@ -19,7 +18,6 @@ import {
 	UnprocessableEntityException,
 } from "chanfana"
 import { seconds } from "itty-time"
-import { isRevoked } from "../../db/index.js"
 import { CertificateType } from "../../db/types.js"
 import {
 	CaPublicKeyEndpointSchema,
@@ -186,7 +184,6 @@ export const renewHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 			.meta({ description: "Lifetime of renewed Host SSH certificate" }),
 	})
-		.superRefine((val, ctx) => refineRenewableCertificate(env, isRevoked, val, ctx))
 		.openapi("Host Certificate Renewal Request")
 )
 
