@@ -28,8 +28,8 @@ import {
 	certificate,
 	certificateTypeName,
 	certificateTypeTag,
-	createHeaderSchema,
-	createIdentityTokenSchema,
+	accessTokenHeaders,
+	identityToken,
 	openapiStringByte,
 	proofOfPossession,
 	publicKey,
@@ -39,9 +39,6 @@ import {
 export {
 	CaPublicKeyEndpointSchema,
 	certificateTypeName,
-	createAccessTokenSchema,
-	createHeaderSchema,
-	createIdentityTokenSchema,
 	createRevocationListEndpointSchema,
 } from "../schema.js"
 
@@ -50,7 +47,7 @@ export const userCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 		public_key: subjectPublicKey,
 		proof: proofOfPossession
 			.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
-		identity: createIdentityTokenSchema(env),
+		identity: identityToken,
 		extensions: z.array(z.string())
 			.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
 			.meta({ description: "Extensions to include in the issued SSH certificate" }),
@@ -70,7 +67,7 @@ export const createUserCertificateRequestEndpointSchema = (env: SshCaBindings) =
 	description: "Issues a signed SSH user certificate for the provided public key. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key. Principals on the issued certificate are derived from the identity token.",
 	security: [{ oidcAuth: [] }],
 	request: {
-		headers: createHeaderSchema(env),
+		headers: accessTokenHeaders,
 		body: contentJson(userCertificateRequestEndpointBodySchema(env)),
 	},
 	responses: {
@@ -96,7 +93,7 @@ export const hostCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 				public_key: subjectPublicKey,
 				proof: proofOfPossession
 					.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
-				identity: createIdentityTokenSchema(env),
+				identity: identityToken,
 				principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1)
 					.meta({ description: "List of principals to include on the issued certificate" }),
 				lifetime: z.int()
@@ -115,7 +112,7 @@ export const createHostCertificateRequestEndpointSchema = (env: SshCaBindings) =
 	description: "Issues a signed SSH host certificate for the provided public key and principals. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key. The user must be permitted to request host certificates by email address or role.",
 	security: [{ oidcAuth: [] }],
 	request: {
-		headers: createHeaderSchema(env),
+		headers: accessTokenHeaders,
 		body: contentJson(hostCertificateRequestEndpointBodySchema(env))
 	},
 	responses: {

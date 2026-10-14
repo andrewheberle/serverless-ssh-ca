@@ -1,10 +1,8 @@
 import { group, Logger } from "@andrewheberle/ts-slog"
 import {
-	ForbiddenException,
 	fromHono,
 	InputValidationException,
 	OpenAPIRoute,
-	UnauthorizedException,
 } from "chanfana"
 import { Hono } from "hono"
 import type { PublicKey } from "../../ssh/keys.js"
@@ -15,10 +13,9 @@ import {
 	createSignedCertificate,
 	createSignedHostCertificate,
 } from "../../certificate.js"
-import { split } from "../../utils.js"
 import { CertificateType } from "../../db/types.js"
 import type { ProofOfPossession } from "../../proof.js"
-import { caPublicKey, issueCertificate, revocationList, revoke } from "../operations.js"
+import { authenticateRequester, caPublicKey, issueCertificate, revocationList, revoke } from "../operations.js"
 import { certificateTypeName } from "../schema.js"
 import {
 	createCaPublicKeyEndpointSchema,
@@ -83,35 +80,27 @@ const IssueUserCertificateEndpoint = (env: SshCaBindings) => {
 		override async handle(c: AppContext) {
 			const data = await this.getValidatedData<typeof this.schema>()
 
-			const l = logger(env).with(
-				...group("request",
-					"type", "user",
-					"action", "request",
+			const { requester, l } = await authenticateRequester(c,
+				logger(env).with(
+					...group("request",
+						"type", "user",
+						"action", "request",
+					),
 				),
-				...group("auth_token",
-					"email", data.headers.Authorization.email,
-					"sub", data.headers.Authorization.sub,
-				),
-				...group("id_token",
-					"sub", data.body.identity.sub,
-				),
+				{ authorization: data.headers.Authorization, identityToken: data.body.identity },
+				CertificateType.User,
 			)
 
 			await verifyProof(l, data.headers[ProofHeader], data.body.public_key, "POST", "/user/certificates")
 
-			if (data.body.identity.sub !== data.headers.Authorization.sub) {
-				l.error("token subjects did not match")
-				throw new ForbiddenException("Possible token substitution as subjects for authentication and identity tokens did not match")
-			}
-
 			const opts: CreateCertificateOptions = {
 				lifetime: data.body.lifetime,
-				principals: data.body.identity.principals,
+				principals: requester.principals,
 				extensions: data.body.extensions,
 			}
 
 			return await issueCertificate(c, l,
-				() => createSignedCertificate(c.env, data.headers.Authorization.email, data.body.public_key, opts),
+				() => createSignedCertificate(c.env, requester.email, data.body.public_key, opts),
 				CertificateType.User,
 			)
 		}
@@ -142,33 +131,18 @@ const IssueHostCertificateEndpoint = (env: SshCaBindings) => {
 		override async handle(c: AppContext) {
 			const data = await this.getValidatedData<typeof this.schema>()
 
-			const l = logger(env).with(
-				...group("request",
-					"type", "host",
-					"action", "request",
+			const { l } = await authenticateRequester(c,
+				logger(env).with(
+					...group("request",
+						"type", "host",
+						"action", "request",
+					),
 				),
-				...group("auth_token",
-					"email", data.headers.Authorization.email,
-					"sub", data.headers.Authorization.sub,
-				),
-				...group("id_token",
-					"sub", data.body.identity.sub,
-				),
+				{ authorization: data.headers.Authorization, identityToken: data.body.identity },
+				CertificateType.Host,
 			)
 
 			await verifyProof(l, data.headers[ProofHeader], data.body.public_key, "POST", "/host/certificates")
-
-			// check id and access token are for the same user
-			if (data.body.identity.sub !== data.headers.Authorization.sub) {
-				l.error("token subjects did not match")
-				throw new ForbiddenException("possible token substitution as subjects for authentication and identity tokens did not match")
-			}
-
-			// check user can issue host certificates
-			if (!split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(data.headers.Authorization.email) && !data.body.identity.principals.some((p: string) => split(c.env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES).includes(p))) {
-				l.error("unauthorized host certificate request")
-				throw new UnauthorizedException("User not allowed to issue host certificates")
-			}
 
 			const opts: CreateHostCertificateOptions = {
 				lifetime: data.body.lifetime,

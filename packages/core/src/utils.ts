@@ -1,14 +1,10 @@
 import type { SshCaBindings } from "./types.js"
-import { JWKInvalid, JWKSInvalid, JWSInvalid, JWSSignatureVerificationFailed, JWTClaimValidationFailed, JWTExpired, JWTInvalid } from "jose/errors"
 import { CertificateParseError, SshCertificate } from "./ssh/certificate.js"
 import { KeyParseError, MinimumRsaKeyBits, parsePrivateKey, PublicKey, rsaKeyBits, UnsupportedKeyError, type PrivateKey } from "./ssh/keys.js"
 import z from "zod"
-import { MissingAudienceError, verifyJWT } from "./verify.js"
-import { CertificateRequestJWTPayload } from "./types.js"
 import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
 import type { isRevoked as IsRevokedFn } from "./db/index.js"
 import { logger } from "./logger.js"
-import { UserInfoClaimsError, userInfoIdentity, UserInfoRejectedError } from "./userinfo.js"
 import { ms } from "itty-time"
 import { InternalServerErrorException } from "chanfana"
 
@@ -49,173 +45,6 @@ export const transformProofOfPossession = (env: SshCaBindings, val: string, ctx:
 		}
 
 		return z.NEVER
-	}
-}
-
-type AccessToken = {
-	email: string
-	sub: string
-}
-
-/**
- * Thrown when a claim of a verified token is missing or is not of the
- * expected type.
- */
-export class TokenClaimError extends Error {
-	constructor(message: string) {
-		super(message)
-		this.name = "TokenClaimError"
-
-		Object.setPrototypeOf(this, TokenClaimError.prototype)
-	}
-}
-
-const SubjectClaimSchema = z.string().min(1)
-
-/**
- * Returns the subject of a verified token, which is compared between the
- * access and identity tokens so must always be present.
- *
- * @param payload The payload of a verified token
- * @returns The `sub` claim of the token
- * @throws {@link TokenClaimError} when the `sub` claim is missing, empty or not a string
- */
-export const tokenSubject = (payload: { sub?: unknown }): string => {
-	const parsed = SubjectClaimSchema.safeParse(payload.sub)
-	if (!parsed.success) {
-		throw new TokenClaimError("JWT was verified but was missing required sub claim")
-	}
-
-	return parsed.data
-}
-
-/**
- * The claims of an access token that identify the user's email address.
- *
- * `email_verified` is optional as not every IdP includes it, but when it is
- * included it must be true, as an IdP may otherwise issue a token for an
- * address the user has not shown they control.
- */
-const EmailClaimsSchema = z.object({
-	email: z.email(),
-	email_verified: z.boolean().optional(),
-})
-
-/**
- * Returns the email address of a verified access token, or why it cannot be
- * used.
- *
- * @param payload The payload of a verified access token
- * @returns The email address, or an error message if the claims are not acceptable
- */
-export const tokenEmail = (payload: Record<string, unknown>): { ok: true, email: string } | { ok: false, error: string } => {
-	if (payload.email === undefined) {
-		return { ok: false, error: "JWT was verified but was missing required email claim" }
-	}
-
-	const parsed = EmailClaimsSchema.safeParse(payload)
-	if (!parsed.success) {
-		return { ok: false, error: "JWT was verified but the email or email_verified claim was not valid" }
-	}
-
-	if (parsed.data.email_verified === false) {
-		return { ok: false, error: "JWT was verified but the email address has not been verified by the IdP" }
-	}
-
-	return { ok: true, email: parsed.data.email }
-}
-
-// the attributes logged when a claim of a token is not valid, so the cause of a
-// rejected token can be found without the token itself. The claims checked
-// (such as aud, iss and nbf) identify the IdP and application, not the user.
-const claimValidationAttributes = (err: JWTClaimValidationFailed): unknown[] => {
-	return ["claim", err.claim, "reason", err.reason, "value", err.payload[err.claim]]
-}
-
-// verifies an access token with the IdP's userinfo endpoint, for IdPs that
-// issue access tokens that are not JWTs
-const userInfoAccessToken = async (env: SshCaBindings, url: string, token: string, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
-	const l = logger(env)
-
-	try {
-		return await userInfoIdentity(url, token)
-	} catch (err) {
-		switch (true) {
-			case (err instanceof UserInfoRejectedError):
-				l.warn(err.message, "in", "transformAuthorizationHeader", "status", err.status, "authenticate", err.authenticate)
-				return fatalIssue(ctx, "the access token was not accepted by the userinfo endpoint", val)
-			case (err instanceof UserInfoClaimsError):
-				l.warn(err.message, "in", "transformAuthorizationHeader")
-				return fatalIssue(ctx, err.message, val)
-			default:
-				// the IdP being unavailable is a server error, not a validation failure
-				l.error("the access token could not be verified with the userinfo endpoint", "in", "transformAuthorizationHeader", "error", err)
-				throw new InternalServerErrorException("the access token could not be verified with the userinfo endpoint")
-		}
-	}
-}
-
-export const transformAuthorizationHeader = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<AccessToken | never> => {
-	if (!val.startsWith("Bearer ") || val.length <= 7) {
-		return fatalIssue(ctx, "authorization header must be a Bearer token", val)
-	}
-
-	const jwt = val.replace("Bearer ", "")
-	const l = logger(env)
-
-	if (jwt === "") {
-		return fatalIssue(ctx, "request did not contain a JWT", val)
-	}
-
-	// when a userinfo endpoint is configured every access token is verified
-	// with it, rather than only those that are not JWTs, so a token cannot
-	// avoid the checks of either method by its format
-	if (env.OIDC_USERINFO_URL !== undefined && env.OIDC_USERINFO_URL !== "") {
-		return userInfoAccessToken(env, env.OIDC_USERINFO_URL, jwt, val, ctx)
-	}
-
-	try {
-		// verify jwt, which must be issued for this CA
-		const aud = split(env.JWT_ACCESS_TOKEN_AUD).length > 0 ? env.JWT_ACCESS_TOKEN_AUD : env.JWT_AUD
-		const { payload } = await verifyJWT(env, jwt, aud)
-
-		const email = tokenEmail(payload)
-		if (!email.ok) {
-			l.warn(email.error, "in", "transformAuthorizationHeader")
-			return fatalIssue(ctx, email.error, val)
-		}
-
-		return {
-			email: email.email,
-			sub: tokenSubject(payload),
-		}
-	} catch (err) {
-		switch (true) {
-			case (err instanceof MissingAudienceError):
-				// a misconfigured CA is a server error, not a validation failure
-				l.error(err.message, "in", "transformAuthorizationHeader")
-				throw new InternalServerErrorException(err.message)
-			case (err instanceof TokenClaimError):
-				return fatalIssue(ctx, err.message, val)
-			case (err instanceof JWSInvalid):
-				return fatalIssue(ctx, "the access token was invalid", val)
-			case (err instanceof JWTInvalid):
-				return fatalIssue(ctx, "the access token failed verification", val)
-			case (err instanceof JWKInvalid):
-				return fatalIssue(ctx, "the access token JWK was invalid", val)
-			case (err instanceof JWKSInvalid):
-				return fatalIssue(ctx, "the access token JWKS was invalid", val)
-			case (err instanceof JWTClaimValidationFailed):
-				l.warn("claim validation of the access token failed", "in", "transformAuthorizationHeader", ...claimValidationAttributes(err))
-				return fatalIssue(ctx, "claim validation of the JWT failed", val)
-			case (err instanceof JWTExpired):
-				return fatalIssue(ctx, "the access token has expired", val)
-			case (err instanceof JWSSignatureVerificationFailed):
-				return fatalIssue(ctx, "the access token signature verification failed", val)
-			default:
-				l.error("unhandled access token validation error", "in", "transformAuthorizationHeader", "error", err)
-				return fatalIssue(ctx, "unhandled access token validation error", val)
-		}
 	}
 }
 
@@ -292,105 +121,6 @@ export const refineSubjectKey = (val: PublicKey, ctx: z.RefinementCtx): void => 
 }
 
 /**
- * Thrown by {@link identityPrincipals} when the principals claim of an
- * identity token is not a string or an array of strings.
- */
-export class PrincipalsClaimError extends Error {
-	constructor(message: string) {
-		super(message)
-		this.name = "PrincipalsClaimError"
-
-		Object.setPrototypeOf(this, PrincipalsClaimError.prototype)
-	}
-}
-
-const PrincipalsClaimSchema = z.union([z.string(), z.array(z.string())]).nullish()
-
-export const identityPrincipals = (env: SshCaBindings, payload: CertificateRequestJWTPayload, claim?: string): string[] => {
-	if (claim === undefined) {
-		claim = env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM
-	}
-
-	const l = logger(env)
-
-	// the token is verified but the claim type is set by the IdP
-	const parsed = PrincipalsClaimSchema.safeParse(payload[claim])
-	if (!parsed.success) {
-		l.warn("claim was not a string or an array of strings", "claim", claim)
-		throw new PrincipalsClaimError(`the ${claim} claim must be a string or an array of strings`)
-	}
-
- 	const p = parsed.data
-
-	if (p === undefined) {
-		l.warn("claim was missing despite being set in CA config", "claim", claim)
-		return []
-	}
-
-	if (p === null) {
-		l.warn("claim was present but was null", "claim", claim)
-		return []
-	}
-
-	if (p === "") {
-		l.warn("claim was present but was an empty string", "claim", claim)
-		return []
-	}
-
-	// make sure its always a string[] and replace any spaces with underscores
-	const principals = (typeof p === "string" ? [p] : p)
- 		.map((value) => value.replaceAll(" ", "_"))
-
-	l.debug("identity token included principals", "principals", principals)
-
-	return principals
-}
-
-type IdentityToken = {
-	sub: string
-	principals: string[]
-}
-
-export const parseIdentity = async (env: SshCaBindings, jwt: string | undefined, claim?: string): Promise<IdentityToken> => {
-	if (jwt === undefined) {
-		throw new Error("missing identity token")
-	}
-
-	const { payload } = await verifyJWT(env, jwt, env.JWT_AUD)
-
-	const sub = tokenSubject(payload)
-	const principals = identityPrincipals(env, payload, claim)
-
-	return {
-		sub: sub,
-		principals: principals,
-	}
-}
-
-export const transformIdentityToken = async (env: SshCaBindings, val: string, ctx: z.RefinementCtx): Promise<IdentityToken | never> => {
-	try {
-		const identity = await parseIdentity(env, val, env.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM)
-
-		return identity
-	} catch (err) {
-		// a misconfigured CA is a server error, not a validation failure
-		if (err instanceof MissingAudienceError) {
-			logger(env).error(err.message, "in", "transformIdentityToken")
-			throw new InternalServerErrorException(err.message)
-		}
-		if (err instanceof JWTClaimValidationFailed) {
-			logger(env).warn("claim validation of the identity token failed", "in", "transformIdentityToken", ...claimValidationAttributes(err))
-		}
-		ctx.issues.push({
-			code: "custom",
-			message: err instanceof PrincipalsClaimError || err instanceof TokenClaimError ? err.message : "problem parsing identity token",
-			input: val
-		})
-		return z.NEVER
-	}
-}
-
-/**
  *
  * @param val A SSH certificate either a base64 encoded "string" or a "Buffer\<ArrayBufferLike\>"
  * @param ctx The Zod context for any errors
@@ -431,7 +161,7 @@ type ParsedCertificateRequest = {
 	proof: ProofOfPossession
 	public_key: PublicKey
 	lifetime: number
-	identity: IdentityToken
+	identity: string
 	extensions: string[]
 }
 
