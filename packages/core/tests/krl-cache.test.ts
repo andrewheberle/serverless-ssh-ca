@@ -3,12 +3,11 @@ import { DatabaseSync } from "node:sqlite"
 import { createSshCa, type CaCache, type SshCa } from "../src/index.js"
 import { cacheInMemory, fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { dbCleanup, getKrlRevision, recordCertificate, recordRenewal, revokeCertificate } from "../src/db/index.js"
-import { createSignedHostCertificate } from "../src/certificate.js"
+import { hostCertificate } from "./helpers/certificate.js"
 import { CertificateType } from "../src/db/types.js"
 import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
-import { pub } from "./helpers/keys.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
 import { generateProof } from "./helpers/proof.js"
 import { listCertificate } from "./helpers/ssh-keygen.js"
@@ -21,7 +20,7 @@ describe("KRL revision", () => {
 	const setup = () => {
 		const sqlite = new DatabaseSync(":memory:")
 		const env = makeEnv({ DB: fromNodeSqlite(sqlite), PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey) })
-		const issue = async () => await createSignedHostCertificate(env, pub(ecdsaKey.host()), { principals: ["test_host"] })
+		const issue = async () => hostCertificate(ecdsaKey.ca(), ecdsaKey.host())
 		return { sqlite, env, issue }
 	}
 

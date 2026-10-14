@@ -8,7 +8,12 @@ import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
 import { CertificateType, type DatabaseSchema, type KrlRecord } from "./types.js"
 
-const connect = async (env: SshCaBindings): Promise<D1QB<DatabaseSchema>> => {
+/**
+ * The bindings used to read and record certificates.
+ */
+export type StoreBindings = Pick<SshCaBindings, "DB" | "LOG_LEVEL">
+
+const connect = async (env: StoreBindings): Promise<D1QB<DatabaseSchema>> => {
 	const l = logger(env)
 
 	try {
@@ -89,7 +94,7 @@ const certificateValues = (certificate: SshCertificate, keyid: string, certifica
 	return CertificateColumns.map((column) => record[column])
 }
 
-export const recordCertificate = async (env: SshCaBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
+export const recordCertificate = async (env: StoreBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
 	const qb = await connect(env)
 	const res = await qb.insert({
 		tableName: "certificates",
@@ -117,7 +122,7 @@ export const recordCertificate = async (env: SshCaBindings, certificate: SshCert
  * @param certificate The certificate issued by the renewal
  * @returns true if the renewal was recorded, or false if the previous certificate was already revoked
  */
-export const recordRenewal = async (env: SshCaBindings, previous: SshCertificate, certificate: SshCertificate): Promise<boolean> => {
+export const recordRenewal = async (env: StoreBindings, previous: SshCertificate, certificate: SshCertificate): Promise<boolean> => {
 	// ensure migrations have been applied
 	await connect(env)
 
@@ -144,7 +149,7 @@ export const recordRenewal = async (env: SshCaBindings, previous: SshCertificate
 	return results[2]?.meta?.changes === 1
 }
 
-export const isRevoked = async (env: SshCaBindings, serial: bigint): Promise<boolean> => {
+export const isRevoked = async (env: StoreBindings, serial: bigint): Promise<boolean> => {
 	const qb = await connect(env)
 	const res = await qb.fetchOne({
 		tableName: "certificates",

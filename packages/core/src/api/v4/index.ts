@@ -7,15 +7,10 @@ import {
 import { Hono } from "hono"
 import type { PublicKey } from "../../ssh/keys.js"
 import { AppContext } from "../../router.js"
-import {
-	CreateCertificateOptions,
-	CreateHostCertificateOptions,
-	createSignedCertificate,
-	createSignedHostCertificate,
-} from "../../certificate.js"
+import { issueHostCertificate, issueUserCertificate, renewHostCertificate } from "../../authority.js"
 import { CertificateType } from "../../db/types.js"
 import type { ProofOfPossession } from "../../proof.js"
-import { authenticateRequester, caPublicKey, issueCertificate, revocationList, revoke } from "../operations.js"
+import { authenticateRequester, caPublicKey, certificateResponse, revocationList, revoke } from "../operations.js"
 import { certificateTypeName } from "../schema.js"
 import {
 	createCaPublicKeyEndpointSchema,
@@ -93,15 +88,8 @@ const IssueUserCertificateEndpoint = (env: SshCaBindings) => {
 
 			await verifyProof(l, data.headers[ProofHeader], data.body.public_key, "POST", "/user/certificates")
 
-			const opts: CreateCertificateOptions = {
-				lifetime: data.body.lifetime,
-				principals: requester.principals,
-				extensions: data.body.extensions,
-			}
-
-			return await issueCertificate(c, l,
-				() => createSignedCertificate(c.env, requester.email, data.body.public_key, opts),
-				CertificateType.User,
+			return await certificateResponse(c, l,
+				issueUserCertificate(c.env, requester, data.body.public_key, { lifetime: data.body.lifetime, extensions: data.body.extensions }, l),
 			)
 		}
 	}
@@ -144,14 +132,8 @@ const IssueHostCertificateEndpoint = (env: SshCaBindings) => {
 
 			await verifyProof(l, data.headers[ProofHeader], data.body.public_key, "POST", "/host/certificates")
 
-			const opts: CreateHostCertificateOptions = {
-				lifetime: data.body.lifetime,
-				principals: data.body.principals,
-			}
-
-			return await issueCertificate(c, l,
-				() => createSignedHostCertificate(c.env, data.body.public_key, opts),
-				CertificateType.Host,
+			return await certificateResponse(c, l,
+				issueHostCertificate(c.env, data.body.public_key, { principals: data.body.principals, lifetime: data.body.lifetime }, l),
 			)
 		}
 	}
@@ -182,21 +164,8 @@ const RenewHostCertificateEndpoint = (env: SshCaBindings) => {
 
 			await verifyProof(l, data.headers[ProofHeader], data.body.certificate.publicKey, "POST", `/host/certificates/${serial}/renew`)
 
-			// use smaller of the current certificate lifetime and the requested lifetime
-			const originalLifetime = (data.body.certificate.validBefore.getTime() - data.body.certificate.validAfter.getTime()) / 1000
-			const lifetime = originalLifetime > data.body.lifetime
-				? data.body.lifetime
-				: originalLifetime
-
-			const opts: CreateHostCertificateOptions = {
-				lifetime: lifetime,
-				principals: data.body.certificate.principals,
-			}
-
-			return await issueCertificate(c, l,
-				() => createSignedHostCertificate(c.env, data.body.certificate.publicKey, opts),
-				CertificateType.Host,
-				data.body.certificate,
+			return await certificateResponse(c, l,
+				renewHostCertificate(c.env, data.body.certificate, { lifetime: data.body.lifetime }, l),
 			)
 		}
 	}

@@ -22,7 +22,7 @@ const logValue = (value: unknown, depth = 0): unknown => {
 	}
 }
 
-export const logger = (env: SshCaBindings): Logger => {
+export const logger = (env: Pick<SshCaBindings, "LOG_LEVEL">): Logger => {
 	const level = env.LOG_LEVEL === "none"
 		? LogLevel.None
 		: env.LOG_LEVEL === "error"

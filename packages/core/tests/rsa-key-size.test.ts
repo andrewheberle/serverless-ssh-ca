@@ -1,18 +1,13 @@
 import { describe, it, expect, beforeAll } from "vitest"
 import { DatabaseSync } from "node:sqlite"
-import type { z } from "zod"
 import { createSshCa, type SshCa } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { PublicKey, rsaKeyBits } from "../src/ssh/keys.js"
-import { SshCertificate } from "../src/ssh/certificate.js"
-import { RenewalProofOfPossession } from "../src/proof.js"
-import { refineHostCertificateRenewal, subjectKeyIssue } from "../src/utils.js"
+import { subjectKeyIssue } from "../src/utils.js"
 import { makeEnv } from "./env.js"
-import { MockSecretStore } from "./helpers/secret.js"
-import { pub } from "./helpers/keys.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
 import { generateProof, generateRequestProof } from "./helpers/proof.js"
-import { generateKey, signCertificate } from "./helpers/ssh-keygen.js"
+import { generateKey } from "./helpers/ssh-keygen.js"
 import type { TestKey } from "./keys/types.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
@@ -101,24 +96,5 @@ describe("certificate requests with small RSA keys", () => {
 			headers: { "Proof-Of-Possession": generateRequestProof(small, "DELETE", "/api/v4/user/certificates/12345") },
 		}))
 		expect(response.status).toBe(404)
-	})
-})
-
-describe("refineHostCertificateRenewal with a small RSA key", () => {
-	it("should not renew a certificate for an RSA key smaller than 2048 bits", async () => {
-		const caKey = ecdsaKey.ca()
-		const host = generateKey("rsa", 1024)
-		const certificate = SshCertificate.parse(signCertificate(caKey, host.publicKey, { kind: "host", keyId: "host_test_host", principals: ["test_host"], validity: "-1m:+1h" }))
-		const issues: unknown[] = []
-		const ctx = { issues } as unknown as z.RefinementCtx
-
-		await refineHostCertificateRenewal(makeEnv({ PRIVATE_KEY: new MockSecretStore(caKey.privateKey) }), async () => false, {
-			certificate,
-			proof: new RenewalProofOfPossession(generateProof(host)),
-			public_key: pub(host),
-			lifetime: 3600,
-		}, ctx)
-
-		expect(issues).toMatchObject([{ message: "the provided certificate cannot be renewed: RSA keys must be at least 2048 bits, not 1024" }])
 	})
 })

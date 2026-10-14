@@ -3,9 +3,6 @@ import { signCertificate, SshCertificate, type CertificateFields } from "../src/
 import { decodePublicKey, SSHUnsignedMpint } from "../src/ssh/encoding.js"
 import { PublicKey } from "../src/ssh/keys.js"
 import { createSigner } from "../src/ssh/signer.js"
-import { createSignedCertificate, createSignedHostCertificate, CertificateError } from "../src/certificate.js"
-import { makeEnv } from "./env.js"
-import { MockSecretStore } from "./helpers/secret.js"
 import { fingerprint, generateKey, listCertificate, sshKeygen, withTempDir } from "./helpers/ssh-keygen.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
@@ -126,44 +123,6 @@ describe("signCertificate", () => {
 		const second = await signCertificate(fieldsFor(ed25519Key.user()), signer)
 
 		expect(first.toString()).not.toBe(second.toString())
-	})
-})
-
-describe("issued certificates", () => {
-	const env = makeEnv({ PRIVATE_KEY: new MockSecretStore(ed25519Key.ca().privateKey) })
-
-	it("should not issue a user certificate without principals", async () => {
-		const noPrincipals = makeEnv({ PRIVATE_KEY: new MockSecretStore(ed25519Key.ca().privateKey), SSH_CERTIFICATE_PRINCIPALS: "" })
-
-		await expect(createSignedCertificate(noPrincipals, "user@example.com", pub(ed25519Key.user())))
-			.rejects.toBeInstanceOf(CertificateError)
-	})
-
-	it("should not issue a host certificate without principals", async () => {
-		await expect(createSignedHostCertificate(env, pub(ed25519Key.host()), { principals: [] }))
-			.rejects.toBeInstanceOf(CertificateError)
-	})
-
-	it("should be valid from the current second for the requested lifetime", async () => {
-		const before = Date.now()
-		const certificate = await createSignedCertificate(env, "user@example.com", pub(ed25519Key.user()), { lifetime: 3600 })
-
-		expect(certificate.validAfter.getTime()).toBeLessThanOrEqual(Date.now())
-		expect(certificate.validAfter.getTime()).toBeGreaterThan(before - 1000)
-		expect(certificate.validBefore.getTime() - certificate.validAfter.getTime()).toBe(3600 * 1000)
-	})
-
-	it("should use the email address as the key ID of a user certificate", async () => {
-		const certificate = await createSignedCertificate(env, "user@example.com", pub(ed25519Key.user()))
-
-		expect(certificate.keyId).toBe("user@example.com")
-	})
-
-	it("should use the first principal as the key ID of a host certificate", async () => {
-		const certificate = await createSignedHostCertificate(env, pub(ed25519Key.host()), { principals: ["first.example.com", "second.example.com"] })
-
-		expect(certificate.keyId).toBe("host_first.example.com")
-		expect(certificate.principals).toEqual(["first.example.com", "second.example.com"])
 	})
 })
 

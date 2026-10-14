@@ -8,7 +8,7 @@ import {
 	transformRenewalProofOfPossession,
 	refineHostCertificateRequest,
 	transformCertificate,
-	refineHostCertificateRenewal,
+	refineRenewalProof,
 	refineRevokeCertificate,
 } from "../../utils.js"
 import {
@@ -22,7 +22,6 @@ import {
 	UnprocessableEntityException,
 } from "chanfana"
 import { seconds } from "itty-time"
-import { isRevoked } from "../../db/index.js"
 import { CertificateType } from "../../db/types.js"
 import {
 	certificate,
@@ -147,7 +146,7 @@ export const hostCertificateRenewEndpointBodySchema = (env: SshCaBindings) => (
 				.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 				.meta({ description: "Lifetime of renewed Host SSH certificate" }),
 		})
-			.superRefine((val, ctx) => refineHostCertificateRenewal(env, isRevoked, val, ctx))
+			.superRefine((val, ctx) => refineRenewalProof(env, val, ctx))
 			.openapi("Host Certificate Renew")
 )
 
