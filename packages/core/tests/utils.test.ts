@@ -7,8 +7,7 @@ import { generateKey, signCertificate } from "./helpers/ssh-keygen.js"
 import { RenewalProofOfPossession } from "../src/proof.js"
 import { generateProof } from "./helpers/proof.js"
 import type { z } from "zod"
-import { getPrivateKey, getPublic, hostPrincipalIssue, identityPrincipals, PrincipalsClaimError, refineHostCertificateRenewal, split, UnsupportedKeyError } from "../src/utils.js"
-import type { CertificateRequestJWTPayload } from "../src/types.js"
+import { getPrivateKey, getPublic, hostPrincipalIssue, refineHostCertificateRenewal, split, UnsupportedKeyError } from "../src/utils.js"
 import { env, makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
 import { key as rsaKey } from "./keys/rsa.js"
@@ -54,56 +53,6 @@ describe("split", () => {
     it ("two item array", () => {
         const result = split(["first", "second"])
         expect(result).toStrictEqual(["first", "second"])
-    })
-})
-
-describe("identityPrincipals", () => {
-    it ("no principals claim", () => {
-        const result = identityPrincipals(env, {email: "user@example.com", sub: "user"})
-        expect(result).toStrictEqual([])
-    })
-
-    it ("empty string principals claim", () => {
-        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: ""}, "groups")
-        expect(result).toStrictEqual([])
-    })
-
-    it ("empty array principals claim", () => {
-        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: []}, "groups")
-        expect(result).toStrictEqual([])
-    })
-
-    it ("principals claim as string", () => {
-        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: "foo"}, "groups")
-        expect(result).toStrictEqual(["foo"])
-    })
-
-    it ("principals claim as array", () => {
-        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: ["foo"]}, "groups")
-        expect(result).toStrictEqual(["foo"])
-    })
-
-    it ("principals claim as array with two items", () => {
-        const result = identityPrincipals(env, {email: "user@example.com", sub: "user", groups: ["foo", "bar"]}, "groups")
-        expect(result).toStrictEqual(["foo", "bar"])
-    })
-
-    // the payload type only allows strings, but an IdP can send any JSON value
-    const payloadWithGroups = (groups: unknown): CertificateRequestJWTPayload =>
-        ({email: "user@example.com", sub: "user", groups}) as unknown as CertificateRequestJWTPayload
-
-    it ("null principals claim", () => {
-        const result = identityPrincipals(env, payloadWithGroups(null), "groups")
-        expect(result).toStrictEqual([])
-    })
-
-    it.each([
-        ["a number", 42],
-        ["an object", {foo: "bar"}],
-        ["an array of numbers", [1, 2]],
-    ])("principals claim as %s", (_, groups) => {
-        expect(() => identityPrincipals(env, payloadWithGroups(groups), "groups"))
-            .toThrow(new PrincipalsClaimError("the groups claim must be a string or an array of strings"))
     })
 })
 

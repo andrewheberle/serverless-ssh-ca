@@ -1,10 +1,7 @@
 import z from "zod"
-import type { SshCaBindings } from "../types.js"
 import {
 	refineSubjectKey,
-	transformAuthorizationHeader,
 	transformPublicKey,
-	transformIdentityToken,
 } from "../utils.js"
 import {
 	contentJson,
@@ -80,32 +77,26 @@ export const subjectPublicKey = openapiStringByte
 		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
 	})
 
-export const createIdentityTokenSchema = (env: SshCaBindings) => (
-	z.string()
-		.meta({
-			description: "Identity Token JWT from OIDC IdP",
-			example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
-		})
-		.transform((val, ctx) => transformIdentityToken(env, val, ctx))
-)
+// tokens are only checked to be strings here, as they are verified together
+// once the request is valid (see authenticate in requester.ts)
+export const identityToken = z.string()
+	.meta({
+		description: "Identity Token JWT from OIDC IdP",
+		example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ1c2VyQGV4YW1wbGUuY29tIiwiaWF0IjoxNzc1NzAzMDk1fQ.ri_neAWnhMNK3LzlsrBcQYymSM4yRjmNSZZSeZiXhrEqtEz6c3cXk0Esq765umGjpUsWcosL-OFrDJlyAjTDnhrd9oV08uc_CW0rQRsJIGEuRo3ryxkLdVu9mGoZWEUb9KwjGJrwxvr-0cPWx5jaDyKwJcqMvtV_bEITUD51sDB1Vm89QfYRO_pGJo2vrRzSvMjpUenRpwPay4lYIBxl41_4YpR9Rc6VrIZuYsjV2iqEZ4eBrygMA7zPR_hN7l7s95FddLOzj5NsK57VT4uLHwYohx2oqMzw3M-B9HsZIQin_9q61pZFQXepzJth0woXiZheU27llnfHX967PhNQyg"
+	})
 
-export const createAccessTokenSchema = (env: SshCaBindings) => (
-	z.string()
-		.meta({
-			description: "Access Token JWT from OIDC IdP",
-			example: "Bearer eyJ..."
-		})
-		.transform((val, ctx) => transformAuthorizationHeader(env, val, ctx))
-)
+export const accessToken = z.string()
+	.meta({
+		description: "Access Token JWT from OIDC IdP",
+		example: "Bearer eyJ..."
+	})
 
 export const krl = openapiStringByte
 	.meta({ description: "Key Revocation List" })
 
-export const createHeaderSchema = (env: SshCaBindings) => (
-	z.object({
-		"Authorization": createAccessTokenSchema(env)
-	})
-)
+export const accessTokenHeaders = z.object({
+	"Authorization": accessToken,
+})
 
 export const certificate = openapiStringByte
 	.meta({ description: "Issued Certificate" })

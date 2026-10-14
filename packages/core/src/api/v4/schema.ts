@@ -26,8 +26,8 @@ import {
 	certificate,
 	certificateTypeName,
 	certificateTypeTag,
-	createAccessTokenSchema,
-	createIdentityTokenSchema,
+	accessToken,
+	identityToken,
 	createRevocationListEndpointSchema,
 	openapiStringByte,
 	subjectPublicKey,
@@ -62,7 +62,7 @@ export const createProofHeaderSchema = (env: SshCaBindings) => (
  */
 export const createAuthenticatedHeaderSchema = (env: SshCaBindings) => (
 	z.object({
-		"Authorization": createAccessTokenSchema(env),
+		"Authorization": accessToken,
 		[ProofHeader]: createProofSchema(env),
 	})
 )
@@ -99,7 +99,7 @@ export const createGetRevocationListEndpointSchema = (certificateType: Certifica
 export const issueUserCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 		public_key: subjectPublicKey,
-		identity: createIdentityTokenSchema(env),
+		identity: identityToken,
 		extensions: z.array(z.string())
 			.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
 			.meta({ description: "Extensions to include in the issued SSH certificate" }),
@@ -139,7 +139,7 @@ export const createIssueUserCertificateEndpointSchema = (env: SshCaBindings) => 
 export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 		public_key: subjectPublicKey,
-		identity: createIdentityTokenSchema(env),
+		identity: identityToken,
 		principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1)
 			.meta({ description: "List of principals to include on the issued certificate" }),
 		lifetime: z.int()

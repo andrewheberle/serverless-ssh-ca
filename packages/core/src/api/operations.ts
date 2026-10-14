@@ -2,9 +2,12 @@ import { group, Logger } from "@andrewheberle/ts-slog"
 import {
 	ApiException,
 	ConflictException,
+	ForbiddenException,
 	InputValidationException,
 	InternalServerErrorException,
+	MultiException,
 	NotFoundException,
+	UnauthorizedException,
 	UnprocessableEntityException,
 } from "chanfana"
 import type { AppContext } from "../router.js"
@@ -15,6 +18,7 @@ import { KeyParseError, type PublicKey } from "../ssh/keys.js"
 import { getPrivateKey, getPublic, UnsupportedKeyError } from "../utils.js"
 import { CertificateType } from "../db/types.js"
 import { KRLBuilder } from "../krl.js"
+import { authenticate, type Requester, type RequesterTokens, type TokenIssue } from "../requester.js"
 import { z } from "zod"
 import { certificateTypeName } from "./schema.js"
 import {
@@ -47,6 +51,74 @@ const caKeyError = (l: Logger, err: unknown): ApiException => {
 			// otherwise throw as InternalServerErrorException
 			l.error("unhandled error", "error", err)
 			return new InternalServerErrorException("internal server error")
+	}
+}
+
+// the path of the request field a token was sent in
+const tokenIssuePath = (issue: TokenIssue): string[] => {
+	switch (issue.token) {
+		case "access":
+			return ["headers", "Authorization"]
+		case "identity":
+			return ["body", "identity"]
+		default: {
+			const unknownToken: never = issue.token
+			throw new Error(`unknown token: ${String(unknownToken)}`)
+		}
+	}
+}
+
+/**
+ * Establishes who is asking for a certificate (see {@link authenticate}), or
+ * throws the API error for why they cannot be.
+ *
+ * @param c The request context
+ * @param l The logger for the request
+ * @param tokens The tokens sent with the request
+ * @param certificateType The type of certificate requested
+ * @returns The {@link Requester}, and the logger for the request with the requester added
+ * @throws {@link MultiException} of {@link InputValidationException} when a token is not accepted
+ * @throws {@link ForbiddenException} when the tokens are for different subjects
+ * @throws {@link UnauthorizedException} when the requester may not request host certificates
+ * @throws {@link InternalServerErrorException} when the tokens could not be verified
+ */
+export const authenticateRequester = async (c: AppContext, l: Logger, tokens: RequesterTokens, certificateType: CertificateType): Promise<{ requester: Requester, l: Logger }> => {
+	const result = await authenticate(c.env, tokens, certificateType, l)
+
+	switch (result.kind) {
+		case "authenticated":
+			return {
+				requester: result.requester,
+				l: l.with(
+					...group("auth_token", "email", result.requester.email, "sub", result.requester.sub),
+					...group("id_token", "sub", result.requester.sub),
+				),
+			}
+		case "invalid":
+			throw new MultiException(result.issues.map((issue) => new InputValidationException(issue.message, tokenIssuePath(issue))))
+		case "subjectMismatch": {
+			l.with(
+				...group("auth_token", "email", result.access.email, "sub", result.access.sub),
+				...group("id_token", "sub", result.identity.sub),
+			).error("token subjects did not match")
+			// the capitalisation differs between endpoints, and clients may match on it
+			const possible = certificateType === CertificateType.Host ? "possible" : "Possible"
+			throw new ForbiddenException(`${possible} token substitution as subjects for authentication and identity tokens did not match`)
+		}
+		case "notPermitted":
+			l.with(
+				...group("auth_token", "email", result.requester.email, "sub", result.requester.sub),
+				...group("id_token", "sub", result.requester.sub),
+			).error("unauthorized host certificate request")
+			throw new UnauthorizedException("User not allowed to issue host certificates")
+		case "misconfigured":
+		case "unavailable":
+			// the reason was logged when the token was verified
+			throw new InternalServerErrorException(result.message)
+		default: {
+			const unknownResult: never = result
+			throw new Error(`unknown authentication result: ${String(unknownResult)}`)
+		}
 	}
 }
 

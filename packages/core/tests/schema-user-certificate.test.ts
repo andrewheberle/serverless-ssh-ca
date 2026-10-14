@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
-import { createHeaderSchema, createIdentityTokenSchema, userCertificateRequestEndpointBodySchema } from "../src/api/v3/schema.js"
+import { userCertificateRequestEndpointBodySchema } from "../src/api/v3/schema.js"
 import { makeEnv } from "./env.js"
-import { getAccessToken, getIdentityToken } from "./helpers/token.js"
+import { getIdentityToken } from "./helpers/token.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import { generateProof } from "./helpers/proof.js"
 import { seconds } from "itty-time"
@@ -9,100 +9,6 @@ import { seconds } from "itty-time"
 const env = makeEnv()
 
 describe("user certificate schema", () => {
-	const schema = createHeaderSchema(env)
-
-	describe("headers", () => {
-		it("should fail with no headers", async () => {
-			const result = await schema.safeParseAsync({})
-			expect(result.success).toBe(false)
-		})
-
-		it("should fail with missing header", async () => {
-			const result = await schema.safeParseAsync({
-				Authorization: undefined
-			})
-			expect(result.success).toBe(false)
-		})
-
-		it("should fail with without correct prefix", async () => {
-			const result = await schema.safeParseAsync({
-				Authorization: "Basic foo"
-			})
-			expect(result.success).toBe(false)
-		})
-
-		it("should fail with empty value after prefix", async () => {
-			const result = await schema.safeParseAsync({
-				Authorization: "Bearer "
-			})
-			expect(result.success).toBe(false)
-		})
-
-		it("should pass with valid token", async () => {
-			const token = await getAccessToken({
-				sub: "1234567890",
-				email: "user123@example.com"
-			})
-
-			const result = await schema.safeParseAsync({
-				Authorization: token
-			})
-
-			expect(result.success).toBe(true)
-		})
-
-		it("should fail with an expired token", async () => {
-			const token = await getAccessToken({
-				sub: "1234567890",
-				email: "user123@example.com",
-				exp: Math.floor(Date.now() / 1000) - 3600,
-			})
-
-			const result = await schema.safeParseAsync({
-				Authorization: token
-			})
-
-			expect(result.success).toBe(false)
-			expect(result.error?.issues[0]?.message).toBe("the access token has expired")
-		})
-
-		it("should fail with a bad signature", async () => {
-			const token = await getAccessToken({
-				sub: "1234567890",
-				email: "user123@example.com"
-			})
-			const other = await getAccessToken({
-				sub: "0987654321",
-				email: "other@example.com"
-			})
-
-			// keep the signature but replace the payload with another token's
-			const [header, , signature] = token.split(".")
-			const [, payload] = other.split(".")
-			const result = await schema.safeParseAsync({
-				Authorization: `${header}.${payload}.${signature}`
-			})
-
-			expect(result.success).toBe(false)
-			expect(result.error?.issues[0]?.message).toBe("the access token signature verification failed")
-		})
-
-		it("should fail with the wrong issuer", async () => {
-			const token = await getAccessToken({
-				sub: "1234567890",
-				email: "user123@example.com",
-				iss: "https://idp.example.com",
-			})
-
-			const result = await schema.safeParseAsync({
-				Authorization: token
-			})
-
-			expect(result.success).toBe(false)
-			expect(result.error?.issues[0]?.message).toBe("claim validation of the JWT failed")
-		})
-	})
-
 	describe("body", async () => {
 		const schema = userCertificateRequestEndpointBodySchema(env)
 
@@ -209,36 +115,6 @@ describe("user certificate schema", () => {
 				lifetime: 3600
 			})
 			expect(result.success).toBe(false)
-		})
-	})
-
-	describe("identity token principals claim", () => {
-		const schema = createIdentityTokenSchema(env)
-
-		it("should pass with a null claim and no principals", async () => {
-			const token = await getIdentityToken({
-				sub: "1234567890",
-				email: "user123@example.com",
-				groups: null,
-			})
-
-			const result = await schema.safeParseAsync(token)
-
-			expect(result.success).toBe(true)
-			expect(result.data?.principals).toEqual([])
-		})
-
-		it("should fail with a clear message for a claim of the wrong type", async () => {
-			const token = await getIdentityToken({
-				sub: "1234567890",
-				email: "user123@example.com",
-				groups: 42,
-			})
-
-			const result = await schema.safeParseAsync(token)
-
-			expect(result.success).toBe(false)
-			expect(result.error?.issues[0]?.message).toBe("the groups claim must be a string or an array of strings")
 		})
 	})
 })
