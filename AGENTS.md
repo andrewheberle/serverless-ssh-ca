@@ -79,3 +79,17 @@ Prefer the scripts in `package.json` over invoking tools directly.
   - Entries are temporary. If an ssh-ca-client release newer than the one named in a group's comment exists, flag that group for removal.
   - To remove entries, delete the lines. Putting `#` in front of an entry does not turn it off, because oasdiff matches any line that contains the method, path and message.
   - Delete the file once it has no entries. The file is optional and is not published to npm.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues on `andrewheberle/serverless-ssh-ca` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
