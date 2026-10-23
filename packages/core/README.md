@@ -118,7 +118,7 @@ The flow to obtain a User SSH certificate using the CLI version is as follows:
    `http://localhost:3000/auth/callback`)
 5. The client uses the JWT from the IdP as `Authorization: Bearer <TOKEN>`
    in a `POST` request containing the users SSH public key to the CA's
-   `/api/v3/user/certificate` endpoint
+   `/api/v4/user/certificates` endpoint
 6. The CA verifies the incoming JWT and assuming it is valid and verified, will
    respond with a signed certificate based on the provided public key
 7. The client saves the certificate and adds the SSH private key and
@@ -145,7 +145,7 @@ sequenceDiagram
     activate Client
     Client-->>User: Auth flow completed
     deactivate Client
-    Client->>CA: POST /api/v3/user/certificate
+    Client->>CA: POST /api/v4/user/certificates
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -165,7 +165,7 @@ sequenceDiagram
     IdP-->>Client: Token returned
     deactivate IdP
     activate Client
-    Client->>CA: POST /api/v3/user/certificate
+    Client->>CA: POST /api/v4/user/certificates
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -207,7 +207,7 @@ sequenceDiagram
     activate Client
     Client-->>User: Auth flow completed
     deactivate Client
-    Client->>CA: POST /api/v3/host/certificate
+    Client->>CA: POST /api/v4/host/certificates
     deactivate Client
     activate CA
     CA-->>Client: Signed certificate
@@ -243,7 +243,7 @@ below when `ssh-ca-client-cli host --renew` is run:
 
 ```mermaid
 sequenceDiagram
-    Client->>CA: POST /api/v3/host/renew
+    Client->>CA: POST /api/v4/host/certificates/{serial}/renew
     activate CA
     CA-->>Client: Signed certificate
     deactivate CA
@@ -503,7 +503,7 @@ The contents of `/etc/ssh/ca.pub` is the public key of the SSH CA, which can be
 retrieved as follows:
 
 ```sh
-curl https://ssh-ca.example.com/api/v3/ca | sudo tee /etc/ssh/ca.pub
+curl https://ssh-ca.example.com/api/v4/ca | sudo tee /etc/ssh/ca.pub
 ```
 
 The `/etc/ssh/principals.d` directory should contain a file corresponding to
@@ -537,7 +537,7 @@ This will need adjusting depending on your environment along with the actual
 SSH CA public key which can be retrieved as follows:
 
 ```sh
-curl https://ssh-ca.example.com/api/v3/ca
+curl https://ssh-ca.example.com/api/v4/ca
 ```
 
 Once the above configuration is completed and host certificates are in place
