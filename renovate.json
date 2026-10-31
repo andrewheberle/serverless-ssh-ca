@@ -6,5 +6,18 @@
 	"rangeStrategy": "update-lockfile",
 	"lockFileMaintenance": {
 		"enabled": true
+	},
+	"packageRules": [
+		{
+			"matchDepTypes": [
+				"dependencies"
+			],
+			"semanticCommitType": "chore"
+		}
+	],
+	"osvVulnerabilityAlerts": true,
+	"vulnerabilityAlerts": {
+		"rangeStrategy": "bump",
+		"semanticCommitType": "fix"
 	}
 }
