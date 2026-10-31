@@ -2,5 +2,22 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": [
 		"config:recommended"
-	]
+	],
+	"rangeStrategy": "update-lockfile",
+	"lockFileMaintenance": {
+		"enabled": true
+	},
+	"packageRules": [
+		{
+			"matchDepTypes": [
+				"dependencies"
+			],
+			"semanticCommitType": "chore"
+		}
+	],
+	"osvVulnerabilityAlerts": true,
+	"vulnerabilityAlerts": {
+		"rangeStrategy": "bump",
+		"semanticCommitType": "fix"
+	}
 }
