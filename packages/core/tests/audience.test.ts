@@ -87,7 +87,7 @@ describe.each([
 
 		expect(response.status).toBe(400)
 		expect(log).toHaveBeenCalledWith(expect.objectContaining({
-			level: "WARNING",
+			level: "warning",
 			message: `claim validation of the ${token} token failed`,
 			claim: "aud",
 			reason: "check_failed",
