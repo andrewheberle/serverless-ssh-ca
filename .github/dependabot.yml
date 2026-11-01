@@ -1,0 +1,44 @@
+# Dependabot replaces Renovate, whose npm manager can't find the locked
+# version of a dependency that npm hoists out of a workspace, so it never
+# proposed in-range updates or security fixes for the workspace packages
+# (renovatebot/renovate discussion #47546).
+#
+# PRs are squash merged with the PR title as the commit message, so titles
+# must be conventional commits. Routine updates are chore(deps) and don't
+# trigger a release; retitle a PR fix(deps) when it raises a published
+# range in packages/core or packages/testing for a security fix.
+version: 2
+updates:
+  - package-ecosystem: npm
+    # The root package-lock.json covers every workspace
+    directory: /
+    schedule:
+      interval: weekly
+    # Update only the lockfile while the range allows the new version, so
+    # the ranges core and testing publish stay as loose as they are
+    versioning-strategy: increase-if-necessary
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    groups:
+      vitest:
+        patterns:
+          - vitest
+          - "@vitest/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
