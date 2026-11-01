@@ -4,9 +4,8 @@
 # (renovatebot/renovate discussion #47546).
 #
 # PRs are squash merged with the PR title as the commit message, so titles
-# must be conventional commits. Routine updates are chore(deps) and don't
-# trigger a release; retitle a PR fix(deps) when it raises a published
-# range in packages/core or packages/testing for a security fix.
+# must be conventional commits. npm updates only change the lockfile, which
+# isn't published, so they are chore(deps) and don't trigger a release.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -14,9 +13,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # Update only the lockfile while the range allows the new version, so
-    # the ranges core and testing publish stay as loose as they are
-    versioning-strategy: increase-if-necessary
+    # Never change package.json. core and testing publish their ranges, and
+    # raising a minimum breaks consumers: core shares zod with chanfana, so a
+    # zod range above the copy chanfana gets installs a second zod that
+    # chanfana never extends with .openapi(). increase-if-necessary raises
+    # minimums anyway (dependabot/dependabot-core#14798), so only the lockfile
+    # is updated, and updates outside a range (majors) are made by hand.
+    versioning-strategy: lockfile-only
     commit-message:
       prefix: chore
       prefix-development: chore
