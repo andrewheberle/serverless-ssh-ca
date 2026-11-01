@@ -77,7 +77,7 @@ describe.each(requests)("access tokens verified with the userinfo endpoint (%s)"
 		expect(response.status).toBe(400)
 		expect(await errorMessages(response)).toContain("the access token was not accepted by the userinfo endpoint")
 		expect(log).toHaveBeenCalledWith(expect.objectContaining({
-			level: "WARNING",
+			level: "warning",
 			status: 401,
 			authenticate: "Bearer error=\"invalid_token\"",
 		}))
@@ -116,7 +116,7 @@ describe.each(requests)("access tokens verified with the userinfo endpoint (%s)"
 
 		expect(response.status).toBe(500)
 		expect(log).toHaveBeenCalledWith(expect.objectContaining({
-			level: "ERROR",
+			level: "error",
 			message: "the access token could not be verified with the userinfo endpoint",
 			error: expect.objectContaining({ name: "UserInfoUnavailableError" }),
 		}))

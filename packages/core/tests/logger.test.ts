@@ -15,7 +15,7 @@ describe("logger", () => {
 		logger(makeEnv({ LOG_LEVEL: "error" })).error("failed", "error", err, "count", 1)
 
 		expect(log).toHaveBeenCalledWith({
-			level: "ERROR",
+			level: "error",
 			message: "failed",
 			error: {
 				name: "KeyParseError",

@@ -81,7 +81,7 @@ describe.each(requests)("CA key errors (%s)", (_name, request) => {
 		// only in the logs
 		expect(response.status).toBe(500)
 		expect(log).toHaveBeenCalledWith(expect.objectContaining({
-			level: "ERROR",
+			level: "error",
 			message: "error parsing private key: private key could not be decoded",
 			error: expect.objectContaining({ name: "KeyParseError", message: "private key could not be decoded", cause: expect.objectContaining({ message: expect.any(String) }) }),
 		}))
