@@ -119,7 +119,7 @@ const IssueHostCertificateEndpoint = (env: SshCaBindings) => {
 		override async handle(c: AppContext) {
 			const data = await this.getValidatedData<typeof this.schema>()
 
-			const { l } = await authenticateRequester(c,
+			const { requester, l } = await authenticateRequester(c,
 				logger(env).with(
 					...group("request",
 						"type", "host",
@@ -133,7 +133,7 @@ const IssueHostCertificateEndpoint = (env: SshCaBindings) => {
 			await verifyProof(l, data.headers[ProofHeader], data.body.public_key, "POST", "/host/certificates")
 
 			return await certificateResponse(c, l,
-				issueHostCertificate(c.env, data.body.public_key, { principals: data.body.principals, lifetime: data.body.lifetime }, l),
+				issueHostCertificate(c.env, requester, data.body.public_key, { principals: data.body.principals, lifetime: data.body.lifetime }, l),
 			)
 		}
 	}
