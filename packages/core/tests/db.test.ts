@@ -7,6 +7,8 @@ import { CertificateType } from "../src/db/types.js"
 import { makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
+import { key as ed25519Key } from "./keys/ed25519.js"
+import { PublicKey } from "../src/ssh/keys.js"
 import type { CaDatabase } from "../src/types.js"
 
 // a D1 binding that records any use of it
@@ -64,7 +66,7 @@ describe("recordRenewal", () => {
 		const { env, issue, recorded } = setup()
 		const previous = await issue()
 		await recordCertificate(env, previous, previous.keyId, CertificateType.Host)
-		await revokeCertificate(env, previous.serial)
+		await revokeCertificate(env, { serial: previous.serial, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: previous.publicKey } })
 		const renewed = await issue()
 
 		expect(await recordRenewal(env, previous, renewed)).toBe(false)
@@ -98,17 +100,57 @@ describe("recordRenewal", () => {
 })
 
 describe("revokeCertificate", () => {
-	it("should only revoke a certificate once, keeping the first revocation time", async () => {
+	const setup = async () => {
 		const sqlite = new DatabaseSync(":memory:")
 		const env = makeEnv({ DB: fromNodeSqlite(sqlite), PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey) })
 		const certificate = hostCertificate(ecdsaKey.ca(), ecdsaKey.host())
 		await recordCertificate(env, certificate, certificate.keyId, CertificateType.Host)
 
-		const first = await revokeCertificate(env, certificate.serial)
-		expect(first).toHaveLength(1)
+		const revokedAt = (): unknown => sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${certificate.serial}`)
+		const revision = (): unknown => sqlite.prepare("SELECT revision FROM krl WHERE certificate_type = ?").get(CertificateType.Host)
+
+		return { env, certificate, revokedAt, revision }
+	}
+
+	it("should only revoke a certificate once, keeping the first revocation time", async () => {
+		const { env, certificate, revokedAt } = await setup()
+		const revocation = { serial: certificate.serial, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } } as const
+
+		const first = await revokeCertificate(env, revocation)
+		if (first.kind !== "revoked") {
+			throw new Error(`expected the certificate to be revoked, not ${first.kind}`)
+		}
 
 		// a second revocation, as from a request that lost a race, changes nothing
-		expect(await revokeCertificate(env, certificate.serial)).toEqual([])
-		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${certificate.serial}`)).toEqual({ revoked_at: first[0]?.revoked_at })
+		expect(await revokeCertificate(env, revocation)).toEqual({ kind: "alreadyRevoked" })
+		expect(revokedAt()).toEqual({ revoked_at: first.revokedAt })
+	})
+
+	it("should not revoke a certificate of another type", async () => {
+		const { env, certificate, revokedAt, revision } = await setup()
+
+		const result = await revokeCertificate(env, { serial: certificate.serial, certificateType: CertificateType.User, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } })
+
+		expect(result).toEqual({ kind: "notFound" })
+		expect(revokedAt()).toEqual({ revoked_at: null })
+		expect(revision()).toEqual({ revision: 0 })
+	})
+
+	it("should not revoke a certificate for another key", async () => {
+		const { env, certificate, revokedAt, revision } = await setup()
+		const other = PublicKey.parse(ed25519Key.host().publicKey)
+
+		const result = await revokeCertificate(env, { serial: certificate.serial, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: other } })
+
+		expect(result).toEqual({ kind: "notFound" })
+		expect(revokedAt()).toEqual({ revoked_at: null })
+		expect(revision()).toEqual({ revision: 0 })
+	})
+
+	it("should report a serial that is not recorded as not found", async () => {
+		const { env, certificate } = await setup()
+
+		expect(await revokeCertificate(env, { serial: certificate.serial + 1n, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } }))
+			.toEqual({ kind: "notFound" })
 	})
 })

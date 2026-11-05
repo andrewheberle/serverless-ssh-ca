@@ -27,3 +27,11 @@ _Avoid_: Role (roles are identity token principals used to decide who may reques
 **Renewal**:
 Issuing a new host certificate for the same key and principals as a current host certificate from this CA, in exchange for revoking it, proven by possession of the host key rather than by tokens.
 _Avoid_: Refresh, re-issue
+
+**Revocation**:
+Adding a certificate to the KRL before it expires, so it is no longer trusted, which only a revoker allowed to revoke that certificate can do.
+_Avoid_: Cancellation, deletion
+
+**Revoker**:
+Whoever is revoking a certificate, which decides whether they may: the holder of the key the certificate was issued for, proven by possession of that key.
+_Avoid_: Requester (a requester is authenticated by tokens, a revoker by what they hold)

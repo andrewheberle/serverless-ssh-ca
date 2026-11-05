@@ -190,12 +190,6 @@ export const isRevoked = async (env: StoreBindings, serial: bigint): Promise<boo
 	return res.results !== undefined
 }
 
-export enum RevocationStatus {
-	NotFound,
-	Revoked,
-	Revokable,
-}
-
 // whether a public key recorded in OpenSSH format is the same as another key,
 // treating a recorded key that cannot be parsed as a different key
 const isKey = (recorded: string, publicKey: PublicKey): boolean => {
@@ -204,42 +198,6 @@ const isKey = (recorded: string, publicKey: PublicKey): boolean => {
 	} catch {
 		return false
 	}
-}
-
-/**
- * Returns whether a certificate can be revoked by the holder of a public key.
- *
- * The public key is compared by fingerprint, so a key with a different
- * comment to the one the certificate was issued for still matches.
- *
- * @param env The CA bindings
- * @param serial The serial of the certificate
- * @param publicKey The public key the requester has proven possession of
- * @param certificateType The type of certificate
- * @returns The revocation status of the certificate
- */
-export const revocationStatus = async (env: SshCaBindings, serial: bigint, publicKey: PublicKey, certificateType: CertificateType): Promise<RevocationStatus> => {
-	const qb = await connect(env)
-	const res = await qb.fetchOne({
-		tableName: "certificates",
-		fields: ["public_key", "revoked_at"],
-		where: {
-			conditions: "serial = ? AND certificate_type = ?",
-			params: [`${serial}`, certificateType]
-		}
-	}).execute()
-
-	// a certificate issued for another key is reported as not found, so
-	// requests cannot be used to discover which serials exist
-	if (res.results?.public_key == null || !isKey(res.results.public_key, publicKey)) {
-		return RevocationStatus.NotFound
-	}
-
-	if (res.results.revoked_at !== null) {
-		return RevocationStatus.Revoked
-	}
-
-	return RevocationStatus.Revokable
 }
 
 export const getRevocationList = async (env: SshCaBindings, certificateType: CertificateType): Promise<string[]> => {
@@ -266,40 +224,103 @@ export const getRevocationList = async (env: SshCaBindings, certificateType: Cer
 	return res.results.map(item => item.serial)
 }
 
-/** The time a certificate was revoked, as an ISO 8601 string */
-type RevokedCertificate = { revoked_at: string }
+/**
+ * Who is revoking a certificate, which decides whether they may.
+ *
+ * - `keyHolder`: the holder of the private key for `publicKey`, who has proven possession of it, may revoke a certificate issued for that key
+ */
+export type Revoker =
+	| { kind: "keyHolder", publicKey: PublicKey }
 
 /**
- * Revokes a certificate that has not already been revoked.
+ * The result of revoking a certificate.
  *
- * A certificate that is already revoked is left unchanged, so when several
- * requests revoke the same certificate concurrently only one of them revokes
- * it and the time it was first revoked is kept.
+ * - `revoked`: the certificate was revoked at `revokedAt`, an ISO 8601 string
+ * - `alreadyRevoked`: the certificate was already revoked, including by another request while this one was revoking it
+ * - `notFound`: there is no certificate of the type that the revoker may revoke
+ */
+export type RevocationResult =
+	| { kind: "revoked", revokedAt: string }
+	| { kind: "alreadyRevoked" }
+	| { kind: "notFound" }
+
+/** A certificate to revoke, and who is revoking it, see {@link Revoker} */
+export type Revocation = {
+	serial: bigint
+	certificateType: CertificateType
+	revoker: Revoker
+}
+
+// whether a revoker may revoke a certificate issued for a recorded public key
+const mayRevoke = (revoker: Revoker, recordedKey: string): boolean => {
+	switch (revoker.kind) {
+		case "keyHolder":
+			return isKey(recordedKey, revoker.publicKey)
+		default: {
+			const unknown: never = revoker.kind
+			throw new Error(`unknown revoker ${String(unknown)}`)
+		}
+	}
+}
+
+/**
+ * Revokes a certificate if the revoker may revoke it, see {@link Revoker}.
+ *
+ * Whether the revoker may revoke the certificate is decided from the recorded
+ * certificate, and the certificate is only revoked if that record is
+ * unchanged, so a decision is never applied to a different certificate. A key
+ * holder's key is compared by fingerprint, so a key with a different comment
+ * to the one the certificate was issued for still matches, and a certificate
+ * issued for another key is reported as not found so that revocations cannot
+ * be used to discover which serials exist.
+ *
+ * A certificate is only revoked once, so when several requests revoke the
+ * same certificate concurrently one of them revokes it and the time it was
+ * first revoked is kept. The KRL revision for the certificate type is
+ * incremented in the same transaction, so a cached KRL that does not include
+ * the certificate is never used again.
  *
  * @param env The CA bindings
- * @param serial The serial of the certificate to revoke
- * @returns The revocation time of the certificate, or an empty array if it was not revoked by this call
+ * @param revocation The certificate to revoke and who is revoking it, see {@link Revocation}
+ * @returns Whether the certificate was revoked, see {@link RevocationResult}
  */
-export const revokeCertificate = async (env: SshCaBindings, serial: bigint): Promise<RevokedCertificate[]> => {
-	// ensure migrations have been applied
-	await connect(env)
+export const revokeCertificate = async (env: SshCaBindings, revocation: Revocation): Promise<RevocationResult> => {
+	const { serial, certificateType, revoker } = revocation
+
+	const qb = await connect(env)
+	const res = await qb.fetchOne({
+		tableName: "certificates",
+		fields: ["public_key", "revoked_at"],
+		where: {
+			conditions: "serial = ? AND certificate_type = ?",
+			params: [`${serial}`, certificateType]
+		}
+	}).execute()
+
+	const recordedKey = res.results?.public_key
+	if (recordedKey == null || !mayRevoke(revoker, recordedKey)) {
+		return { kind: "notFound" }
+	}
+
+	if (res.results?.revoked_at != null) {
+		return { kind: "alreadyRevoked" }
+	}
 
 	const revokedAt = (new Date).toISOString()
 
-	// the KRL revision is incremented in the same transaction, so a cached KRL
-	// that does not include this certificate is never used again
+	// only the certificate the decision was made for is revoked, and only if
+	// another request has not revoked it since it was read
 	const results = await env.DB.batch([
-		env.DB.prepare("UPDATE certificates SET revoked_at = ? WHERE serial = ? AND revoked_at IS NULL")
-			.bind(revokedAt, `${serial}`),
-		env.DB.prepare("UPDATE krl SET revision = revision + 1 WHERE certificate_type = (SELECT certificate_type FROM certificates WHERE serial = ?) AND changes() = 1")
-			.bind(`${serial}`),
+		env.DB.prepare("UPDATE certificates SET revoked_at = ? WHERE serial = ? AND certificate_type = ? AND public_key = ? AND revoked_at IS NULL")
+			.bind(revokedAt, `${serial}`, certificateType, recordedKey),
+		env.DB.prepare(BumpRevisionIfChanged).bind(certificateType),
 	])
 
 	if (results.some((res) => !res.success)) {
 		throw new Error("error during query")
 	}
 
-	return results[0]?.meta?.changes === 1 ? [{ revoked_at: revokedAt }] : []
+	return results[0]?.meta?.changes === 1 ? { kind: "revoked", revokedAt } : { kind: "alreadyRevoked" }
 }
 
 const KrlRevisionRow = z.object({

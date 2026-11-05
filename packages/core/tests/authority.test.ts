@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite"
 import { seconds } from "itty-time"
 import { issueHostCertificate, issueUserCertificate, renewHostCertificate, type AuthorityConfig, type IssueResult, type RenewResult } from "../src/authority.js"
 import { isRevoked, revokeCertificate } from "../src/db/index.js"
+import { CertificateType } from "../src/db/types.js"
 import { logger } from "../src/logger.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import type { Requester } from "../src/requester.js"
@@ -108,7 +109,7 @@ describe("issueUserCertificate", () => {
 	it("should record the certificate so it can be revoked", async () => {
 		const env = config()
 		const certificate = certificateOf(await issueUserCertificate(env, requester, pub(ed25519Key.user()), {}, l))
-		expect(await revokeCertificate(env, certificate.serial)).toHaveLength(1)
+		expect(await revokeCertificate(env, { serial: certificate.serial, certificateType: CertificateType.User, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } })).toMatchObject({ kind: "revoked" })
 	})
 })
 
