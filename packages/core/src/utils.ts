@@ -4,7 +4,7 @@ import { KeyParseError, MinimumRsaKeyBits, parsePrivateKey, PublicKey, rsaKeyBit
 import z from "zod"
 import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
 import { logger } from "./logger.js"
-import { ms } from "itty-time"
+import { caConfig } from "./config.js"
 
 export { UnsupportedKeyError }
 
@@ -21,7 +21,7 @@ export const fatalIssue = (ctx: z.RefinementCtx, message: string, val: unknown) 
 export const transformProofOfPossession = (env: SshCaBindings, val: string, ctx: z.core.$RefinementCtx<string>): ProofOfPossession | never => {
 	const l = logger(env)
 	try {
-		const proof = new ProofOfPossession(val, { logger: l, skew: ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX) })
+		const proof = new ProofOfPossession(val, { logger: l, skew: caConfig(env).requestTimeSkewMax })
 
 		return proof
 	} catch (err) {
@@ -187,7 +187,7 @@ export const refineCertificateRequest = async (env: SshCaBindings, val: ParsedCe
 export const transformRenewalProofOfPossession = (env: SshCaBindings, val: string, ctx: z.RefinementCtx): RenewalProofOfPossession | never => {
 	const l = logger(env)
 	try {
-		return new RenewalProofOfPossession(val, { logger: l, skew: ms(env.CERTIFICATE_REQUEST_TIME_SKEW_MAX) })
+		return new RenewalProofOfPossession(val, { logger: l, skew: caConfig(env).requestTimeSkewMax })
 	} catch (err) {
 		if (err instanceof PossessionParseError) {
 			return fatalIssue(ctx, err.message, val)

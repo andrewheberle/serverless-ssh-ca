@@ -2,7 +2,6 @@ import z from "zod"
 import type { SshCaBindings } from "../../types.js"
 import {
 	refineHostPrincipal,
-	split,
 	refineCertificateRequest,
 	transformProofOfPossession,
 	transformRenewalProofOfPossession,
@@ -22,6 +21,7 @@ import {
 	UnprocessableEntityException,
 } from "chanfana"
 import { seconds } from "itty-time"
+import { caConfig } from "../../config.js"
 import { CertificateType } from "../../db/types.js"
 import {
 	certificate,
@@ -48,12 +48,12 @@ export const userCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 			.transform((val, ctx) => transformProofOfPossession(env, val, ctx)),
 		identity: identityToken,
 		extensions: z.array(z.string())
-			.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
+			.default(caConfig(env).extensions)
 			.meta({ description: "Extensions to include in the issued SSH certificate" }),
 		lifetime: z.int()
 			.min(seconds("5 minutes"))
-			.max(seconds(env.SSH_CERTIFICATE_LIFETIME))
-			.default(seconds(env.SSH_CERTIFICATE_LIFETIME))
+			.max(caConfig(env).certificateLifetime)
+			.default(caConfig(env).certificateLifetime)
 			.meta({ description: "Lifetime of issued SSH certificate" }),
 	})
 		.superRefine((val, ctx) => refineCertificateRequest(env, val, ctx))
@@ -97,8 +97,8 @@ export const hostCertificateRequestEndpointBodySchema = (env: SshCaBindings) => 
 					.meta({ description: "List of principals to include on the issued certificate" }),
 				lifetime: z.int()
 					.min(seconds("24 hours"))
-					.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-					.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+					.max(caConfig(env).hostCertificateLifetime)
+					.default(caConfig(env).hostCertificateLifetime)
 					.meta({ description: "Lifetime of issued Host SSH certificate" }),
 			})
 				.superRefine((val, ctx) => refineHostCertificateRequest(env, val, ctx))
@@ -142,8 +142,8 @@ export const hostCertificateRenewEndpointBodySchema = (env: SshCaBindings) => (
 				.transform((val, ctx) => transformRenewalProofOfPossession(env, val, ctx)),
 			lifetime: z.int()
 				.min(seconds("24 hours"))
-				.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-				.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+				.max(caConfig(env).hostCertificateLifetime)
+				.default(caConfig(env).hostCertificateLifetime)
 				.meta({ description: "Lifetime of renewed Host SSH certificate" }),
 		})
 			.superRefine((val, ctx) => refineRenewalProof(env, val, ctx))

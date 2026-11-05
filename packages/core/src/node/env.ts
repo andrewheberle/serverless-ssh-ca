@@ -1,63 +1,39 @@
-import { seconds } from "itty-time"
 import z from "zod"
+import { BooleanString, configurationError, DurationString, HttpUrl, InvalidConfigurationError, LogLevelName, RequiredString, RetentionString } from "../config.js"
 import type { CaCache, CaDatabase, CaRateLimiter, CaSecret, SshCaBindings } from "../types.js"
 
-const required = z.string().trim().min(1, { message: "must be set" })
-
-// a duration in the format accepted by itty-time, such as "24 hours"
-const duration = (opts: { allowZero: boolean }) => required.refine(v => {
-	const s = seconds(v)
-	return Number.isFinite(s) && (opts.allowZero ? s >= 0 : s > 0)
-}, { message: opts.allowZero ? "must be a duration such as \"90 seconds\"" : "must be a positive duration such as \"24 hours\"" })
-
-const boolean = z.enum(["true", "false"], { message: "must be \"true\" or \"false\"" })
+export { InvalidConfigurationError }
 
 /**
  * The environment variables read by {@link bindingsFromEnv}, which match the
  * Workers vars documented for the CA.
  */
 export const EnvSchema = z.object({
-	DB_CERTIFICATE_RETENTION: z.union([
-		z.literal("infinite"),
-		// an SQLite date modifier such as "1 year" or "90 days"
-		z.string().regex(/^[+-]?\d+(\.\d+)? (second|minute|hour|day|month|year)s?$/),
-	], { message: "must be \"infinite\" or a period such as \"1 year\"" }),
+	DB_CERTIFICATE_RETENTION: RetentionString,
 	SSH_CERTIFICATE_EXTENSIONS: z.string(),
-	SSH_CERTIFICATE_LIFETIME: duration({ allowZero: false }),
-	SSH_CERTIFICATE_INCLUDE_SELF: boolean.optional(),
-	SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: boolean.optional(),
+	SSH_CERTIFICATE_LIFETIME: DurationString({ allowZero: false }),
+	SSH_CERTIFICATE_INCLUDE_SELF: BooleanString.optional(),
+	SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: BooleanString.optional(),
 	SSH_CERTIFICATE_PRINCIPALS: z.string().optional(),
-	SSH_HOST_CERTIFICATE_LIFETIME: duration({ allowZero: false }),
+	SSH_HOST_CERTIFICATE_LIFETIME: DurationString({ allowZero: false }),
 	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: z.string().optional(),
 	SSH_HOST_CERTIFICATE_ALLOWED_ROLES: z.string().optional(),
-	ISSUER_DN: required,
-	JWT_JWKS_URL: z.url({ protocol: /^https?$/, message: "must be an http or https URL" }),
-	JWT_AUD: required,
+	ISSUER_DN: RequiredString,
+	JWT_JWKS_URL: HttpUrl,
+	JWT_AUD: RequiredString,
 	JWT_ACCESS_TOKEN_AUD: z.string().optional(),
-	OIDC_USERINFO_URL: z.url({ protocol: /^https?$/, message: "must be an http or https URL" }).optional(),
-	JWT_ISSUER: required,
-	JWT_ALGORITHMS: required,
-	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: required,
-	CERTIFICATE_REQUEST_TIME_SKEW_MAX: duration({ allowZero: true }),
-	LOG_LEVEL: z.enum(["none", "error", "warning", "info", "debug"]).optional(),
+	OIDC_USERINFO_URL: HttpUrl.optional(),
+	JWT_ISSUER: RequiredString,
+	JWT_ALGORITHMS: RequiredString,
+	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: RequiredString,
+	CERTIFICATE_REQUEST_TIME_SKEW_MAX: DurationString({ allowZero: true }),
+	LOG_LEVEL: LogLevelName.optional(),
 })
 
 /**
  * The CA's configuration as read from environment variables, see {@link EnvSchema}.
  */
 export type CaEnv = z.infer<typeof EnvSchema>
-
-/**
- * Thrown by {@link bindingsFromEnv} when the environment is not a valid configuration.
- */
-export class InvalidConfigurationError extends Error {
-	constructor(message: string) {
-		super(message)
-		this.name = "InvalidConfigurationError"
-
-		Object.setPrototypeOf(this, InvalidConfigurationError.prototype)
-	}
-}
 
 /**
  * Build the CA's bindings from environment variables, for runtimes where
@@ -85,7 +61,7 @@ export const bindingsFromEnv = (
 ): SshCaBindings => {
 	const result = EnvSchema.safeParse(source)
 	if (!result.success) {
-		throw new InvalidConfigurationError(`invalid configuration:\n${z.prettifyError(result.error)}`)
+		throw configurationError(result.error)
 	}
 
 	return { ...result.data, DB: bindings.DB, PRIVATE_KEY: bindings.PRIVATE_KEY, RATE_LIMITER: bindings.RATE_LIMITER, CACHE: bindings.CACHE }
