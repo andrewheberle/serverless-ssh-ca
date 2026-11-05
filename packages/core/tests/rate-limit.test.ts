@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest"
+import { afterEach, describe, it, expect, vi } from "vitest"
 import { DatabaseSync } from "node:sqlite"
-import { createSshCa, type CaRateLimiter, type SshCa, type SshCaOptions } from "../src/index.js"
+import ca, { cloudflareClientIp, createSshCa, InvalidConfigurationError, type CaRateLimiter, type SshCa, type SshCaOptions } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { makeEnv } from "./env.js"
 import { generateProof, generateRequestProof } from "./helpers/proof.js"
@@ -25,7 +25,9 @@ const fakeLimiter = (outcome: boolean | "throw"): CaRateLimiter & { keys: string
 	}
 }
 
-const createCa = (limiter: CaRateLimiter | undefined, options: SshCaOptions = {}): SshCa => createSshCa(makeEnv({
+// createSshCa requires a rate limit key with a rate limiter, so the CA is
+// keyed by the client IP address set by Cloudflare unless another is given
+const createCa = (limiter: CaRateLimiter | undefined, options: SshCaOptions = { rateLimitKey: cloudflareClientIp }): SshCa => createSshCa(makeEnv({
 	DB: fromNodeSqlite(new DatabaseSync(":memory:")),
 	PRIVATE_KEY: secretFromString(ed25519Key.ca().privateKey),
 	RATE_LIMITER: limiter,
@@ -87,12 +89,61 @@ describe("rate limiting", () => {
 
 	it("should use the rate limit key from the options", async () => {
 		const limiter = fakeLimiter(true)
-		const ca = createCa(limiter, { rateLimitKey: (req) => req.headers.get("X-Real-IP") ?? undefined })
-		expect((await revoke(ca, { "X-Real-IP": "198.51.100.7", "CF-Connecting-IP": "192.0.2.1" })).status).toBe(404)
+		const keyed = createCa(limiter, { rateLimitKey: (req) => req.headers.get("X-Real-IP") ?? undefined })
+		expect((await revoke(keyed, { "X-Real-IP": "198.51.100.7", "CF-Connecting-IP": "192.0.2.1" })).status).toBe(404)
 		expect(limiter.keys).toEqual(["198.51.100.7"])
 	})
 
 	it("should not limit requests when the rate limiter fails", async () => {
 		expect((await revoke(createCa(fakeLimiter("throw")))).status).toBe(404)
+	})
+})
+
+describe("the rate limit key", () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	const env = (limiter: CaRateLimiter | undefined, overrides = {}) => makeEnv({
+		DB: fromNodeSqlite(new DatabaseSync(":memory:")),
+		PRIVATE_KEY: secretFromString(ed25519Key.ca().privateKey),
+		RATE_LIMITER: limiter,
+		...overrides,
+	})
+
+	it("should be required by createSshCa when there is a rate limiter", () => {
+		expect(() => createSshCa(env(fakeLimiter(true)))).toThrow(InvalidConfigurationError)
+		expect(() => createSshCa(env(fakeLimiter(true)))).toThrow("rateLimitKey")
+	})
+
+	it("should not be required by createSshCa without a rate limiter", () => {
+		expect(() => createSshCa(env(undefined))).not.toThrow()
+	})
+
+	it("should be the client IP address set by Cloudflare for the Workers default export", async () => {
+		const limiter = fakeLimiter(true)
+		const ctx = { waitUntil: () => undefined, passThroughOnException: () => undefined, props: {} }
+
+		const response = await ca.fetch(new Request("http://example.com/api/v4/user/certificates/12345", {
+			method: "DELETE",
+			headers: { "Proof-Of-Possession": generateRequestProof(userKey, "DELETE", "/api/v4/user/certificates/12345"), "CF-Connecting-IP": "192.0.2.1" },
+		}), env(limiter), ctx)
+
+		expect(response.status).toBe(404)
+		expect(limiter.keys).toEqual(["192.0.2.1"])
+	})
+
+	it("should be reported once when requests have none, which are not limited", async () => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
+		const limiter = fakeLimiter(false)
+		const keyless = createSshCa(env(limiter, { LOG_LEVEL: "warning" }), { rateLimitKey: () => undefined })
+
+		expect((await revoke(keyless, {})).status).toBe(404)
+		expect((await revoke(keyless, {})).status).toBe(404)
+
+		expect(limiter.keys).toEqual([])
+		const warnings = log.mock.calls.filter(([entry]) => (entry as { message?: string }).message === "requests without a rate limit key are not rate limited")
+		expect(warnings).toHaveLength(1)
+		expect(warnings[0]?.[0]).toMatchObject({ level: "warning" })
 	})
 })
