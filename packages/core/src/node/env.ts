@@ -1,5 +1,5 @@
 import z from "zod"
-import { BooleanString, configurationError, DurationString, HttpUrl, InvalidConfigurationError, LogLevelName, RequiredString, RetentionString } from "../config.js"
+import { BooleanString, configurationError, DurationString, HttpUrl, InvalidConfigurationError, LogLevelName, PrincipalListString, RequiredString, RetentionString } from "../config.js"
 import type { CaCache, CaDatabase, CaRateLimiter, CaSecret, SshCaBindings } from "../types.js"
 
 export { InvalidConfigurationError }
@@ -14,7 +14,7 @@ export const EnvSchema = z.object({
 	SSH_CERTIFICATE_LIFETIME: DurationString({ allowZero: false }),
 	SSH_CERTIFICATE_INCLUDE_SELF: BooleanString.optional(),
 	SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: BooleanString.optional(),
-	SSH_CERTIFICATE_PRINCIPALS: z.string().optional(),
+	SSH_CERTIFICATE_PRINCIPALS: PrincipalListString,
 	SSH_HOST_CERTIFICATE_LIFETIME: DurationString({ allowZero: false }),
 	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: z.string().optional(),
 	SSH_HOST_CERTIFICATE_ALLOWED_ROLES: z.string().optional(),

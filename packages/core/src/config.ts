@@ -1,5 +1,6 @@
 import { ms } from "itty-time"
 import z from "zod"
+import { principalIssue } from "./principals.js"
 import type { SshCaBindings } from "./types.js"
 
 /**
@@ -106,6 +107,31 @@ const List = z.union([z.string(), z.array(z.string())]).optional().transform((v)
 	return typeof v === "string" ? v.split(",") : v
 })
 
+// reports each entry of a list of user certificate principals that cannot be
+// on a certificate
+const checkPrincipals = (principals: string[], ctx: z.RefinementCtx): void => {
+	for (const principal of principals) {
+		const issue = principalIssue("user", principal)
+		if (issue !== undefined) {
+			ctx.issues.push({ code: "custom", message: issue, input: principal })
+		}
+	}
+}
+
+/**
+ * A comma separated list of principals added to every user certificate, each
+ * of which must be allowed by {@link principalIssue}. Entries are not
+ * trimmed, so a space after a comma is refused.
+ */
+export const PrincipalListString = z.string().optional().superRefine((v, ctx) => {
+	if (v !== undefined && v !== "") {
+		checkPrincipals(v.split(","), ctx)
+	}
+})
+
+// a list of principals added to every user certificate, see PrincipalListString
+const PrincipalList = List.superRefine(checkPrincipals)
+
 // a list that must have at least one entry
 const RequiredList = z.union([RequiredString, z.array(RequiredString).min(1, { message: "must be set" })])
 	.transform((v): string[] => typeof v === "string" ? v.split(",") : v)
@@ -145,7 +171,7 @@ const ConfigSchema = z.object({
 	SSH_CERTIFICATE_INCLUDE_SELF: Flag,
 	SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: Flag,
 	SSH_CERTIFICATE_LIFETIME: Duration({ allowZero: false }),
-	SSH_CERTIFICATE_PRINCIPALS: List,
+	SSH_CERTIFICATE_PRINCIPALS: PrincipalList,
 	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: List,
 	SSH_HOST_CERTIFICATE_ALLOWED_ROLES: List,
 	SSH_HOST_CERTIFICATE_LIFETIME: Duration({ allowZero: false }),

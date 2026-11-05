@@ -181,6 +181,16 @@ If the process to request a new authentication token fails using the refresh
 token, the standard authentication process is followed which requires user
 interaction.
 
+The principals of a user certificate come from the identity token's
+`JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` (with spaces replaced by underscores),
+`SSH_CERTIFICATE_PRINCIPALS` and the `SSH_CERTIFICATE_INCLUDE_SELF*` settings.
+A request is refused with a `422` error if any of them is empty or contains a
+comma, whitespace, a control character or an OpenSSH pattern character (`*`,
+`?` or `!`). A server that restricts certificates with the `principals="..."`
+option in `authorized_keys` reads that option as a comma separated list, so,
+depending on how it matches them, a principal such as `alice,root` might
+otherwise be accepted for an account it was not meant for.
+
 ### Host Certificates
 
 #### Initial Request
@@ -326,6 +336,7 @@ with it:
 | `JWT_ISSUER`, `ISSUER_DN`, `JWT_ALGORITHMS`, `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | Must be set |
 | `JWT_JWKS_URL` | An `http` or `https` URL |
 | `OIDC_USERINFO_URL` | An `http` or `https` URL, or unset (an empty string is treated as unset) |
+| `SSH_CERTIFICATE_PRINCIPALS` | A comma separated list of principals, each of which is not empty and contains no whitespace, control characters or `*`, `?`, `!`, or unset. Entries are not trimmed, so `"a, b"` is refused |
 | `SSH_CERTIFICATE_INCLUDE_SELF`, `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | `"true"` or `"false"` (or a boolean), or unset |
 | `LOG_LEVEL` | `none`, `error`, `warning`, `info` or `debug`, or unset |
 
