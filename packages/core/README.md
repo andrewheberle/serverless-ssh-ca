@@ -466,17 +466,24 @@ named `RATE_LIMITER` to `wrangler.jsonc`:
 ]
 ```
 
-Requests are counted by the client IP address in the `CF-Connecting-IP`
-header, and requests over the limit receive a `429` response. Requests to get
-the CA public key and the KRLs are not limited, as many hosts may fetch them
-from the same address. When no `RATE_LIMITER` binding is configured, requests
-are not limited. If the rate limiter fails, the request is allowed and the
-error is logged, so certificates can still be issued and revoked.
+On Workers, requests are counted by the client IP address in the
+`CF-Connecting-IP` header, which Cloudflare sets, and requests over the limit
+receive a `429` response. Requests to get the CA public key and the KRLs are
+not limited, as many hosts may fetch them from the same address. When no
+`RATE_LIMITER` binding is configured, requests are not limited. If the rate
+limiter fails, the request is allowed and the error is logged, so
+certificates can still be issued and revoked.
 
-On Node.js, pass any limiter with the same shape (a `limit({ key })` method
-returning `{ success }`, see `CaRateLimiter`) as `RATE_LIMITER`, and choose
-the key requests are counted by with the `rateLimitKey` option, as there is no
-`CF-Connecting-IP` header:
+With `createSshCa`, for example on Node.js, pass any limiter with the same
+shape (a `limit({ key })` method returning `{ success }`, see
+`CaRateLimiter`) as `RATE_LIMITER`. The `rateLimitKey` option, which chooses
+the key requests are counted by, must then be set too, and `createSshCa`
+throws an `InvalidConfigurationError` without it. Choose a value the client
+cannot set itself: a client can send any `CF-Connecting-IP`, `X-Real-IP` or
+`X-Forwarded-For` header it likes, so a header can only be trusted when a
+proxy you control overwrites or appends to it. Behind a single trusted
+reverse proxy that appends the client address to `X-Forwarded-For`, use the
+last entry, as any earlier ones came from the client:
 
 ```ts
 const ca = createSshCa(bindingsFromEnv({
@@ -484,12 +491,17 @@ const ca = createSshCa(bindingsFromEnv({
     PRIVATE_KEY: secretFromFile("/etc/ssh-ca/ca_key"),
     RATE_LIMITER: myLimiter,
 }), {
-    // the client address as set by your reverse proxy
-    rateLimitKey: (req) => req.headers.get("X-Real-IP") ?? undefined,
+    // the address appended by the one trusted proxy in front of the CA
+    rateLimitKey: (req) => req.headers.get("X-Forwarded-For")?.split(",").at(-1)?.trim() || undefined,
 })
 ```
 
-Requests for which `rateLimitKey` returns `undefined` are not limited.
+When `createSshCa` runs behind Cloudflare, pass `rateLimitKey:
+cloudflareClientIp` (exported by this package) to count requests as the
+Workers default export does.
+
+Requests for which `rateLimitKey` returns `undefined` are not limited, and the
+first such request is logged as a warning.
 
 ### KRL Caching
 

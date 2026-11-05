@@ -1,5 +1,5 @@
 import type { ExecutionContext } from "hono"
-import { caConfig, parseConfig } from "./config.js"
+import { caConfig, InvalidConfigurationError, parseConfig } from "./config.js"
 import { dbCleanup } from "./db/index.js"
 import { logger } from "./logger.js"
 import { createApp, type SshCaOptions } from "./router.js"
@@ -41,11 +41,19 @@ export interface SshCa {
  * @param env The bindings (configuration, database and private key) for the CA, see {@link SshCaBindings}
  * @param options Options for the CA, such as the key requests are rate limited by, see {@link SshCaOptions}
  * @returns The CA's request handler and database cleanup task, see {@link SshCa}
- * @throws {@link InvalidConfigurationError} if the configuration in `env` is missing or invalid
+ * @throws {@link InvalidConfigurationError} if the configuration in `env` is
+ * missing or invalid, or if `RATE_LIMITER` is set without the `rateLimitKey`
+ * option
  */
 export const createSshCa = (env: SshCaBindings, options: SshCaOptions = {}): SshCa => {
     // refuse an invalid configuration before anything is served with it
     caConfig(env)
+
+    // the default key is a header that only Cloudflare sets, which a client
+    // can set itself anywhere else, so the key must be chosen explicitly
+    if (env.RATE_LIMITER !== undefined && options.rateLimitKey === undefined) {
+        throw new InvalidConfigurationError("invalid configuration:\n✖ the rateLimitKey option must be set when RATE_LIMITER is set, for example to cloudflareClientIp when running behind Cloudflare")
+    }
 
     const app = createApp(env, options)
 

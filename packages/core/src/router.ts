@@ -21,16 +21,19 @@ export type RateLimitKey = (req: Request) => string | undefined
 export interface SshCaOptions {
     /**
      * Returns the key requests are rate limited by when `RATE_LIMITER` is
-     * set. Defaults to the client IP address in the `CF-Connecting-IP` header,
-     * which is set by Cloudflare, so other runtimes should provide one that
-     * suits their limiter, for example using a header set by a reverse proxy.
+     * set, which `createSshCa` requires when `RATE_LIMITER` is set. Use a
+     * value the client cannot set itself, such as a header set by a trusted
+     * reverse proxy, or {@link cloudflareClientIp} behind Cloudflare. The
+     * Workers default export always uses {@link cloudflareClientIp}.
      */
     rateLimitKey?: RateLimitKey
 }
 
 /**
  * Returns the client IP address set by Cloudflare in the `CF-Connecting-IP`
- * header, which is the default key requests are rate limited by.
+ * header, which is the key the Workers default export rate limits requests by.
+ * A client can set this header itself unless the request comes through
+ * Cloudflare.
  */
 export const cloudflareClientIp: RateLimitKey = (req) => req.headers.get("CF-Connecting-IP") ?? undefined
 
@@ -40,6 +43,9 @@ const ReadMethods = new Set(["GET", "HEAD", "OPTIONS"])
 export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
     const hono = new Hono<{ Bindings: SshCaBindings }>()
     const rateLimitKey = options.rateLimitKey ?? cloudflareClientIp
+    // whether a request without a rate limit key has been reported, as
+    // requests without one are not limited
+    let reportedMissingKey = false
 
     // limit requests to issue, renew and revoke certificates
     hono.use("/api/*", async (c, next) => {
@@ -51,7 +57,12 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
         const l = logger(env).with("in", "rateLimit")
         const key = rateLimitKey(c.req.raw)
         if (key === undefined) {
-            l.debug("no rate limit key for request")
+            if (!reportedMissingKey) {
+                reportedMissingKey = true
+                l.warn("requests without a rate limit key are not rate limited", "method", c.req.method, "path", c.req.path)
+            } else {
+                l.debug("no rate limit key for request")
+            }
             return await next()
         }
 
