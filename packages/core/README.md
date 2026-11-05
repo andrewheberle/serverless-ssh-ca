@@ -75,6 +75,8 @@ Notes:
   as the `vars` in the Workers [`wrangler.jsonc`](https://github.com/andrewheberle/serverless-ssh-ca/blob/main/packages/workers-integration/wrangler.jsonc).
   `bindingsFromEnv` validates them at start up and throws an
   `InvalidConfigurationError` that lists every missing or invalid variable.
+  `createSshCa` validates the bindings it is given in the same way (see
+  [Validation](#validation)).
 - The database schema is created and migrated automatically on first use, as
   on Workers. Use a file path for `DatabaseSync` (not `:memory:`) so issued
   and revoked certificates survive restarts.
@@ -310,6 +312,48 @@ In v4 the public key for a revocation or renewal is taken from the proof and
 the certificate respectively, so it is not sent separately.
 
 ## Configuration
+
+### Validation
+
+The configuration is validated on every runtime before the CA serves anything
+with it:
+
+| Setting | Accepted values |
+|---|---|
+| `CERTIFICATE_REQUEST_TIME_SKEW_MAX` | A duration of zero or more, such as `"90 seconds"` |
+| `SSH_CERTIFICATE_LIFETIME`, `SSH_HOST_CERTIFICATE_LIFETIME` | A positive duration, such as `"24 hours"` or `"30 days"` |
+| `DB_CERTIFICATE_RETENTION` | `"infinite"`, or a positive period such as `"1 year"` or `"90 days"` |
+| `JWT_ISSUER`, `ISSUER_DN`, `JWT_ALGORITHMS`, `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | Must be set |
+| `JWT_JWKS_URL` | An `http` or `https` URL |
+| `OIDC_USERINFO_URL` | An `http` or `https` URL, or unset (an empty string is treated as unset) |
+| `SSH_CERTIFICATE_INCLUDE_SELF`, `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | `"true"` or `"false"` (or a boolean), or unset |
+| `LOG_LEVEL` | `none`, `error`, `warning`, `info` or `debug`, or unset |
+
+A duration is a number and one of the units `second`, `minute`, `hour`,
+`day`, `week`, `month` or `year` (singular or plural), separated by a space. A
+unit is required, so a bare number or an abbreviation such as `"90 secs"` is
+refused. A retention period uses the same format without `week`, as it is
+passed to SQLite as a date modifier.
+
+`JWT_AUD` is not refused when it is empty, but every certificate request then
+fails with a `500` error, as tokens are only accepted for a configured
+audience. `bindingsFromEnv` on Node.js also requires `JWT_AUD` to be set.
+
+How an invalid configuration is reported depends on the runtime:
+
+- On Cloudflare Workers the default export logs the problems once, at error
+  level, and then answers every request with a `500` error whose body does not
+  describe the configuration. The scheduled database cleanup is skipped until
+  the configuration is fixed.
+- `createSshCa` throws an `InvalidConfigurationError` listing every missing or
+  invalid setting, as does `bindingsFromEnv` on Node.js. The error is exported
+  from both `@andrewheberle/serverless-ssh-ca` and
+  `@andrewheberle/serverless-ssh-ca/node`.
+
+The scheduled cleanup removes certificates that expired longer ago than
+`DB_CERTIFICATE_RETENTION`. A revoked certificate stays in the KRL until 24
+hours after it expires, so it is not removed before then, however short the
+retention period is.
 
 ### CA Private Key
 

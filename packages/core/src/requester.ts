@@ -4,23 +4,13 @@ import z from "zod"
 import { CertificateType } from "./db/types.js"
 import type { CertificateRequestJWTPayload, SshCaBindings } from "./types.js"
 import { UserInfoClaimsError, userInfoIdentity, UserInfoRejectedError } from "./userinfo.js"
-import { split } from "./utils.js"
-import { MissingAudienceError, verifyJWT } from "./verify.js"
+import { caConfig } from "./config.js"
+import { MissingAudienceError, MissingIssuerError, verifyJWT } from "./verify.js"
 
 /**
  * The bindings used to authenticate a {@link Requester}.
  */
-export type RequesterConfig = Pick<SshCaBindings,
-	| "JWT_ALGORITHMS"
-	| "JWT_AUD"
-	| "JWT_ACCESS_TOKEN_AUD"
-	| "JWT_ISSUER"
-	| "JWT_JWKS_URL"
-	| "JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM"
-	| "OIDC_USERINFO_URL"
-	| "SSH_HOST_CERTIFICATE_ALLOWED_EMAILS"
-	| "SSH_HOST_CERTIFICATE_ALLOWED_ROLES"
->
+export type RequesterConfig = SshCaBindings
 
 /**
  * The person asking for a certificate, established from an access token and
@@ -216,13 +206,14 @@ const verifyAccessToken = async (config: RequesterConfig, logger: Logger, author
 	// when a userinfo endpoint is configured every access token is verified
 	// with it, rather than only those that are not JWTs, so a token cannot
 	// avoid the checks of either method by its format
-	if (config.OIDC_USERINFO_URL !== undefined && config.OIDC_USERINFO_URL !== "") {
-		return await verifyUserInfoAccessToken(l, config.OIDC_USERINFO_URL, token)
+	const settings = caConfig(config)
+	if (settings.userinfoUrl !== undefined) {
+		return await verifyUserInfoAccessToken(l, settings.userinfoUrl, token)
 	}
 
 	try {
 		// verify jwt, which must be issued for this CA
-		const aud = split(config.JWT_ACCESS_TOKEN_AUD).length > 0 ? config.JWT_ACCESS_TOKEN_AUD : config.JWT_AUD
+		const aud = settings.accessTokenAudience.length > 0 ? settings.accessTokenAudience : settings.audience
 		const { payload } = await verifyJWT(config, token, aud)
 
 		const email = tokenEmail(payload)
@@ -235,6 +226,7 @@ const verifyAccessToken = async (config: RequesterConfig, logger: Logger, author
 	} catch (err) {
 		switch (true) {
 			case (err instanceof MissingAudienceError):
+			case (err instanceof MissingIssuerError):
 				l.error(err.message)
 				return { kind: "misconfigured", message: err.message }
 			case (err instanceof TokenClaimError):
@@ -265,17 +257,18 @@ const verifyIdentityToken = async (config: RequesterConfig, logger: Logger, toke
 	const l = logger.with("in", "verifyIdentityToken")
 
 	try {
-		const { payload } = await verifyJWT(config, token, config.JWT_AUD)
+		const settings = caConfig(config)
+		const { payload } = await verifyJWT(config, token, settings.audience)
 
 		return {
 			kind: "verified",
 			value: {
 				sub: tokenSubject(payload),
-				principals: identityPrincipals(l, payload, config.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM),
+				principals: identityPrincipals(l, payload, settings.principalsClaim),
 			},
 		}
 	} catch (err) {
-		if (err instanceof MissingAudienceError) {
+		if (err instanceof MissingAudienceError || err instanceof MissingIssuerError) {
 			l.error(err.message)
 			return { kind: "misconfigured", message: err.message }
 		}
@@ -290,10 +283,10 @@ const verifyIdentityToken = async (config: RequesterConfig, logger: Logger, toke
 // whether a requester may request host certificates, by their email address
 // or a principal from their identity token
 const mayRequestHostCertificates = (config: RequesterConfig, requester: Requester): boolean => {
-	const roles = split(config.SSH_HOST_CERTIFICATE_ALLOWED_ROLES)
+	const { hostAllowedEmails, hostAllowedRoles } = caConfig(config)
 
-	return split(config.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS).includes(requester.email)
-		|| requester.principals.some((p) => roles.includes(p))
+	return hostAllowedEmails.includes(requester.email)
+		|| requester.principals.some((p) => hostAllowedRoles.includes(p))
 }
 
 /**

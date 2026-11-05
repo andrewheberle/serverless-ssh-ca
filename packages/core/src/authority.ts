@@ -1,28 +1,18 @@
 import { group, type Logger } from "@andrewheberle/ts-slog"
-import { ms, seconds } from "itty-time"
-import { isRevoked, recordCertificate, recordRenewal, type StoreBindings } from "./db/index.js"
+import { isRevoked, recordCertificate, recordRenewal } from "./db/index.js"
 import { CertificateType } from "./db/types.js"
 import type { Requester } from "./requester.js"
 import { signCertificate, type CertificateFields, type SshCertificate } from "./ssh/certificate.js"
 import { KeyParseError, type PrivateKey, type PublicKey } from "./ssh/keys.js"
 import { createSigner } from "./ssh/signer.js"
 import type { SshCaBindings } from "./types.js"
-import { getPrivateKey, getPublic, hostPrincipalIssue, split, subjectKeyIssue, UnsupportedKeyError } from "./utils.js"
+import { caConfig } from "./config.js"
+import { getPrivateKey, getPublic, hostPrincipalIssue, subjectKeyIssue, UnsupportedKeyError } from "./utils.js"
 
 /**
  * The bindings the Certificate Authority issues and renews certificates with.
  */
-export type AuthorityConfig = StoreBindings & Pick<SshCaBindings,
-	| "PRIVATE_KEY"
-	| "ISSUER_DN"
-	| "CERTIFICATE_REQUEST_TIME_SKEW_MAX"
-	| "SSH_CERTIFICATE_EXTENSIONS"
-	| "SSH_CERTIFICATE_INCLUDE_SELF"
-	| "SSH_CERTIFICATE_INCLUDE_SELF_EMAIL"
-	| "SSH_CERTIFICATE_LIFETIME"
-	| "SSH_CERTIFICATE_PRINCIPALS"
-	| "SSH_HOST_CERTIFICATE_LIFETIME"
->
+export type AuthorityConfig = SshCaBindings
 
 /**
  * The result of issuing a certificate.
@@ -64,11 +54,6 @@ class CertificateError extends Error {
 // returns a random certificate serial number
 const generateSerial = (): bigint => {
 	return new DataView(crypto.getRandomValues(new Uint8Array(8)).buffer).getBigUint64(0)
-}
-
-// a boolean binding, which may be set as a string
-const flag = (value: string | boolean | undefined): boolean => {
-	return typeof value === "string" ? value === "true" : value ?? false
 }
 
 // the smaller of a requested lifetime and the maximum, or the maximum when
@@ -193,15 +178,16 @@ export const issueUserCertificate = async (config: AuthorityConfig, requester: R
 		return key
 	}
 
+	const settings = caConfig(config)
 	const principals = [
-		...(flag(config.SSH_CERTIFICATE_INCLUDE_SELF) ? [requester.email.split("@")[0] ?? ""] : []),
-		...(flag(config.SSH_CERTIFICATE_INCLUDE_SELF_EMAIL) ? [requester.email] : []),
+		...(settings.includeSelf ? [requester.email.split("@")[0] ?? ""] : []),
+		...(settings.includeSelfEmail ? [requester.email] : []),
 		...requester.principals,
-		...split(config.SSH_CERTIFICATE_PRINCIPALS),
+		...settings.principals,
 	]
 
 	return await issue(config, l, CertificateType.User, async () => {
-		const allowed = split(config.SSH_CERTIFICATE_EXTENSIONS)
+		const allowed = settings.extensions
 		const notAllowed = options.extensions?.find((extension) => !allowed.includes(extension))
 		if (notAllowed !== undefined) {
 			throw new CertificateError(`${notAllowed} is not allowed`)
@@ -214,7 +200,7 @@ export const issueUserCertificate = async (config: AuthorityConfig, requester: R
 			keyId: requester.email,
 			principals,
 			extensions: options.extensions ?? allowed,
-		}, clampLifetime(options.lifetime, seconds(config.SSH_CERTIFICATE_LIFETIME)))
+		}, clampLifetime(options.lifetime, settings.certificateLifetime))
 	})
 }
 
@@ -227,7 +213,7 @@ const signHostCertificate = async (config: AuthorityConfig, key: PrivateKey, pub
 		keyId: `host_${principals[0]}`,
 		principals,
 		extensions: [],
-	}, clampLifetime(lifetime, seconds(config.SSH_HOST_CERTIFICATE_LIFETIME)))
+	}, clampLifetime(lifetime, caConfig(config).hostCertificateLifetime))
 }
 
 /**
@@ -283,7 +269,7 @@ const renewalIssue = async (config: AuthorityConfig, key: PrivateKey, certificat
 	if (now >= certificate.validBefore.getTime()) {
 		return "the provided certificate is expired"
 	}
-	if (certificate.validAfter.getTime() > now + ms(config.CERTIFICATE_REQUEST_TIME_SKEW_MAX)) {
+	if (certificate.validAfter.getTime() > now + caConfig(config).requestTimeSkewMax) {
 		return "the provided certificate is not yet valid"
 	}
 

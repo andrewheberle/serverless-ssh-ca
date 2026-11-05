@@ -2,7 +2,6 @@ import z from "zod"
 import type { SshCaBindings } from "../../types.js"
 import {
 	refineHostPrincipal,
-	split,
 	transformCertificate,
 	transformProofOfPossession,
 } from "../../utils.js"
@@ -18,6 +17,7 @@ import {
 	UnprocessableEntityException,
 } from "chanfana"
 import { seconds } from "itty-time"
+import { caConfig } from "../../config.js"
 import { CertificateType } from "../../db/types.js"
 import {
 	CaPublicKeyEndpointSchema,
@@ -99,12 +99,12 @@ export const issueUserCertificateEndpointBodySchema = (env: SshCaBindings) => (
 		public_key: subjectPublicKey,
 		identity: identityToken,
 		extensions: z.array(z.string())
-			.default(split(env.SSH_CERTIFICATE_EXTENSIONS))
+			.default(caConfig(env).extensions)
 			.meta({ description: "Extensions to include in the issued SSH certificate" }),
 		lifetime: z.int()
 			.min(seconds("5 minutes"))
-			.max(seconds(env.SSH_CERTIFICATE_LIFETIME))
-			.default(seconds(env.SSH_CERTIFICATE_LIFETIME))
+			.max(caConfig(env).certificateLifetime)
+			.default(caConfig(env).certificateLifetime)
 			.meta({ description: "Lifetime of issued SSH certificate" }),
 	})
 		.openapi("User Certificate Issue Request")
@@ -142,8 +142,8 @@ export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.meta({ description: "List of principals to include on the issued certificate" }),
 		lifetime: z.int()
 			.min(seconds("24 hours"))
-			.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-			.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+			.max(caConfig(env).hostCertificateLifetime)
+			.default(caConfig(env).hostCertificateLifetime)
 			.meta({ description: "Lifetime of issued Host SSH certificate" }),
 	})
 		.openapi("Host Certificate Issue Request")
@@ -180,8 +180,8 @@ export const renewHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.meta({ description: "SSH certificate to renew, which must have the serial number in the path" }),
 		lifetime: z.int()
 			.min(seconds("24 hours"))
-			.max(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
-			.default(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
+			.max(caConfig(env).hostCertificateLifetime)
+			.default(caConfig(env).hostCertificateLifetime)
 			.meta({ description: "Lifetime of renewed Host SSH certificate" }),
 	})
 		.openapi("Host Certificate Renewal Request")

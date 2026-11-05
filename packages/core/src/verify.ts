@@ -16,6 +16,19 @@ export class MissingAudienceError extends Error {
 	}
 }
 
+/**
+ * Thrown when no issuer is configured for a token, as the issuer of a token is
+ * otherwise not checked at all.
+ */
+export class MissingIssuerError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = "MissingIssuerError"
+
+		Object.setPrototypeOf(this, MissingIssuerError.prototype)
+	}
+}
+
 type RemoteJWKSet = ReturnType<typeof createRemoteJWKSet>
 
 // the remote JWKS for each URL, kept between requests so the keys that jose
@@ -43,18 +56,25 @@ const remoteJWKSet = (url: string): RemoteJWKSet => {
 }
 
 /**
- * Verifies a JWT from the IdP, including that it was issued for one of the
- * audiences given.
+ * Verifies a JWT from the IdP, including that it was issued by the configured
+ * issuer for one of the audiences given.
  *
  * @param config The bindings that say where the IdP's keys are and which tokens it issues
  * @param jwt The JWT to verify
  * @param aud The audiences the JWT may be issued for, which must not be empty
  * @throws {@link MissingAudienceError} when no audience is given
+ * @throws {@link MissingIssuerError} when `JWT_ISSUER` is empty
  */
 export const verifyJWT = async (config: Pick<SshCaBindings, "JWT_JWKS_URL" | "JWT_ISSUER" | "JWT_ALGORITHMS">, jwt: string, aud: string | string[] | undefined) => {
 	const audience = split(aud)
 	if (audience.length === 0) {
 		throw new MissingAudienceError("no audience is configured for verifying tokens, set JWT_AUD")
+	}
+
+	// jose only checks the issuer when one is given, so an empty issuer would
+	// accept tokens from any issuer the keys are trusted for
+	if (typeof config.JWT_ISSUER !== "string" || config.JWT_ISSUER.trim() === "") {
+		throw new MissingIssuerError("no issuer is configured for verifying tokens, set JWT_ISSUER")
 	}
 
 	return await jwtVerify<CertificateRequestJWTPayload>(jwt, remoteJWKSet(config.JWT_JWKS_URL), {

@@ -2,6 +2,7 @@ import { PublicKey } from "../ssh/keys.js"
 import type { SshCertificate } from "../ssh/certificate.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
+import { caConfig } from "../config.js"
 import { D1QB } from "workers-qb"
 import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
@@ -38,12 +39,35 @@ const BumpAllRevisions = "UPDATE krl SET revision = revision + 1"
 // previous statement in the same batch changed a row
 const BumpRevisionIfChanged = "UPDATE krl SET revision = revision + 1 WHERE certificate_type = ? AND changes() = 1"
 
-export const dbCleanup = async (env: SshCaBindings) => {
+// how long a revoked certificate is kept in the KRL after it expires, see
+// getRevocationList, as an SQLite date modifier
+const KrlGracePeriod = "24 hours"
+
+/**
+ * Removes certificates that expired longer ago than the retention period in
+ * `DB_CERTIFICATE_RETENTION`.
+ *
+ * A revoked certificate is never removed while it is still in a KRL, which is
+ * until 24 hours after it expires, whatever the retention. A
+ * certificate removed before then would drop out of the KRL while it is still
+ * valid, and could be renewed again if it is a host certificate.
+ *
+ * @param env The CA bindings
+ */
+export const dbCleanup = async (env: SshCaBindings): Promise<void> => {
+	const { retention } = caConfig(env)
 	const l = logger(env).with("retention", env.DB_CERTIFICATE_RETENTION)
 
-	if (env.DB_CERTIFICATE_RETENTION === "infinite") {
-		l.info("skipping database cleanup")
-		return
+	switch (retention.kind) {
+		case "infinite":
+			l.info("skipping database cleanup")
+			return
+		case "period":
+			break
+		default: {
+			const unknown: never = retention
+			throw new Error(`unknown retention ${JSON.stringify(unknown)}`)
+		}
 	}
 
 	l.info("starting database cleanup")
@@ -52,8 +76,11 @@ export const dbCleanup = async (env: SshCaBindings) => {
 		const res = await qb.delete({
 			tableName: "certificates",
 			where: {
-				conditions: "unixepoch('subsec') > unixepoch(valid_before,'subsec',?)",
-				params: env.DB_CERTIFICATE_RETENTION
+				conditions: [
+					"unixepoch('subsec') > unixepoch(valid_before,'subsec',?)",
+					"(revoked_at IS NULL OR unixepoch('subsec') >= unixepoch(valid_before,'subsec',?))",
+				],
+				params: [retention.modifier, KrlGracePeriod],
 			}
 		}).execute()
 		l.info("completed database cleanup", "changes", res.meta?.changes)
@@ -64,7 +91,7 @@ export const dbCleanup = async (env: SshCaBindings) => {
 			await env.DB.prepare(BumpAllRevisions).run()
 		}
 	} catch (err) {
-		l.error("error during database cleanup", "retention", env.DB_CERTIFICATE_RETENTION, "error", err)
+		l.error("error during database cleanup", "error", err)
 	}
 }
 
@@ -223,8 +250,8 @@ export const getRevocationList = async (env: SshCaBindings, certificateType: Cer
 		tableName: "certificates",
 		fields: ["serial"],
 		where: {
-			conditions: "revoked_at NOTNULL AND certificate_type = ? AND unixepoch('subsec') < unixepoch(valid_before,'subsec','24 hours')",
-			params: certificateType
+			conditions: "revoked_at NOTNULL AND certificate_type = ? AND unixepoch('subsec') < unixepoch(valid_before,'subsec',?)",
+			params: [certificateType, KrlGracePeriod]
 		}
 	}).execute()
 
