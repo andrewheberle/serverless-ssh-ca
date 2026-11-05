@@ -93,12 +93,15 @@ describe("applyMigrations", () => {
 			applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 		)`)
 		raw.exec("INSERT INTO migrations (name) VALUES ('0001_initial_schema')")
+		// the certificates table as created by that migration, without any of
+		// the columns added since
+		raw.exec("CREATE TABLE certificates (id INTEGER PRIMARY KEY, serial TEXT)")
 
 		const applied = await applyMigrations(db, migrations)
 
-		// only migrations added since are applied
-		expect(applied.map(m => m.name)).toEqual(["0002_krl_version", "0003_krl_revision"])
-		expect(raw.prepare("SELECT name FROM sqlite_master WHERE name = 'certificates'").all()).toEqual([])
+		// only migrations added since are applied, so the table is not created again
+		expect(applied.map(m => m.name)).toEqual(["0002_krl_version", "0003_krl_revision", "0004_certificate_audit"])
+		expect(columns(raw, "certificates")).toEqual(["id", "serial", "requested_by", "revoked_by", "revocation_reason"])
 	})
 
 	it("should create the certificates schema", async () => {
@@ -106,10 +109,11 @@ describe("applyMigrations", () => {
 
 		await applyMigrations(db, migrations)
 
-		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version", "0003_krl_revision"])
+		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version", "0003_krl_revision", "0004_certificate_audit"])
 		expect(columns(raw, "certificates")).toEqual([
 			"id", "serial", "key_id", "principals", "extensions", "valid_after",
 			"valid_before", "revoked_at", "certificate_type", "public_key",
+			"requested_by", "revoked_by", "revocation_reason",
 		])
 	})
 

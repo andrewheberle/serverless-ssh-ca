@@ -23,6 +23,12 @@ export type CertificateRecord = {
 	revoked_at: Date | null
 	certificate_type: CertificateType
 	public_key: string | null
+	/** The email address of the requester who asked for the certificate, or null if not known */
+	requested_by: string | null
+	/** Who revoked the certificate, such as "key-holder", or null if it is not revoked or not known */
+	revoked_by: string | null
+	/** Why the certificate was revoked, such as "renewal", or null if no reason was given */
+	revocation_reason: string | null
 }
 
 /** A row in the `krl` table, holding the current version of the KRL for a {@link CertificateType} */

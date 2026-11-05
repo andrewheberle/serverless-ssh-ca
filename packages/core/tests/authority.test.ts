@@ -121,7 +121,7 @@ describe("issueHostCertificate", () => {
 			["Ed25519", ed25519Key.host()],
 		])("should issue a certificate for an %s key", async (_key, key) => {
 			const env = config({}, ca)
-			const certificate = certificateOf(await issueHostCertificate(env, pub(key), { principals: ["test_host"] }, l))
+			const certificate = certificateOf(await issueHostCertificate(env, requester, pub(key), { principals: ["test_host"] }, l))
 
 			// ssh-keygen verifies the signature
 			const listed = listCertificate(certificate.toString())
@@ -136,26 +136,26 @@ describe("issueHostCertificate", () => {
 	})
 
 	it("should use the first principal as the key ID", async () => {
-		const certificate = certificateOf(await issueHostCertificate(config(), pub(ed25519Key.host()), { principals: ["first.example.com", "second.example.com"] }, l))
+		const certificate = certificateOf(await issueHostCertificate(config(), requester, pub(ed25519Key.host()), { principals: ["first.example.com", "second.example.com"] }, l))
 		expect(certificate.keyId).toBe("host_first.example.com")
 		expect(certificate.principals).toEqual(["first.example.com", "second.example.com"])
 	})
 
 	it("should not issue a certificate without principals", async () => {
-		expect(await issueHostCertificate(config(), pub(ed25519Key.host()), { principals: [] }, l))
+		expect(await issueHostCertificate(config(), requester, pub(ed25519Key.host()), { principals: [] }, l))
 			.toEqual({ kind: "notAllowed", message: "a certificate must have at least one principal" })
 	})
 
 	it("should not be valid for longer than the configured lifetime", async () => {
 		const env = config()
-		const certificate = certificateOf(await issueHostCertificate(env, pub(ed25519Key.host()), { principals: ["test_host"], lifetime: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME) + 3600 }, l))
+		const certificate = certificateOf(await issueHostCertificate(env, requester, pub(ed25519Key.host()), { principals: ["test_host"], lifetime: seconds(env.SSH_HOST_CERTIFICATE_LIFETIME) + 3600 }, l))
 		expect(lifetimeOf(certificate)).toBe(seconds(env.SSH_HOST_CERTIFICATE_LIFETIME))
 	})
 })
 
 describe.each([
 	["issueUserCertificate", (env: AuthorityConfig) => issueUserCertificate(env, requester, pub(ed25519Key.user()), {}, l)],
-	["issueHostCertificate", (env: AuthorityConfig) => issueHostCertificate(env, pub(ed25519Key.host()), { principals: ["test_host"] }, l)],
+	["issueHostCertificate", (env: AuthorityConfig) => issueHostCertificate(env, requester, pub(ed25519Key.host()), { principals: ["test_host"] }, l)],
 	["renewHostCertificate", (env: AuthorityConfig) => renewHostCertificate(env, hostCertificate(ed25519Key.ca(), ed25519Key.host()), {}, l)],
 ] as const)("%s", (_name, operation) => {
 	it("should report a CA key of a type that is not supported", async () => {

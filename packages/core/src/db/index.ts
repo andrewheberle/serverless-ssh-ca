@@ -39,6 +39,24 @@ const BumpAllRevisions = "UPDATE krl SET revision = revision + 1"
 // previous statement in the same batch changed a row
 const BumpRevisionIfChanged = "UPDATE krl SET revision = revision + 1 WHERE certificate_type = ? AND changes() = 1"
 
+// recorded in revoked_by for a certificate revoked by the holder of its key
+const KeyHolderRevoker = "key-holder"
+
+// a certificate presented for renewal is revoked by its key holder, as
+// possession of the host key is what a renewal is proven by
+const RenewalRevoker = KeyHolderRevoker
+const RenewalReason = "renewal"
+
+// logs a revocation for the audit trail, however the certificate was revoked
+const logRevocation = (env: StoreBindings, serial: bigint, certificateType: CertificateType, by: string, reason: string | null): void => {
+	logger(env).info("certificate revoked",
+		"serial", `${serial}`,
+		"certificate_type", CertificateType[certificateType].toLowerCase(),
+		"revoked_by", by,
+		"revocation_reason", reason,
+	)
+}
+
 // how long a revoked certificate is kept in the KRL after it expires, see
 // getRevocationList, as an SQLite date modifier
 const KrlGracePeriod = "24 hours"
@@ -121,11 +139,20 @@ const certificateValues = (certificate: SshCertificate, keyid: string, certifica
 	return CertificateColumns.map((column) => record[column])
 }
 
-export const recordCertificate = async (env: StoreBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User) => {
+/**
+ * Records an issued certificate, so it can be revoked and listed.
+ *
+ * @param env The CA bindings
+ * @param certificate The certificate that was issued
+ * @param keyid The key ID of the certificate
+ * @param certificateType The type of certificate
+ * @param requestedBy The email address of the requester who asked for the certificate, when known
+ */
+export const recordCertificate = async (env: StoreBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User, requestedBy?: string) => {
 	const qb = await connect(env)
 	const res = await qb.insert({
 		tableName: "certificates",
-		data: certificateRecord(certificate, keyid, certificateType),
+		data: { ...certificateRecord(certificate, keyid, certificateType), requested_by: requestedBy ?? null },
 	}).execute()
 
 	if (!res.success) {
@@ -144,6 +171,11 @@ export const recordCertificate = async (env: StoreBindings, certificate: SshCert
  * signed with the CA key outside of the CA) is recorded so that it can be
  * revoked.
  *
+ * The certificate that was renewed is recorded as revoked by its key holder
+ * because of the renewal, and the renewed certificate keeps the requester of
+ * the certificate that was renewed, as a renewal is proven by possession of
+ * the host key rather than by a requester's tokens.
+ *
  * @param env The CA bindings
  * @param previous The certificate that was presented for renewal
  * @param certificate The certificate issued by the renewal
@@ -160,11 +192,11 @@ export const recordRenewal = async (env: StoreBindings, previous: SshCertificate
 	const results = await env.DB.batch([
 		env.DB.prepare(`INSERT INTO certificates (${columns}) VALUES (${placeholders}) ON CONFLICT (serial) DO NOTHING`)
 			.bind(...certificateValues(previous, previous.keyId, CertificateType.Host)),
-		env.DB.prepare("UPDATE certificates SET revoked_at = ? WHERE serial = ? AND certificate_type = ? AND revoked_at IS NULL")
-			.bind(revokedAt, `${previous.serial}`, CertificateType.Host),
+		env.DB.prepare("UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ? WHERE serial = ? AND certificate_type = ? AND revoked_at IS NULL")
+			.bind(revokedAt, RenewalRevoker, RenewalReason, `${previous.serial}`, CertificateType.Host),
 		// changes() is the number of rows revoked by the previous statement
-		env.DB.prepare(`INSERT INTO certificates (${columns}) SELECT ${placeholders} WHERE changes() = 1`)
-			.bind(...certificateValues(certificate, certificate.keyId, CertificateType.Host)),
+		env.DB.prepare(`INSERT INTO certificates (${columns}, requested_by) SELECT ${placeholders}, (SELECT requested_by FROM certificates WHERE serial = ?) WHERE changes() = 1`)
+			.bind(...certificateValues(certificate, certificate.keyId, CertificateType.Host), `${previous.serial}`),
 		// the previous certificate was revoked if the renewed one was recorded
 		env.DB.prepare(BumpRevisionIfChanged).bind(CertificateType.Host),
 	])
@@ -173,7 +205,12 @@ export const recordRenewal = async (env: StoreBindings, previous: SshCertificate
 		throw new Error("error during query")
 	}
 
-	return results[2]?.meta?.changes === 1
+	const renewed = results[2]?.meta?.changes === 1
+	if (renewed) {
+		logRevocation(env, previous.serial, CertificateType.Host, RenewalRevoker, RenewalReason)
+	}
+
+	return renewed
 }
 
 export const isRevoked = async (env: StoreBindings, serial: bigint): Promise<boolean> => {
@@ -251,6 +288,18 @@ export type Revocation = {
 	revoker: Revoker
 }
 
+// what is recorded in revoked_by for a revoker
+const revokedBy = (revoker: Revoker): string => {
+	switch (revoker.kind) {
+		case "keyHolder":
+			return KeyHolderRevoker
+		default: {
+			const unknown: never = revoker.kind
+			throw new Error(`unknown revoker ${String(unknown)}`)
+		}
+	}
+}
+
 // whether a revoker may revoke a certificate issued for a recorded public key
 const mayRevoke = (revoker: Revoker, recordedKey: string): boolean => {
 	switch (revoker.kind) {
@@ -307,12 +356,14 @@ export const revokeCertificate = async (env: SshCaBindings, revocation: Revocati
 	}
 
 	const revokedAt = (new Date).toISOString()
+	const by = revokedBy(revoker)
 
 	// only the certificate the decision was made for is revoked, and only if
-	// another request has not revoked it since it was read
+	// another request has not revoked it since it was read. No reason is
+	// recorded, as the API does not ask for one
 	const results = await env.DB.batch([
-		env.DB.prepare("UPDATE certificates SET revoked_at = ? WHERE serial = ? AND certificate_type = ? AND public_key = ? AND revoked_at IS NULL")
-			.bind(revokedAt, `${serial}`, certificateType, recordedKey),
+		env.DB.prepare("UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = NULL WHERE serial = ? AND certificate_type = ? AND public_key = ? AND revoked_at IS NULL")
+			.bind(revokedAt, by, `${serial}`, certificateType, recordedKey),
 		env.DB.prepare(BumpRevisionIfChanged).bind(certificateType),
 	])
 
@@ -320,7 +371,13 @@ export const revokeCertificate = async (env: SshCaBindings, revocation: Revocati
 		throw new Error("error during query")
 	}
 
-	return results[0]?.meta?.changes === 1 ? { kind: "revoked", revokedAt } : { kind: "alreadyRevoked" }
+	if (results[0]?.meta?.changes !== 1) {
+		return { kind: "alreadyRevoked" }
+	}
+
+	logRevocation(env, serial, certificateType, by, null)
+
+	return { kind: "revoked", revokedAt }
 }
 
 const KrlRevisionRow = z.object({

@@ -145,14 +145,15 @@ const issued = (l: Logger, certificate: SshCertificate, renews?: SshCertificate)
 	return { kind: "issued", certificate }
 }
 
-// signs and records a certificate that is not a renewal
-const issue = async (config: AuthorityConfig, l: Logger, certificateType: CertificateType, signed: () => Promise<SshCertificate>): Promise<IssueResult> => {
+// signs and records a certificate that is not a renewal, as requested by a
+// requester
+const issue = async (config: AuthorityConfig, l: Logger, certificateType: CertificateType, requester: Requester, signed: () => Promise<SshCertificate>): Promise<IssueResult> => {
 	const result = await trySign(l, signed)
 	if (result.kind !== "signed") {
 		return result
 	}
 
-	const recorded = await tryStore(l, async () => await recordCertificate(config, result.certificate, result.certificate.keyId, certificateType), RecordingProblem)
+	const recorded = await tryStore(l, async () => await recordCertificate(config, result.certificate, result.certificate.keyId, certificateType, requester.email), RecordingProblem)
 	if (recorded.kind !== "stored") {
 		return recorded
 	}
@@ -186,7 +187,7 @@ export const issueUserCertificate = async (config: AuthorityConfig, requester: R
 		...settings.principals,
 	]
 
-	return await issue(config, l, CertificateType.User, async () => {
+	return await issue(config, l, CertificateType.User, requester, async () => {
 		const allowed = settings.extensions
 		const notAllowed = options.extensions?.find((extension) => !allowed.includes(extension))
 		if (notAllowed !== undefined) {
@@ -220,18 +221,19 @@ const signHostCertificate = async (config: AuthorityConfig, key: PrivateKey, pub
  * Issues a host certificate for the given principals.
  *
  * @param config The bindings of the CA, see {@link AuthorityConfig}
+ * @param requester The requester who asked for the certificate, who is recorded as having requested it
  * @param publicKey The key the certificate is issued for
  * @param options The principals, of which there must be at least one, and the lifetime in seconds, which is no longer than `SSH_HOST_CERTIFICATE_LIFETIME`
  * @param l The logger for the request
  * @returns The certificate, or why it was not issued, see {@link IssueResult}
  */
-export const issueHostCertificate = async (config: AuthorityConfig, publicKey: PublicKey, options: { principals: string[], lifetime?: number }, l: Logger): Promise<IssueResult> => {
+export const issueHostCertificate = async (config: AuthorityConfig, requester: Requester, publicKey: PublicKey, options: { principals: string[], lifetime?: number }, l: Logger): Promise<IssueResult> => {
 	const key = await loadKey(config, l)
 	if (key.kind !== "loaded") {
 		return key
 	}
 
-	return await issue(config, l, CertificateType.Host, async () => await signHostCertificate(config, key.key, publicKey, options.principals, options.lifetime))
+	return await issue(config, l, CertificateType.Host, requester, async () => await signHostCertificate(config, key.key, publicKey, options.principals, options.lifetime))
 }
 
 // returns why a certificate cannot be renewed, or undefined if it can be,
