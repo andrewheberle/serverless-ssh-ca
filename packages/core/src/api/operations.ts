@@ -24,9 +24,8 @@ import {
 	getKrlRevision,
 	getKrlVersion,
 	getRevocationList,
-	RevocationStatus,
-	revocationStatus,
 	revokeCertificate,
+	type RevocationResult,
 } from "../db/index.js"
 
 /**
@@ -314,43 +313,29 @@ export const certificateResponse = async (c: AppContext, l: Logger, result: Prom
  * @returns The response containing the time of revocation
  */
 export const revoke = async (c: AppContext, l: Logger, serial: bigint, publicKey: PublicKey, certificateType: CertificateType): Promise<Response> => {
-	// ensure certificate can be revoked
-	const status = await revocationStatus(c.env, serial, publicKey, certificateType)
-	switch (status) {
-		case RevocationStatus.Revoked:
-			l.warn("certificate is already revoked")
-			throw new ConflictException("certificate is already revoked")
-		case RevocationStatus.NotFound:
-			l.warn("certificate not found")
-			throw new NotFoundException("certificate not found")
+	let result: RevocationResult
+	try {
+		result = await revokeCertificate(c.env, { serial, certificateType, revoker: { kind: "keyHolder", publicKey } })
+	} catch (err) {
+		l.error("unhandled error", "error", err)
+		throw new InternalServerErrorException("internal server error")
 	}
 
-	try {
-		const res = await revokeCertificate(c.env, serial)
-
-		if (res.length === 0) {
-			// another request revoked the certificate after its status was checked
-			l.warn("certificate was revoked by another request")
+	switch (result.kind) {
+		case "revoked":
+			l.info("completed revocation")
+			return c.json({
+				revoked_at: result.revokedAt
+			})
+		case "alreadyRevoked":
+			l.warn("certificate is already revoked")
 			throw new ConflictException("certificate is already revoked")
-		}
-
-		if (res.length > 1) {
-			l.warn("more than one revocation result was returned", "count", res.length)
-		}
-
-		l.info("completed revocation")
-		return c.json({
-			revoked_at: res[0]!.revoked_at
-		})
-	} catch (err) {
-		switch (true) {
-			case (err instanceof ApiException):
-				// re-throw any exisiting chanfana error
-				throw err
-			default:
-				// otherwise throw as InternalServerErrorException
-				l.error("unhandled error", "error", err)
-				throw new InternalServerErrorException("internal server error")
+		case "notFound":
+			l.warn("certificate not found")
+			throw new NotFoundException("certificate not found")
+		default: {
+			const unknownResult: never = result
+			throw new Error(`unknown revocation result: ${String(unknownResult)}`)
 		}
 	}
 }

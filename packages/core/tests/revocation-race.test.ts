@@ -1,58 +1,57 @@
-import { describe, it, expect, vi } from "vitest"
+import { describe, it, expect } from "vitest"
 import { DatabaseSync } from "node:sqlite"
-import { createSshCa } from "../src/index.js"
-import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
+import { getKrlRevision, recordCertificate, revokeCertificate, type RevocationResult } from "../src/db/index.js"
+import { CertificateType } from "../src/db/types.js"
+import { fromNodeSqlite } from "../src/node/index.js"
+import type { CaDatabase } from "../src/types.js"
 import { makeEnv } from "./env.js"
-import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateRequestProof } from "./helpers/proof.js"
-import { listCertificate } from "./helpers/ssh-keygen.js"
-import { key as ed25519Key } from "./keys/ed25519.js"
+import { hostCertificate } from "./helpers/certificate.js"
+import { MockSecretStore } from "./helpers/secret.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 
-// report every certificate as revocable, as a request that checked the status
-// before another request revoked the certificate would see it
-vi.mock("../src/db", async (importOriginal) => {
-	const original = await importOriginal<typeof import("../src/db/index.js")>()
+// a database whose batches wait until a number of them have been started, so
+// every revocation reads the certificate before any of them revokes it
+const withBatchBarrier = (db: CaDatabase, count: number): CaDatabase => {
+	let waiting = 0
+	let release: () => void = () => undefined
+	const barrier = new Promise<void>((resolve) => { release = resolve })
+
 	return {
-		...original,
-		revocationStatus: vi.fn(async () => original.RevocationStatus.Revokable),
+		prepare: (query) => db.prepare(query),
+		exec: async (query) => await db.exec(query),
+		batch: async (statements) => {
+			waiting++
+			if (waiting === count) {
+				release()
+			}
+			await barrier
+
+			return await db.batch(statements)
+		},
 	}
-})
+}
 
-describe("revoking a certificate revoked by another request", () => {
-	it("should respond with a 409 and keep the first revocation time", async () => {
+describe("revoking a certificate concurrently", () => {
+	it("should revoke it once, keeping the first revocation time", async () => {
+		const requests = 5
 		const sqlite = new DatabaseSync(":memory:")
-		const ca = createSshCa(makeEnv({
-			DB: fromNodeSqlite(sqlite),
-			PRIVATE_KEY: secretFromString(ed25519Key.ca().privateKey),
-		}))
-		const key = ecdsaKey.user()
-		const claims = { sub: "user123", email: "user@example.com" }
+		const env = makeEnv({ DB: fromNodeSqlite(sqlite), PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey) })
+		const certificate = hostCertificate(ecdsaKey.ca(), ecdsaKey.host())
+		await recordCertificate(env, certificate, certificate.keyId, CertificateType.Host)
+		expect(await getKrlRevision(env, CertificateType.Host)).toBe(0n)
 
-		const issued = await ca.fetch(new Request("http://example.com/api/v4/user/certificates", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"Authorization": await getAccessToken(claims),
-				"Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/user/certificates"),
-			},
-			body: JSON.stringify({ public_key: Buffer.from(key.publicKey).toString("base64"), identity: await getIdentityToken(claims) }),
-		}))
-		expect(issued.status).toBe(200)
-		const { certificate } = await issued.json() as { certificate: string }
-		const serial = listCertificate(Buffer.from(certificate, "base64").toString()).serial
+		const racing = { ...env, DB: withBatchBarrier(env.DB, requests) }
+		const results = await Promise.all(Array.from({ length: requests }, async (): Promise<RevocationResult> => await revokeCertificate(racing, {
+			serial: certificate.serial,
+			certificateType: CertificateType.Host,
+			revoker: { kind: "keyHolder", publicKey: certificate.publicKey },
+		})))
 
-		const revoke = async (): Promise<Response> => await ca.fetch(new Request(`http://example.com/api/v4/user/certificates/${serial}`, {
-			method: "DELETE",
-			headers: { "Proof-Of-Possession": generateRequestProof(key, "DELETE", `/api/v4/user/certificates/${serial}`) },
-		}))
+		const revoked = results.filter((result) => result.kind === "revoked")
+		expect(revoked).toHaveLength(1)
+		expect(results.filter((result) => result.kind === "alreadyRevoked")).toHaveLength(requests - 1)
 
-		const first = await revoke()
-		expect(first.status).toBe(200)
-		const { revoked_at } = await first.json() as { revoked_at: string }
-
-		const second = await revoke()
-		expect(second.status).toBe(409)
-		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${serial}`)).toEqual({ revoked_at })
+		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${certificate.serial}`)).toEqual({ revoked_at: revoked[0]?.revokedAt })
+		expect(await getKrlRevision(env, CertificateType.Host)).toBe(1n)
 	})
 })

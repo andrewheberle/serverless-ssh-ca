@@ -180,7 +180,7 @@ describe("database cleanup", () => {
 			const certificate = hostCertificate(ecdsaKey.ca(), ecdsaKey.host())
 			await recordCertificate(env, certificate, certificate.keyId, CertificateType.Host)
 			if (revoked) {
-				await revokeCertificate(env, certificate.serial)
+				await revokeCertificate(env, { serial: certificate.serial, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } })
 			}
 			sqlite.prepare("UPDATE certificates SET valid_before = ? WHERE serial = ?")
 				.run(new Date(Date.now() - hours * 60 * 60 * 1000).toISOString(), `${certificate.serial}`)

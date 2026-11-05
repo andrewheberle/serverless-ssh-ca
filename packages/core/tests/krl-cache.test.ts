@@ -30,7 +30,7 @@ describe("KRL revision", () => {
 		await recordCertificate(env, certificate, certificate.keyId, CertificateType.Host)
 
 		expect(await getKrlRevision(env, CertificateType.Host)).toBe(0n)
-		await revokeCertificate(env, certificate.serial)
+		await revokeCertificate(env, { serial: certificate.serial, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } })
 		expect(await getKrlRevision(env, CertificateType.Host)).toBe(1n)
 		expect(await getKrlRevision(env, CertificateType.User)).toBe(0n)
 	})
@@ -39,9 +39,9 @@ describe("KRL revision", () => {
 		const { env, issue } = setup()
 		const certificate = await issue()
 		await recordCertificate(env, certificate, certificate.keyId, CertificateType.Host)
-		await revokeCertificate(env, certificate.serial)
+		await revokeCertificate(env, { serial: certificate.serial, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } })
 
-		expect(await revokeCertificate(env, certificate.serial)).toEqual([])
+		expect(await revokeCertificate(env, { serial: certificate.serial, certificateType: CertificateType.Host, revoker: { kind: "keyHolder", publicKey: certificate.publicKey } })).toEqual({ kind: "alreadyRevoked" })
 		expect(await getKrlRevision(env, CertificateType.Host)).toBe(1n)
 	})
 
