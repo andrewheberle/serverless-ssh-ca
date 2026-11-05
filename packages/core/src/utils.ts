@@ -5,6 +5,7 @@ import z from "zod"
 import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
 import { logger } from "./logger.js"
 import { caConfig } from "./config.js"
+import { principalIssue } from "./principals.js"
 
 export { UnsupportedKeyError }
 
@@ -238,39 +239,14 @@ export const refineHostCertificateRequest = async (env: SshCaBindings, val: Pars
 	}
 }
 
-// characters that OpenSSH treats as pattern syntax when matching host
-// certificate principals, or that separate entries in a pattern list
-const HostPrincipalPatternChars = /[*?!,]/
-// whitespace and control characters, which no host name contains
-const HostPrincipalInvalidChars = /[\s\p{Cc}]/u
-
 /**
  * Returns why a principal cannot be included on a host certificate, or
- * undefined if it can be.
- *
- * OpenSSH matches the principals of a host certificate as patterns, so a
- * principal such as `*` would make the certificate valid for every host that
- * trusts the CA. Principals are otherwise not restricted, as hosts may be
- * reached by IP address, bare host name or fully qualified domain name.
+ * undefined if it can be, see {@link principalIssue}.
  *
  * @param principal The principal to check
  * @returns The reason the principal cannot be used, or undefined if it can be
  */
-export const hostPrincipalIssue = (principal: string): string | undefined => {
-	if (principal === "") {
-		return "host certificate principals must not be empty"
-	}
-
-	if (HostPrincipalPatternChars.test(principal)) {
-		return `host certificate principal ${JSON.stringify(principal)} must not contain wildcard or pattern characters (*, ?, ! or ,)`
-	}
-
-	if (HostPrincipalInvalidChars.test(principal)) {
-		return `host certificate principal ${JSON.stringify(principal)} must not contain whitespace or control characters`
-	}
-
-	return undefined
-}
+export const hostPrincipalIssue = (principal: string): string | undefined => principalIssue("host", principal)
 
 /**
  * Refines a host certificate principal so only one allowed by

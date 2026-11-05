@@ -7,6 +7,7 @@ import { KeyParseError, type PrivateKey, type PublicKey } from "./ssh/keys.js"
 import { createSigner } from "./ssh/signer.js"
 import type { SshCaBindings } from "./types.js"
 import { caConfig } from "./config.js"
+import { principalIssue } from "./principals.js"
 import { getPrivateKey, getPublic, hostPrincipalIssue, subjectKeyIssue, UnsupportedKeyError } from "./utils.js"
 
 /**
@@ -188,6 +189,13 @@ export const issueUserCertificate = async (config: AuthorityConfig, requester: R
 	]
 
 	return await issue(config, l, CertificateType.User, requester, async () => {
+		// the principals come from the identity token and the configuration,
+		// so are checked whichever they came from
+		const invalid = principals.map((principal) => principalIssue("user", principal)).find((issue) => issue !== undefined)
+		if (invalid !== undefined) {
+			throw new CertificateError(invalid)
+		}
+
 		const allowed = settings.extensions
 		const notAllowed = options.extensions?.find((extension) => !allowed.includes(extension))
 		if (notAllowed !== undefined) {
