@@ -39,6 +39,8 @@
 		"CERTIFICATE_REQUEST_TIME_SKEW_MAX": "90 seconds",
 		"DB_CERTIFICATE_RETENTION": "1 year",
 		"LOG_LEVEL": "info",
+		/* the landing page at /, see the core README
+		"LANDING_PAGE": "true", */
 		/* the admin UI under /admin, behind Cloudflare Access, see the core README
 		"ADMIN_JWT_HEADER": "Cf-Access-Jwt-Assertion",
 		"ADMIN_JWKS_URL": "https://<team>.cloudflareaccess.com/cdn-cgi/access/certs",

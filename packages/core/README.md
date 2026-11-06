@@ -339,6 +339,7 @@ with it:
 | `SSH_CERTIFICATE_PRINCIPALS` | A comma separated list of principals, each of which is not empty and contains no whitespace, control characters or `*`, `?`, `!`, or unset. Entries are not trimmed, so `"a, b"` is refused |
 | `SSH_CERTIFICATE_INCLUDE_SELF`, `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | `"true"` or `"false"` (or a boolean), or unset |
 | `LOG_LEVEL` | `none`, `error`, `warning`, `info` or `debug`, or unset |
+| `LANDING_PAGE` | `"true"` or `"false"` (or a boolean), or unset. See [Landing Page](#landing-page) |
 | `ADMIN_*` | See [Admin UI](#admin-ui). Each may be unset, but must be valid when set |
 
 A duration is a number and one of the units `second`, `minute`, `hour`,
@@ -543,6 +544,50 @@ A KRL keeps the same version and generation date until its contents
 change, so a regenerated KRL is identical to the one that was cached. If the
 cache cannot be read or written the KRL is generated as it is without a
 cache.
+
+### Landing Page
+
+The CA can serve a landing page at `/`, on Workers and with `createSshCa`,
+that shows public information about the CA. It is off unless
+`LANDING_PAGE` is set to `"true"`; while it is off, `/` answers with `404`.
+Like the admin UI, it is not part of the OpenAPI schema.
+
+The page shows:
+
+- the CA public key, its SHA256 fingerprint and a link to `/api/v4/ca`;
+- generic instructions for trusting user certificates on a host
+  (`TrustedUserCAKeys`), trusting host certificates in SSH clients
+  (`@cert-authority`), and refusing revoked certificates with the KRLs
+  (`RevokedKeys` and `RevokedHostKeys`), with the CA's URL and public key
+  filled in;
+- a pointer to [ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client)
+  for requesting certificates;
+- links to the API documentation (`/docs`), the user and host KRLs,
+  ssh-ca-client and its releases, and the admin UI.
+
+It shows only what the CA already publishes. In particular it does not show
+a configuration for ssh-ca-client: the CA cannot know the client ID or the
+redirect URL for certain (`JWT_AUD` may be a list, or an audience that is not
+the client ID), and a page that shows a wrong value is worse than none, so
+users are told to get the client's settings from their administrator. It
+never shows the identity provider's settings, certificate lifetimes, the
+version of the CA or any allowlist.
+
+The link to the admin UI is only shown while the admin UI is turned on (see
+[Admin UI](#admin-ui)). It is to `/admin`, or to
+`https://<ADMIN_HOSTNAME>/admin` when `ADMIN_HOSTNAME` is set, as the landing
+page answers on every host name. Every visitor sees the link, as the CA cannot
+tell who is an admin outside `/admin`.
+
+The page has no client-side JavaScript or forms and loads only its own
+stylesheet (`/style.css`), and is sent with the same security headers as the
+admin UI.
+
+The CA's URL in the instructions is the origin the page was requested on. On
+Workers this is always the public URL. On Node.js, behind a reverse proxy that
+terminates TLS, it is only the public URL if the server builds the `Request`
+from the public URL, otherwise the instructions show `http://` and the
+internal host name. Links on the page are relative, so they work either way.
 
 ### Admin UI
 

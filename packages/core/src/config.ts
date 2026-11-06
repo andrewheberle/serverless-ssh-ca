@@ -377,6 +377,7 @@ const ConfigSchema = z.object({
 	SSH_HOST_CERTIFICATE_LIFETIME: Duration({ allowZero: false }),
 	DB_CERTIFICATE_RETENTION: RetentionSetting,
 	LOG_LEVEL: LogLevelName.optional(),
+	LANDING_PAGE: Flag,
 	// the admin settings may each be missing, which turns the admin UI off,
 	// but any that are set must be valid
 	ADMIN_JWT_HEADER: OptionalSetting(HeaderNameString),
@@ -410,6 +411,8 @@ const ConfigSchema = z.object({
 	/** The maximum lifetime of a host certificate, in seconds */
 	hostCertificateLifetime: env.SSH_HOST_CERTIFICATE_LIFETIME / 1000,
 	retention: env.DB_CERTIFICATE_RETENTION,
+	/** Whether the landing page is served at `/` */
+	landingPage: env.LANDING_PAGE,
 	admin: adminConfig({
 		ADMIN_JWT_HEADER: env.ADMIN_JWT_HEADER,
 		ADMIN_JWKS_URL: env.ADMIN_JWKS_URL,
