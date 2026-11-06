@@ -166,6 +166,13 @@ export interface SshCaBindings {
     SSH_HOST_CERTIFICATE_ALLOWED_ROLES?: string | string[]
     SSH_HOST_CERTIFICATE_LIFETIME: string
     /**
+     * Whether to serve the landing page at `/`, which shows the CA public key,
+     * generic setup instructions for hosts and clients, and links to the API
+     * docs, the KRLs and (when it is turned on) the admin UI. `/` answers with
+     * 404 when this is not set or is false.
+     */
+    LANDING_PAGE?: string | boolean
+    /**
      * The request header an identity-aware proxy in front of `/admin` sends
      * its signed JWT in, for example `Cf-Access-Jwt-Assertion`. The admin UI
      * is turned off unless this, {@link SshCaBindings.ADMIN_JWKS_URL},

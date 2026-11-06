@@ -28,6 +28,7 @@ export const EnvSchema = z.object({
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: RequiredString,
 	CERTIFICATE_REQUEST_TIME_SKEW_MAX: DurationString({ allowZero: true }),
 	LOG_LEVEL: LogLevelName.optional(),
+	LANDING_PAGE: BooleanString.optional(),
 	ADMIN_JWT_HEADER: OptionalSetting(HeaderNameString),
 	ADMIN_JWKS_URL: OptionalSetting(HttpsUrl),
 	ADMIN_JWT_ISSUER: OptionalSetting(RequiredString),

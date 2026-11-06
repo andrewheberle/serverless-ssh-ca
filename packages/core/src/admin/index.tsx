@@ -1,4 +1,4 @@
-import { Hono, type Context, type MiddlewareHandler } from "hono"
+import { Hono, type Context } from "hono"
 import { html } from "hono/html"
 import { HTTPException } from "hono/http-exception"
 import { bodyLimit } from "hono/body-limit"
@@ -9,6 +9,7 @@ import { caConfig } from "../config.js"
 import { certificateStatus, getCertificate, listCertificates, revokeCertificate } from "../db/index.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
+import { SecurityHeaders, securityHeaders } from "../web/headers.js"
 import { authenticateAdmin, type EnabledAdminConfig } from "./auth.js"
 import { CertificateDetailPage, CertificateListPage, ErrorPage, Stylesheet, StylesheetPath } from "./pages.js"
 import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeQueryError, RevokeForm, SerialString, type CertificateKind } from "./query.js"
@@ -18,17 +19,10 @@ export const AdminBasePath = "/admin"
 
 /**
  * The headers on every response from the admin UI, including errors and the
- * 404 it answers with while it is turned off.
+ * 404 it answers with while it is turned off, which are the headers of every
+ * HTML page the CA serves, see {@link SecurityHeaders}.
  */
-export const AdminSecurityHeaders: Readonly<Record<string, string>> = {
-	"Content-Security-Policy": "default-src 'none'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
-	"Cache-Control": "no-store",
-	// no other site is sent a referrer. no-referrer would also make browsers
-	// send "Origin: null" on the admin UI's own form posts, which the check
-	// against cross-site requests would then refuse
-	"Referrer-Policy": "same-origin",
-	"X-Content-Type-Options": "nosniff",
-}
+export const AdminSecurityHeaders: Readonly<Record<string, string>> = SecurityHeaders
 
 type AdminEnv = {
 	Bindings: SshCaBindings
@@ -77,15 +71,6 @@ const page = (c: Context<AdminEnv>, element: JSX.Element, status: ContentfulStat
 	return c.html(html`<!DOCTYPE html>${element}`, status)
 }
 
-// sets the security headers on every response, see AdminSecurityHeaders
-const securityHeaders: MiddlewareHandler<AdminEnv> = async (c, next) => {
-	await next()
-
-	for (const [name, value] of Object.entries(AdminSecurityHeaders)) {
-		c.res.headers.set(name, value)
-	}
-}
-
 /**
  * Creates the admin UI, a plain Hono app (not registered with chanfana, so it
  * is not part of the OpenAPI schema) to be mounted at {@link AdminBasePath}.
@@ -113,7 +98,7 @@ export const createAdminApp = (env: SshCaBindings): Hono<AdminEnv> => {
 		return c.text("Internal Server Error", 500)
 	})
 
-	app.use(securityHeaders)
+	app.use(securityHeaders<AdminEnv>())
 
 	switch (config.kind) {
 		case "disabled":

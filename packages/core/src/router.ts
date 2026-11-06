@@ -1,5 +1,6 @@
 import { fromHono } from "chanfana"
 import { AdminBasePath, createAdminApp } from "./admin/index.js"
+import { createLandingApp } from "./landing/index.js"
 import { Hono, type Context } from "hono"
 import { createApi as apiv3 } from "./api/v3/index.js"
 import { BasePath as v4BasePath, createApi as apiv4 } from "./api/v4/index.js"
@@ -97,6 +98,10 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
 
     // the admin UI is a plain Hono app, so is not part of the OpenAPI schema
     hono.route(AdminBasePath, createAdminApp(env))
+
+    // the landing page is a plain Hono app too, with routes only for "/" and
+    // its stylesheet, and only while it is turned on
+    hono.route("/", createLandingApp(env))
 
     const app = fromHono(hono, {
 		schema: {
