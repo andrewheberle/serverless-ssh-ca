@@ -1,4 +1,5 @@
 import { fromHono } from "chanfana"
+import { AdminBasePath, createAdminApp } from "./admin/index.js"
 import { Hono, type Context } from "hono"
 import { createApi as apiv3 } from "./api/v3/index.js"
 import { BasePath as v4BasePath, createApi as apiv4 } from "./api/v4/index.js"
@@ -93,6 +94,9 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
         logger(env).error("unexpected error from router", "error", err)
         return c.json({ success: false, errors: [{ code: 7000, message: "Internal Server Error" }] }, 500)
     })
+
+    // the admin UI is a plain Hono app, so is not part of the OpenAPI schema
+    hono.route(AdminBasePath, createAdminApp(env))
 
     const app = fromHono(hono, {
 		schema: {

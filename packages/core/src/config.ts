@@ -140,6 +140,206 @@ const RequiredList = z.union([RequiredString, z.array(RequiredString).min(1, { m
 const Flag = z.union([z.boolean(), BooleanString]).optional().transform((v): boolean => v === true || v === "true")
 
 /**
+ * An admin setting that may be left unset, which is unset when it is missing
+ * or an empty string (as an unset var may be on Workers), and otherwise must
+ * be valid according to `schema`.
+ */
+export const OptionalSetting = <T extends z.ZodType>(schema: T) => z.preprocess((v) => v === "" ? undefined : v, schema.optional())
+
+/** An https URL */
+export const HttpsUrl = z.url({ protocol: /^https$/, message: "must be an https URL" })
+
+// the characters of an HTTP header name, a token in RFC 9110
+const HeaderNameFormat = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
+
+/** The name of an HTTP header */
+export const HeaderNameString = z.string().regex(HeaderNameFormat, { message: "must be an HTTP header name" })
+
+// a host name made of DNS labels, without a scheme, port or path
+const HostnameFormat = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i
+
+/** A host name, such as "ssh-ca.example.com", without a scheme, port or path */
+export const HostnameString = z.string().regex(HostnameFormat, { message: "must be a host name such as \"ssh-ca.example.com\"" })
+
+/**
+ * The algorithms a proxy JWT may be signed with. Only asymmetric algorithms
+ * are allowed, as the keys come from a public JWKS.
+ */
+export const AdminJwtAlgorithms = ["RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA", "Ed25519"] as const
+
+// the entries of a list, trimmed so a space after a comma is allowed
+const listEntries = (v: string | string[]): string[] => (typeof v === "string" ? v.split(",") : v).map((entry) => entry.trim())
+
+// reports a list without entries, or with an empty entry, which is more
+// likely to be a mistake than meant
+const listIssue = (entries: string[]): string | undefined => {
+	if (entries.length === 0 || entries.some((entry) => entry === "")) {
+		return "must be a comma separated list without empty entries"
+	}
+
+	return undefined
+}
+
+// reports each entry of a list of algorithms that a proxy JWT may not be
+// signed with
+const algorithmIssues = (entries: string[]): string[] => entries
+	.filter((entry) => !(AdminJwtAlgorithms as readonly string[]).includes(entry))
+	.map((entry) => `"${entry}" is not one of ${AdminJwtAlgorithms.join(", ")}`)
+
+/**
+ * A comma separated list of values, each of which is trimmed and must not be
+ * empty.
+ */
+export const ListString = z.string().superRefine((v, ctx) => {
+	const issue = listIssue(listEntries(v))
+	if (issue !== undefined) {
+		ctx.issues.push({ code: "custom", message: issue, input: v })
+	}
+})
+
+/** A comma separated list of the algorithms in {@link AdminJwtAlgorithms} */
+export const AdminJwtAlgorithmListString = ListString.superRefine((v, ctx) => {
+	for (const message of algorithmIssues(listEntries(v))) {
+		ctx.issues.push({ code: "custom", message, input: v })
+	}
+})
+
+// a list, either as a comma separated string or as an array, whose entries are
+// trimmed and must not be empty
+const NonEmptyList = z.union([z.string(), z.array(z.string())]).transform((v, ctx): string[] => {
+	const entries = listEntries(v)
+	const issue = listIssue(entries)
+	if (issue !== undefined) {
+		ctx.issues.push({ code: "custom", message: issue, input: v })
+		return z.NEVER
+	}
+
+	return entries
+})
+
+// a list of algorithms a proxy JWT may be signed with, see AdminJwtAlgorithms
+const AdminJwtAlgorithmList = NonEmptyList.superRefine((entries, ctx) => {
+	for (const message of algorithmIssues(entries)) {
+		ctx.issues.push({ code: "custom", message, input: entries })
+	}
+})
+
+/**
+ * Who may use the admin UI, from the settings that say which emails and
+ * roles are admins.
+ */
+export interface AdminAllowlist {
+	/** The emails of admins, lowercased, as emails are compared case-insensitively */
+	emails: string[]
+	/** The roles that make someone an admin and the claim of the proxy JWT that holds them, when roles are used */
+	roles: { claim: string, allowed: string[] } | undefined
+}
+
+/**
+ * The settings of the admin UI, which is only turned on once every setting it
+ * needs is set, see ADR-0002.
+ *
+ * - `disabled`: none of the `ADMIN_*` settings are set
+ * - `partial`: some are set, but not enough to turn the admin UI on, and `missing` names those still needed
+ * - `enabled`: the admin UI is on
+ */
+export type AdminConfig =
+	| { kind: "disabled" }
+	| { kind: "partial", missing: string[] }
+	| {
+		kind: "enabled"
+		/** The request header the proxy sends its JWT in */
+		header: string
+		/** The https URL of the proxy's JWKS */
+		jwksUrl: string
+		/** The issuer the proxy JWT must have */
+		issuer: string
+		/** The audiences the proxy JWT may be issued for, at least one */
+		audience: string[]
+		/** The algorithms the proxy JWT may be signed with */
+		algorithms: string[]
+		/** Who is an admin */
+		allowlist: AdminAllowlist
+		/** The only host name the admin UI answers on, lowercased, when it is limited to one */
+		hostname: string | undefined
+	}
+
+// the admin settings once each has been validated, where undefined means
+// the setting is not set
+type AdminSettings = {
+	ADMIN_JWT_HEADER?: string | undefined
+	ADMIN_JWKS_URL?: string | undefined
+	ADMIN_JWT_ISSUER?: string | undefined
+	ADMIN_JWT_AUD?: string[] | undefined
+	ADMIN_JWT_ALGORITHMS?: string[] | undefined
+	ADMIN_ALLOWED_EMAILS?: string[] | undefined
+	ADMIN_ALLOWED_ROLES?: string[] | undefined
+	ADMIN_JWT_ROLES_CLAIM?: string | undefined
+	ADMIN_HOSTNAME?: string | undefined
+}
+
+/**
+ * Decides whether the admin UI is turned on from its validated settings, see
+ * {@link AdminConfig}.
+ *
+ * @param env The admin settings, already validated
+ * @returns The settings of the admin UI
+ */
+const adminConfig = (env: AdminSettings): AdminConfig => {
+	if (Object.values(env).every((v) => v === undefined)) {
+		return { kind: "disabled" }
+	}
+
+	const missing: string[] = []
+	const { ADMIN_JWT_HEADER: header, ADMIN_JWKS_URL: jwksUrl, ADMIN_JWT_ISSUER: issuer, ADMIN_JWT_AUD: audience } = env
+	if (header === undefined) {
+		missing.push("ADMIN_JWT_HEADER")
+	}
+	if (jwksUrl === undefined) {
+		missing.push("ADMIN_JWKS_URL")
+	}
+	if (issuer === undefined) {
+		missing.push("ADMIN_JWT_ISSUER")
+	}
+	if (audience === undefined) {
+		missing.push("ADMIN_JWT_AUD")
+	}
+
+	// roles are only used when the claim holding them is set too
+	const roles = env.ADMIN_ALLOWED_ROLES !== undefined && env.ADMIN_JWT_ROLES_CLAIM !== undefined
+		? { claim: env.ADMIN_JWT_ROLES_CLAIM, allowed: env.ADMIN_ALLOWED_ROLES }
+		: undefined
+	const emails = env.ADMIN_ALLOWED_EMAILS
+	if (emails === undefined && roles === undefined) {
+		if (env.ADMIN_ALLOWED_ROLES !== undefined) {
+			missing.push("ADMIN_JWT_ROLES_CLAIM")
+		} else if (env.ADMIN_JWT_ROLES_CLAIM !== undefined) {
+			missing.push("ADMIN_ALLOWED_ROLES")
+		} else {
+			missing.push("ADMIN_ALLOWED_EMAILS or ADMIN_ALLOWED_ROLES with ADMIN_JWT_ROLES_CLAIM")
+		}
+	}
+
+	if (header === undefined || jwksUrl === undefined || issuer === undefined || audience === undefined || missing.length > 0) {
+		return { kind: "partial", missing }
+	}
+
+	return {
+		kind: "enabled",
+		header,
+		jwksUrl,
+		issuer,
+		audience,
+		algorithms: env.ADMIN_JWT_ALGORITHMS ?? ["RS256"],
+		allowlist: {
+			emails: (emails ?? []).map((email) => email.toLowerCase()),
+			roles,
+		},
+		hostname: env.ADMIN_HOSTNAME?.toLowerCase(),
+	}
+}
+
+/**
  * How long certificates are kept in the database after they expire.
  *
  * - `infinite`: certificates are never removed
@@ -177,6 +377,17 @@ const ConfigSchema = z.object({
 	SSH_HOST_CERTIFICATE_LIFETIME: Duration({ allowZero: false }),
 	DB_CERTIFICATE_RETENTION: RetentionSetting,
 	LOG_LEVEL: LogLevelName.optional(),
+	// the admin settings may each be missing, which turns the admin UI off,
+	// but any that are set must be valid
+	ADMIN_JWT_HEADER: OptionalSetting(HeaderNameString),
+	ADMIN_JWKS_URL: OptionalSetting(HttpsUrl),
+	ADMIN_JWT_ISSUER: OptionalSetting(RequiredString),
+	ADMIN_JWT_AUD: OptionalSetting(NonEmptyList),
+	ADMIN_JWT_ALGORITHMS: OptionalSetting(AdminJwtAlgorithmList),
+	ADMIN_ALLOWED_EMAILS: OptionalSetting(NonEmptyList),
+	ADMIN_ALLOWED_ROLES: OptionalSetting(NonEmptyList),
+	ADMIN_JWT_ROLES_CLAIM: OptionalSetting(RequiredString),
+	ADMIN_HOSTNAME: OptionalSetting(HostnameString),
 }).transform((env) => ({
 	issuerDn: env.ISSUER_DN,
 	jwksUrl: env.JWT_JWKS_URL,
@@ -199,6 +410,17 @@ const ConfigSchema = z.object({
 	/** The maximum lifetime of a host certificate, in seconds */
 	hostCertificateLifetime: env.SSH_HOST_CERTIFICATE_LIFETIME / 1000,
 	retention: env.DB_CERTIFICATE_RETENTION,
+	admin: adminConfig({
+		ADMIN_JWT_HEADER: env.ADMIN_JWT_HEADER,
+		ADMIN_JWKS_URL: env.ADMIN_JWKS_URL,
+		ADMIN_JWT_ISSUER: env.ADMIN_JWT_ISSUER,
+		ADMIN_JWT_AUD: env.ADMIN_JWT_AUD,
+		ADMIN_JWT_ALGORITHMS: env.ADMIN_JWT_ALGORITHMS,
+		ADMIN_ALLOWED_EMAILS: env.ADMIN_ALLOWED_EMAILS,
+		ADMIN_ALLOWED_ROLES: env.ADMIN_ALLOWED_ROLES,
+		ADMIN_JWT_ROLES_CLAIM: env.ADMIN_JWT_ROLES_CLAIM,
+		ADMIN_HOSTNAME: env.ADMIN_HOSTNAME,
+	}),
 }))
 
 /**
