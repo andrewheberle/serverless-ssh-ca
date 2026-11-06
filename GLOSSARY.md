@@ -20,6 +20,10 @@ _Avoid_: ID token, id_token
 The CA itself: the key that signs certificates, and the rules for what certificate it will issue to whom and for how long.
 _Avoid_: Signer, issuer (except for the `ISSUER_DN` of the CA key)
 
+**CA public key**:
+The public half of the key the Certificate Authority signs certificates with, which hosts and clients are configured to trust.
+_Avoid_: CA certificate, root certificate (an SSH CA has no certificate of its own; "certificate" always means one the CA has issued)
+
 **Principal**:
 A user name or host name that a certificate is valid for.
 _Avoid_: Role (roles are identity token principals used to decide who may request host certificates), group
