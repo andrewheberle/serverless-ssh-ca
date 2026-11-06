@@ -38,7 +38,16 @@
 		"SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
 		"CERTIFICATE_REQUEST_TIME_SKEW_MAX": "90 seconds",
 		"DB_CERTIFICATE_RETENTION": "1 year",
-		"LOG_LEVEL": "info"
+		"LOG_LEVEL": "info",
+		/* the admin UI under /admin, behind Cloudflare Access, see the core README
+		"ADMIN_JWT_HEADER": "Cf-Access-Jwt-Assertion",
+		"ADMIN_JWKS_URL": "https://<team>.cloudflareaccess.com/cdn-cgi/access/certs",
+		"ADMIN_JWT_ISSUER": "https://<team>.cloudflareaccess.com",
+		"ADMIN_JWT_AUD": "<the Access application's AUD tag>",
+		"ADMIN_ALLOWED_EMAILS": "admin@example.com",
+		"ADMIN_ALLOWED_ROLES": "",
+		"ADMIN_JWT_ROLES_CLAIM": "",
+		"ADMIN_HOSTNAME": "ssh-ca.example.com" */
 	},
 	"secrets_store_secrets": [
 		{

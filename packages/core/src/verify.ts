@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose"
+import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyResult } from "jose"
 import { CertificateRequestJWTPayload } from "./types.js"
 import type { SshCaBindings } from "./types.js"
 import { split } from "./utils.js"
@@ -56,6 +56,41 @@ const remoteJWKSet = (url: string): RemoteJWKSet => {
 }
 
 /**
+ * What a JWT must be to be accepted by {@link verifyJWTWithJWKS}.
+ */
+export interface JWTRequirements {
+	/** The URL of the JWKS the JWT must be signed with a key from */
+	jwksUrl: string
+	/** The issuer the JWT must have, which must not be empty */
+	issuer: string
+	/** The audiences the JWT may be issued for, which must not be empty */
+	audience: string[]
+	/** The algorithms the JWT may be signed with */
+	algorithms: string[]
+}
+
+/**
+ * Verifies a JWT against a remote JWKS, which is fetched once and cached
+ * between requests, including that it was issued by the required issuer for
+ * one of the required audiences. Both requester tokens and the JWTs of the
+ * identity-aware proxy in front of the admin UI are verified this way.
+ *
+ * Callers must ensure the issuer and audience are not empty, as jose does not
+ * check them otherwise; see {@link verifyJWT}, which does.
+ *
+ * @param jwt The JWT to verify
+ * @param requirements What the JWT must be, see {@link JWTRequirements}
+ * @returns The verified JWT
+ */
+export const verifyJWTWithJWKS = async <T extends JWTPayload>(jwt: string, requirements: JWTRequirements): Promise<JWTVerifyResult<T>> => {
+	return await jwtVerify<T>(jwt, remoteJWKSet(requirements.jwksUrl), {
+		issuer: requirements.issuer,
+		algorithms: requirements.algorithms,
+		audience: requirements.audience,
+	})
+}
+
+/**
  * Verifies a JWT from the IdP, including that it was issued by the configured
  * issuer for one of the audiences given.
  *
@@ -77,7 +112,8 @@ export const verifyJWT = async (config: Pick<SshCaBindings, "JWT_JWKS_URL" | "JW
 		throw new MissingIssuerError("no issuer is configured for verifying tokens, set JWT_ISSUER")
 	}
 
-	return await jwtVerify<CertificateRequestJWTPayload>(jwt, remoteJWKSet(config.JWT_JWKS_URL), {
+	return await verifyJWTWithJWKS<CertificateRequestJWTPayload>(jwt, {
+		jwksUrl: config.JWT_JWKS_URL,
 		issuer: config.JWT_ISSUER,
 		algorithms: split(config.JWT_ALGORITHMS),
 		audience: audience,

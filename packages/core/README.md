@@ -339,6 +339,7 @@ with it:
 | `SSH_CERTIFICATE_PRINCIPALS` | A comma separated list of principals, each of which is not empty and contains no whitespace, control characters or `*`, `?`, `!`, or unset. Entries are not trimmed, so `"a, b"` is refused |
 | `SSH_CERTIFICATE_INCLUDE_SELF`, `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | `"true"` or `"false"` (or a boolean), or unset |
 | `LOG_LEVEL` | `none`, `error`, `warning`, `info` or `debug`, or unset |
+| `ADMIN_*` | See [Admin UI](#admin-ui). Each may be unset, but must be valid when set |
 
 A duration is a number and one of the units `second`, `minute`, `hour`,
 `day`, `week`, `month` or `year` (singular or plural), separated by a space. A
@@ -542,6 +543,96 @@ A KRL keeps the same version and generation date until its contents
 change, so a regenerated KRL is identical to the one that was cached. If the
 cache cannot be read or written the KRL is generated as it is without a
 cache.
+
+### Admin UI
+
+The CA can serve an admin UI under `/admin`, on Workers and with
+`createSshCa`. At the moment it only shows who is signed in, which proves the
+identity-aware proxy in front of it is set up correctly. It is not part of the
+OpenAPI schema.
+
+#### Security model
+
+The CA has no login of its own for admins. Instead an identity-aware proxy,
+such as [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/),
+sits in front of `/admin`, signs in the admin, and adds a signed JWT to every
+request it passes on. The CA verifies that JWT on every request against the
+proxy's JWKS, issuer and audience, and decides who is an admin from an
+allowlist of emails or roles. See
+[ADR-0002](../../docs/adr/0002-authenticate-admins-with-an-identity-aware-proxy.md)
+for why.
+
+- A request without a JWT, or with one that does not verify, gets `401`.
+- A request with a valid JWT that has no `email` claim, or whose email and
+  roles are not in the allowlist, gets `403`.
+- Requests that change state (anything other than `GET`, `HEAD` or
+  `OPTIONS`) must come from the admin UI itself: their `Origin` must be the
+  admin UI's origin (`https://<ADMIN_HOSTNAME>` when it is set) and their
+  `Sec-Fetch-Site` header must be `same-origin`, or they get `403`. The proxy
+  keeps the admin's session in a cookie, so does not protect against
+  cross-site requests itself.
+- When a `RATE_LIMITER` is configured, requests that change state are rate
+  limited with the key `admin:<email>`, using the verified email, so they never
+  share a key with the client API. The `rateLimitKey` option is not used for
+  them. `GET` requests are not limited.
+- Every response has a strict `Content-Security-Policy`, `Cache-Control:
+  no-store`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options:
+  nosniff`. Pages are plain HTML without JavaScript.
+- Every request is logged at info level with the admin's email, the method,
+  the path and the response status. The JWT is never logged.
+
+Make sure the proxy protects every hostname the CA answers on, or set
+`ADMIN_HOSTNAME` to the one it protects. On Workers this includes the
+`workers.dev` hostname unless `workers_dev` is `false`.
+
+#### Settings
+
+| Setting | Meaning |
+|---|---|
+| `ADMIN_JWT_HEADER` | The request header holding the proxy's JWT |
+| `ADMIN_JWKS_URL` | The `https` URL of the proxy's JWKS |
+| `ADMIN_JWT_ISSUER` | The issuer (`iss`) the JWT must have |
+| `ADMIN_JWT_AUD` | The audience (`aud`) the JWT must be issued for, or a comma separated list of them |
+| `ADMIN_JWT_ALGORITHMS` | Optional. A comma separated list of the algorithms the JWT may be signed with, from `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `ES512`, `EdDSA` and `Ed25519`. `RS256` when unset |
+| `ADMIN_ALLOWED_EMAILS` | A comma separated list of the emails of admins, compared case-insensitively with the JWT's `email` claim |
+| `ADMIN_ALLOWED_ROLES` | A comma separated list of roles that make someone an admin, compared exactly |
+| `ADMIN_JWT_ROLES_CLAIM` | The claim of the JWT holding the roles, as a string or an array of strings. A claim of any other type is ignored with a warning |
+| `ADMIN_HOSTNAME` | Optional. The only host name the admin UI answers on, such as `ssh-ca.example.com`. Every other host name gets `404` for `/admin` |
+
+The admin UI is turned on when `ADMIN_JWT_HEADER`, `ADMIN_JWKS_URL`,
+`ADMIN_JWT_ISSUER` and `ADMIN_JWT_AUD` are set, along with
+`ADMIN_ALLOWED_EMAILS` or both `ADMIN_ALLOWED_ROLES` and
+`ADMIN_JWT_ROLES_CLAIM`. Roles are only used when both are set.
+
+- When none of the `ADMIN_*` settings are set, the admin UI is off and every
+  `/admin` path gets `404`.
+- When only some are set, the admin UI is also off, and a warning naming the
+  missing settings is logged once. The rest of the CA keeps working.
+- A setting that is set but not valid, such as an `http` JWKS URL or an
+  audience list with an empty entry, makes the whole configuration invalid,
+  as described under [Validation](#validation).
+
+An empty string counts as not set. List entries are trimmed, so
+`"a@example.com, b@example.com"` is accepted, but an empty entry is refused.
+
+#### Cloudflare Access example
+
+Create a self-hosted Access application for `ssh-ca.example.com/admin` with a
+policy that allows your admins, then set:
+
+```jsonc
+"vars": {
+	"ADMIN_JWT_HEADER": "Cf-Access-Jwt-Assertion",
+	"ADMIN_JWKS_URL": "https://<team>.cloudflareaccess.com/cdn-cgi/access/certs",
+	"ADMIN_JWT_ISSUER": "https://<team>.cloudflareaccess.com",
+	"ADMIN_JWT_AUD": "<the Access application's AUD tag>",
+	"ADMIN_ALLOWED_EMAILS": "admin@example.com",
+	"ADMIN_HOSTNAME": "ssh-ca.example.com"
+}
+```
+
+`<team>` is your Zero Trust team name. The AUD tag is shown in the Access
+application's settings.
 
 ### Client
 

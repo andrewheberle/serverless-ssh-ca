@@ -1,5 +1,5 @@
 import z from "zod"
-import { BooleanString, configurationError, DurationString, HttpUrl, InvalidConfigurationError, LogLevelName, PrincipalListString, RequiredString, RetentionString } from "../config.js"
+import { AdminJwtAlgorithmListString, BooleanString, configurationError, DurationString, HeaderNameString, HostnameString, HttpsUrl, HttpUrl, InvalidConfigurationError, ListString, LogLevelName, OptionalSetting, PrincipalListString, RequiredString, RetentionString } from "../config.js"
 import type { CaCache, CaDatabase, CaRateLimiter, CaSecret, SshCaBindings } from "../types.js"
 
 export { InvalidConfigurationError }
@@ -28,6 +28,15 @@ export const EnvSchema = z.object({
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: RequiredString,
 	CERTIFICATE_REQUEST_TIME_SKEW_MAX: DurationString({ allowZero: true }),
 	LOG_LEVEL: LogLevelName.optional(),
+	ADMIN_JWT_HEADER: OptionalSetting(HeaderNameString),
+	ADMIN_JWKS_URL: OptionalSetting(HttpsUrl),
+	ADMIN_JWT_ISSUER: OptionalSetting(RequiredString),
+	ADMIN_JWT_AUD: OptionalSetting(ListString),
+	ADMIN_JWT_ALGORITHMS: OptionalSetting(AdminJwtAlgorithmListString),
+	ADMIN_ALLOWED_EMAILS: OptionalSetting(ListString),
+	ADMIN_ALLOWED_ROLES: OptionalSetting(ListString),
+	ADMIN_JWT_ROLES_CLAIM: OptionalSetting(RequiredString),
+	ADMIN_HOSTNAME: OptionalSetting(HostnameString),
 })
 
 /**

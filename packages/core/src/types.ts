@@ -165,4 +165,30 @@ export interface SshCaBindings {
     SSH_HOST_CERTIFICATE_ALLOWED_EMAILS?: string | string[]
     SSH_HOST_CERTIFICATE_ALLOWED_ROLES?: string | string[]
     SSH_HOST_CERTIFICATE_LIFETIME: string
+    /**
+     * The request header an identity-aware proxy in front of `/admin` sends
+     * its signed JWT in, for example `Cf-Access-Jwt-Assertion`. The admin UI
+     * is turned off unless this, {@link SshCaBindings.ADMIN_JWKS_URL},
+     * {@link SshCaBindings.ADMIN_JWT_ISSUER}, {@link SshCaBindings.ADMIN_JWT_AUD}
+     * and an allowlist ({@link SshCaBindings.ADMIN_ALLOWED_EMAILS}, or
+     * {@link SshCaBindings.ADMIN_ALLOWED_ROLES} with
+     * {@link SshCaBindings.ADMIN_JWT_ROLES_CLAIM}) are all set.
+     */
+    ADMIN_JWT_HEADER?: string
+    /** The https URL of the JWKS the proxy's JWTs are signed with */
+    ADMIN_JWKS_URL?: string
+    /** The issuer (`iss`) the proxy's JWT must have */
+    ADMIN_JWT_ISSUER?: string
+    /** The audiences (`aud`) the proxy's JWT may be issued for, at least one */
+    ADMIN_JWT_AUD?: string | string[]
+    /** The algorithms the proxy's JWT may be signed with, `RS256` when not set */
+    ADMIN_JWT_ALGORITHMS?: string | string[]
+    /** The emails of admins, compared case-insensitively with the `email` claim of the proxy's JWT */
+    ADMIN_ALLOWED_EMAILS?: string | string[]
+    /** The roles that make someone an admin, compared exactly with the values of {@link SshCaBindings.ADMIN_JWT_ROLES_CLAIM} */
+    ADMIN_ALLOWED_ROLES?: string | string[]
+    /** The claim of the proxy's JWT that holds the requester's roles, as a string or an array of strings */
+    ADMIN_JWT_ROLES_CLAIM?: string
+    /** The only host name the admin UI answers on, when set; requests to `/admin` on any other host name get 404 */
+    ADMIN_HOSTNAME?: string
 }

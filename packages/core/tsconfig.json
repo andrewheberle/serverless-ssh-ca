@@ -15,8 +15,10 @@
 		"sourceMap": true,
 		"declarationMap": true,
 		"lib": ["es2024", "dom"],
-		"types": ["node"]
+		"types": ["node"],
+		"jsx": "react-jsx",
+		"jsxImportSource": "hono/jsx"
 	},
 	"exclude": ["tests", "dist"],
-	"include": ["src/**/*.ts"]
+	"include": ["src/**/*.ts", "src/**/*.tsx"]
 }
