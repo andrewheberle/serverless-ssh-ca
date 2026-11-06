@@ -121,3 +121,23 @@ export const certificatesLink = (kind: CertificateKind, query: CertificateListQu
 
 	return `${certificatesPath(kind)}?${params.toString()}`
 }
+
+/** The longest reason an admin may give for revoking a certificate */
+export const MaxRevocationReason = 500
+
+/**
+ * The form an admin revokes a certificate with. The reason is trimmed and
+ * must then be 1 to {@link MaxRevocationReason} characters, and the
+ * confirmation box must be ticked. Each message is shown to the admin as it
+ * is.
+ */
+export const RevokeForm = z.object({
+	reason: z.string({ message: "Give a reason for revoking the certificate." })
+		.trim()
+		.min(1, { message: "Give a reason for revoking the certificate." })
+		.max(MaxRevocationReason, { message: `The reason must be at most ${MaxRevocationReason} characters.` }),
+	confirm: z.literal("yes", { message: "Tick the box to confirm that the revocation cannot be undone." }),
+})
+
+/** A validated revoke form, see {@link RevokeForm} */
+export type RevokeForm = z.infer<typeof RevokeForm>

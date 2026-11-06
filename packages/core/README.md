@@ -547,8 +547,8 @@ cache.
 ### Admin UI
 
 The CA can serve an admin UI under `/admin`, on Workers and with
-`createSshCa`, where admins can see every certificate the CA has issued. It
-is not part of the OpenAPI schema.
+`createSshCa`, where admins can see every certificate the CA has issued and
+revoke any that are still valid. It is not part of the OpenAPI schema.
 
 #### Pages
 
@@ -556,7 +556,8 @@ is not part of the OpenAPI schema.
 |---|---|
 | `/admin` | Redirects to `/admin/user/certificates` |
 | `/admin/user/certificates`, `/admin/host/certificates` | The user or host certificates, newest first, 50 at a time |
-| `/admin/user/certificates/<serial>`, `/admin/host/certificates/<serial>` | Everything recorded about one certificate |
+| `/admin/user/certificates/<serial>`, `/admin/host/certificates/<serial>` | Everything recorded about one certificate, and a form to revoke it while it is valid |
+| `POST /admin/user/certificates/<serial>/revoke`, `POST /admin/host/certificates/<serial>/revoke` | Revokes the certificate, sent by the revoke form |
 
 The lists are filtered by query parameters, which the filter form on the
 page sets, so a filtered view can be bookmarked:
@@ -578,6 +579,33 @@ who requested it. For a revoked certificate it also shows when, by whom and
 why it was revoked. Values that were not recorded, such as the requester of a
 certificate issued before they were recorded, or the reason for a revocation
 by the key holder, are shown as "unknown".
+
+#### Revoking certificates
+
+The detail page of a valid certificate has a form to revoke it. The admin
+must give a reason, of 1 to 500 characters once surrounding whitespace is
+trimmed, and tick a box to confirm. A revoked certificate is added to the KRL
+for its type, just as when its key holder revokes it, and the detail page then
+shows when, by whom and why it was revoked. The admin's email is recorded
+exactly as the proxy's JWT gives it, and the revocation is logged at info
+level with the serial, type, email and reason.
+
+**Revocations are permanent.** Nobody can undo one, including an admin.
+Access is restored by issuing a new certificate.
+
+| Response | When |
+|---|---|
+| `303` to the detail page | The certificate was revoked |
+| `422` with the form again | The reason is missing, empty or too long, or the box was not ticked. Nothing is revoked |
+| `422` | The certificate has expired. Expired certificates are no longer trusted, so they are read-only and have no revoke form. A key holder can still revoke one through the API |
+| `409` | The certificate was already revoked |
+| `404` | There is no certificate of that type with the serial |
+
+Revocations are `POST` requests, so they must come from the admin UI itself
+and are rate limited, as described in the [security model](#security-model).
+Whether a certificate has expired or was already revoked is checked again as
+it is revoked, so concurrent revocations revoke it once, keeping the first,
+and a revocation cannot race with the certificate expiring.
 
 #### Security model
 
@@ -604,8 +632,10 @@ for why.
   share a key with the client API. The `rateLimitKey` option is not used for
   them. `GET` requests are not limited.
 - Every response has a strict `Content-Security-Policy`, `Cache-Control:
-  no-store`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options:
-  nosniff`. Pages are plain HTML without JavaScript.
+  no-store`, `Referrer-Policy: same-origin` and `X-Content-Type-Options:
+  nosniff`. Pages are plain HTML without JavaScript. Other sites are never
+  sent a referrer. `no-referrer` is not used because browsers then send
+  `Origin: null` on the admin UI's own forms, which would be refused.
 - Every request is logged at info level with the admin's email, the method,
   the path and the response status. The JWT is never logged.
 

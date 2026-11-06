@@ -333,6 +333,11 @@ export const revoke = async (c: AppContext, l: Logger, serial: bigint, publicKey
 		case "notFound":
 			l.warn("certificate not found")
 			throw new NotFoundException("certificate not found")
+		case "expired":
+			// only admins are refused because a certificate has expired, so
+			// this cannot happen for a key holder
+			l.error("revocation by a key holder was refused as the certificate has expired")
+			throw new InternalServerErrorException("internal server error")
 		default: {
 			const unknownResult: never = result
 			throw new Error(`unknown revocation result: ${String(unknownResult)}`)

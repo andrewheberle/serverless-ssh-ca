@@ -1,16 +1,17 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono"
 import { html } from "hono/html"
 import { HTTPException } from "hono/http-exception"
+import { bodyLimit } from "hono/body-limit"
 import { csrf } from "hono/csrf"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
 import type { JSX } from "hono/jsx/jsx-runtime"
 import { caConfig } from "../config.js"
-import { certificateStatus, getCertificate, listCertificates } from "../db/index.js"
+import { certificateStatus, getCertificate, listCertificates, revokeCertificate } from "../db/index.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { authenticateAdmin, type EnabledAdminConfig } from "./auth.js"
 import { CertificateDetailPage, CertificateListPage, ErrorPage, Stylesheet, StylesheetPath } from "./pages.js"
-import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeQueryError, SerialString, type CertificateKind } from "./query.js"
+import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeQueryError, RevokeForm, SerialString, type CertificateKind } from "./query.js"
 
 /** The path the admin UI is served under */
 export const AdminBasePath = "/admin"
@@ -22,7 +23,10 @@ export const AdminBasePath = "/admin"
 export const AdminSecurityHeaders: Readonly<Record<string, string>> = {
 	"Content-Security-Policy": "default-src 'none'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
 	"Cache-Control": "no-store",
-	"Referrer-Policy": "no-referrer",
+	// no other site is sent a referrer. no-referrer would also make browsers
+	// send "Origin: null" on the admin UI's own form posts, which the check
+	// against cross-site requests would then refuse
+	"Referrer-Policy": "same-origin",
 	"X-Content-Type-Options": "nosniff",
 }
 
@@ -63,6 +67,10 @@ const adminEmail = (c: Context<AdminEnv>): string => {
 
 	return email
 }
+
+// the largest request body accepted by the admin UI, which is far more than
+// the revoke form sends
+const MaxBodySize = 16 * 1024
 
 // renders a page as an HTML document
 const page = (c: Context<AdminEnv>, element: JSX.Element, status: ContentfulStatusCode = 200): Response | Promise<Response> => {
@@ -269,6 +277,66 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		}
 
 		return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={certificateStatus(certificate)} />)
+	})
+
+	// revokes a certificate. Revocations are permanent, so the reason and
+	// confirmation are required, and the cross-site and rate limiting
+	// middleware above apply as to every POST
+	app.post("/:kind/certificates/:serial/revoke", bodyLimit({ maxSize: MaxBodySize, onError: (c) => c.text("Payload Too Large", 413) }), async (c) => {
+		const kind = certificateKind(c.req.param("kind"))
+		if (kind === undefined) {
+			return c.notFound()
+		}
+
+		const email = adminEmail(c)
+		const serial = SerialString.safeParse(c.req.param("serial"))
+		const certificate = serial.success ? await getCertificate(env, serial.data, certificateType(kind)) : undefined
+		if (!serial.success || certificate === undefined) {
+			return page(c, <ErrorPage email={email} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
+		}
+
+		const alreadyRevoked = () => page(c, <ErrorPage email={email} title="Certificate already revoked" message="This certificate has already been revoked, so nothing was changed." />, 409)
+		const expired = () => page(c, <ErrorPage email={email} title="Certificate has expired" message="An expired certificate cannot be revoked, as it is no longer trusted. Nothing was changed." />, 422)
+
+		// the form is only offered for valid certificates, so explain why
+		// one that is not cannot be revoked before checking what was sent
+		const status = certificateStatus(certificate)
+		if (status === "revoked") {
+			return alreadyRevoked()
+		}
+		if (status === "expired") {
+			return expired()
+		}
+
+		const body = await c.req.parseBody()
+		const form = RevokeForm.safeParse(body)
+		if (!form.success) {
+			const reason = typeof body.reason === "string" ? body.reason : ""
+			return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={status} revokeForm={{ reason, errors: form.error.issues.map((i) => i.message) }} />, 422)
+		}
+
+		// the operation decides again, as the certificate may have been
+		// revoked or have expired since it was read
+		const result = await revokeCertificate(env, {
+			serial: serial.data,
+			certificateType: certificateType(kind),
+			revoker: { kind: "admin", email, reason: form.data.reason },
+		})
+
+		switch (result.kind) {
+			case "revoked":
+				return c.redirect(`${certificatesPath(kind)}/${certificate.serial}`, 303)
+			case "alreadyRevoked":
+				return alreadyRevoked()
+			case "expired":
+				return expired()
+			case "notFound":
+				return page(c, <ErrorPage email={email} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
+			default: {
+				const unknown: never = result
+				throw new Error(`unknown revocation result ${JSON.stringify(unknown)}`)
+			}
+		}
 	})
 
 	app.get(StylesheetPath.slice(AdminBasePath.length), (c) => {

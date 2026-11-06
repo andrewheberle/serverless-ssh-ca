@@ -1,7 +1,7 @@
 import type { FC, PropsWithChildren } from "hono/jsx"
 import type { CertificateDetails, CertificateStatus } from "../db/index.js"
 import { PublicKey } from "../ssh/keys.js"
-import { certificatesPath, type CertificateKind, type CertificateListQuery } from "./query.js"
+import { certificatesPath, MaxRevocationReason, type CertificateKind, type CertificateListQuery } from "./query.js"
 
 /** The path the admin UI's stylesheet is served at */
 export const StylesheetPath = "/admin/style.css"
@@ -370,6 +370,81 @@ ul.plain {
 	color: var(--text-subtle);
 	font-style: italic;
 }
+
+.revoke {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.revoke p {
+	color: var(--text-subtle);
+	font-size: 0.875rem;
+	margin: 0;
+}
+
+.revoke label {
+	color: var(--text-strong);
+	display: grid;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	gap: 0.375rem;
+}
+
+.revoke label.checkbox {
+	align-items: center;
+	display: flex;
+	font-weight: 400;
+	gap: 0.5rem;
+}
+
+textarea {
+	background: var(--control);
+	border: 0;
+	border-radius: 0.5rem;
+	box-shadow: 0 0 0 1px var(--line);
+	color: var(--text);
+	font: inherit;
+	font-size: 0.875rem;
+	min-height: 5rem;
+	padding: 0.5rem 0.75rem;
+	resize: vertical;
+	width: 100%;
+}
+
+textarea:focus {
+	box-shadow: 0 0 0 1.5px var(--focus);
+	outline: none;
+}
+
+textarea[aria-invalid="true"] {
+	box-shadow: 0 0 0 1.5px var(--danger);
+}
+
+input[type="checkbox"] {
+	accent-color: var(--danger);
+	box-shadow: none;
+	height: 1rem;
+	padding: 0;
+	width: 1rem;
+}
+
+.button.danger {
+	background: var(--danger);
+	box-shadow: none;
+	color: #fff;
+	justify-self: start;
+}
+
+.button.danger:hover {
+	background: color-mix(in oklch, var(--danger), black 10%);
+}
+
+.form-errors {
+	color: var(--danger);
+	font-size: 0.875rem;
+	margin: 0;
+	padding-left: 1.25rem;
+}
 `
 
 // shown for an audit value that was not recorded
@@ -570,14 +645,45 @@ export type CertificateDetailProps = {
 	kind: CertificateKind
 	certificate: CertificateDetails
 	status: CertificateStatus
+	/** The revoke form as it was sent, when it is shown again because it was not valid */
+	revokeForm?: { reason: string, errors: string[] } | undefined
+}
+
+/**
+ * The form an admin revokes a valid certificate with, which asks for a
+ * reason and a confirmation as a revocation cannot be undone. When it is
+ * shown again it keeps the reason that was entered and lists what was wrong.
+ */
+const RevokeSection: FC<{ kind: CertificateKind, serial: string, form: CertificateDetailProps["revokeForm"] }> = ({ kind, serial, form }) => {
+	const errors = form?.errors ?? []
+
+	return (
+		<section class="card">
+			<h3 class="section-title">Revoke this certificate</h3>
+			<form class="revoke" method="post" action={`${certificatesPath(kind)}/${serial}/revoke`}>
+				<p>Revoking is permanent and cannot be undone. The certificate is added to the {kind} KRL until it expires, and access is restored by issuing a new certificate.</p>
+				{errors.length > 0 && <ul class="form-errors" role="alert">{errors.map((e) => <li>{e}</li>)}</ul>}
+				<label>
+					Reason
+					<textarea name="reason" required maxlength={MaxRevocationReason} aria-invalid={errors.length > 0 ? "true" : undefined}>{form?.reason ?? ""}</textarea>
+				</label>
+				<label class="checkbox">
+					<input type="checkbox" name="confirm" value="yes" required />
+					I understand that this revocation cannot be undone
+				</label>
+				<button type="submit" class="button danger">Revoke certificate</button>
+			</form>
+		</section>
+	)
 }
 
 /**
  * Everything recorded about one certificate. The revocation details are only
  * shown for a revoked certificate, and audit values that were not recorded
- * are shown as "unknown".
+ * are shown as "unknown". A valid certificate has a form to revoke it, while
+ * revoked and expired certificates are read-only.
  */
-export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind, certificate, status }) => {
+export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind, certificate, status, revokeForm }) => {
 	const extensions = certificate.extensions === null || certificate.extensions === "" ? [] : certificate.extensions.split(",")
 	const keyFingerprint = fingerprint(certificate.public_key)
 
@@ -625,6 +731,7 @@ export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind,
 					</dl>
 				</section>
 			)}
+			{status === "valid" && <RevokeSection kind={kind} serial={certificate.serial} form={revokeForm} />}
 		</Layout>
 	)
 }
