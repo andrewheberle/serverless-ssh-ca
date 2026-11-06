@@ -491,3 +491,203 @@ export const getKrlVersion = async (env: SshCaBindings, certificateType: Certifi
 
 	throw new Error("unable to update KRL version due to concurrent updates")
 }
+
+/**
+ * The status of a recorded certificate. A certificate that is revoked is
+ * `revoked` even after it expires, an `expired` certificate is one that is
+ * not revoked and whose `valid_before` has passed, and a `valid` one is
+ * neither.
+ */
+export type CertificateStatus = "valid" | "expired" | "revoked"
+
+// a timestamp read from the database, see parseTimestamp
+const Timestamp = z.string().transform((v, ctx): Date => {
+	const date = parseTimestamp(v)
+	if (Number.isNaN(date.getTime())) {
+		ctx.issues.push({ code: "custom", message: "must be a timestamp", input: v })
+		return z.NEVER
+	}
+
+	return date
+})
+
+// a row of the certificates table as it is read back, which is validated as
+// it comes from storage
+const CertificateRow = z.object({
+	id: z.number().int(),
+	serial: z.string(),
+	key_id: z.string(),
+	principals: z.string(),
+	extensions: z.string().nullable(),
+	valid_after: Timestamp,
+	valid_before: Timestamp,
+	revoked_at: Timestamp.nullable(),
+	certificate_type: z.enum(CertificateType),
+	public_key: z.string().nullable(),
+	requested_by: z.string().nullable(),
+	revoked_by: z.string().nullable(),
+	revocation_reason: z.string().nullable(),
+})
+
+/** A recorded certificate as it is shown to an admin, see {@link listCertificates} and {@link getCertificate} */
+export type CertificateDetails = z.infer<typeof CertificateRow>
+
+// the columns of CertificateRow, in the order they are selected
+const CertificateRowColumns = Object.keys(CertificateRow.shape).join(", ")
+
+/**
+ * Returns the status of a recorded certificate, see {@link CertificateStatus}.
+ *
+ * @param certificate The certificate
+ * @param now The time to decide whether it has expired at
+ * @returns The certificate's status
+ */
+export const certificateStatus = (certificate: Pick<CertificateDetails, "revoked_at" | "valid_before">, now: Date = new Date()): CertificateStatus => {
+	if (certificate.revoked_at !== null) {
+		return "revoked"
+	}
+
+	return certificate.valid_before.getTime() <= now.getTime() ? "expired" : "valid"
+}
+
+/** The number of certificates on each page of {@link listCertificates} */
+export const CertificatePageSize = 50
+
+/**
+ * The certificates to list, see {@link listCertificates}. Filters that are
+ * not set do not limit the list.
+ */
+export type CertificateFilter = {
+	certificateType: CertificateType
+	/** Only certificates with this status, or every certificate for `all` */
+	status: CertificateStatus | "all"
+	/** Only certificates that have this principal, matched exactly and case-sensitively against each of their principals */
+	principal?: string | undefined
+	/** Only certificates whose key ID contains this, compared case-insensitively */
+	keyId?: string | undefined
+	/** Only the certificate with this serial */
+	serial?: bigint | undefined
+	/** Only certificates recorded before the one with this ID, for the next page */
+	before?: number | undefined
+}
+
+/** A page of certificates, see {@link listCertificates} */
+export type CertificatePage = {
+	certificates: CertificateDetails[]
+	/** The ID to list certificates before for the next page, or undefined if this is the last page */
+	next: number | undefined
+}
+
+// escapes the characters LIKE treats as patterns, and the escape character
+// itself, so a value is matched literally with ESCAPE '\'
+const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (c) => `\\${c}`)
+
+// the conditions on the status of a certificate, which compare valid_before
+// as KRL and cleanup queries do
+const statusCondition = (status: CertificateFilter["status"]): string | undefined => {
+	switch (status) {
+		case "all":
+			return undefined
+		case "revoked":
+			return "revoked_at IS NOT NULL"
+		case "expired":
+			return "revoked_at IS NULL AND unixepoch('subsec') >= unixepoch(valid_before,'subsec')"
+		case "valid":
+			return "revoked_at IS NULL AND unixepoch('subsec') < unixepoch(valid_before,'subsec')"
+		default: {
+			const unknown: never = status
+			throw new Error(`unknown certificate status ${String(unknown)}`)
+		}
+	}
+}
+
+/**
+ * Lists recorded certificates of one type, newest first, a page of
+ * {@link CertificatePageSize} at a time. Pages are found by the ID of the
+ * last certificate on the previous page rather than by number, so pages
+ * neither skip nor repeat certificates while others are being recorded.
+ *
+ * @param env The CA bindings
+ * @param filter Which certificates to list, see {@link CertificateFilter}
+ * @returns A page of certificates, see {@link CertificatePage}
+ */
+export const listCertificates = async (env: StoreBindings, filter: CertificateFilter): Promise<CertificatePage> => {
+	// ensure migrations have been applied
+	await connect(env)
+
+	const conditions: string[] = ["certificate_type = ?"]
+	const params: unknown[] = [filter.certificateType]
+
+	const status = statusCondition(filter.status)
+	if (status !== undefined) {
+		conditions.push(status)
+	}
+
+	if (filter.principal !== undefined) {
+		// principals are recorded as one comma separated string of
+		// distinguished names, and cannot contain a comma themselves, so a
+		// whole entry is matched by looking for it between commas. instr is
+		// used rather than LIKE as it is case-sensitive
+		const prefix = filter.certificateType === CertificateType.Host ? "CN" : "UID"
+		conditions.push("instr(',' || principals || ',', ?) > 0")
+		params.push(`,${prefix}=${filter.principal},`)
+	}
+
+	if (filter.keyId !== undefined) {
+		conditions.push("lower(key_id) LIKE lower(?) ESCAPE '\\'")
+		params.push(`%${escapeLike(filter.keyId)}%`)
+	}
+
+	if (filter.serial !== undefined) {
+		conditions.push("serial = ?")
+		params.push(`${filter.serial}`)
+	}
+
+	if (filter.before !== undefined) {
+		conditions.push("id < ?")
+		params.push(filter.before)
+	}
+
+	// one more than a page is read, to know whether there is a next page
+	params.push(CertificatePageSize + 1)
+	const res = await env.DB.prepare(`SELECT ${CertificateRowColumns} FROM certificates WHERE ${conditions.join(" AND ")} ORDER BY id DESC LIMIT ?`)
+		.bind(...params)
+		.all()
+
+	if (!res.success) {
+		throw new Error("error during query")
+	}
+
+	const rows = z.array(CertificateRow).parse(res.results)
+	const certificates = rows.slice(0, CertificatePageSize)
+
+	return {
+		certificates,
+		next: rows.length > CertificatePageSize ? certificates.at(-1)?.id : undefined,
+	}
+}
+
+/**
+ * Returns a recorded certificate by its serial and type.
+ *
+ * @param env The CA bindings
+ * @param serial The serial of the certificate
+ * @param certificateType The type of the certificate
+ * @returns The certificate, or undefined if no certificate of that type has the serial
+ */
+export const getCertificate = async (env: StoreBindings, serial: bigint, certificateType: CertificateType): Promise<CertificateDetails | undefined> => {
+	// ensure migrations have been applied
+	await connect(env)
+
+	const res = await env.DB.prepare(`SELECT ${CertificateRowColumns} FROM certificates WHERE serial = ? AND certificate_type = ?`)
+		.bind(`${serial}`, certificateType)
+		.all()
+
+	if (!res.success) {
+		throw new Error("error during query")
+	}
+
+	const [row] = z.array(CertificateRow).max(1).parse(res.results)
+
+	return row
+}

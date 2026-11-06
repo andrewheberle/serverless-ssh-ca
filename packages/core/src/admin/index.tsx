@@ -2,11 +2,15 @@ import { Hono, type Context, type MiddlewareHandler } from "hono"
 import { html } from "hono/html"
 import { HTTPException } from "hono/http-exception"
 import { csrf } from "hono/csrf"
+import type { ContentfulStatusCode } from "hono/utils/http-status"
+import type { JSX } from "hono/jsx/jsx-runtime"
 import { caConfig } from "../config.js"
+import { certificateStatus, getCertificate, listCertificates } from "../db/index.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { authenticateAdmin, type EnabledAdminConfig } from "./auth.js"
-import { SignedInPage, Stylesheet, StylesheetPath } from "./pages.js"
+import { CertificateDetailPage, CertificateListPage, ErrorPage, Stylesheet, StylesheetPath } from "./pages.js"
+import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, SerialString, type CertificateKind } from "./query.js"
 
 /** The path the admin UI is served under */
 export const AdminBasePath = "/admin"
@@ -44,6 +48,26 @@ const reportedPartial = new WeakSet<SshCaBindings>()
 const expectedOrigin = (config: EnabledAdminConfig, c: Context): string => config.hostname !== undefined
 	? `https://${config.hostname}`
 	: new URL(c.req.url).origin
+
+// the kind of certificate named in a path, if it names one
+const certificateKind = (kind: string): CertificateKind | undefined => CertificateKinds.find((k) => k === kind)
+
+// the email of the admin making a request
+const adminEmail = (c: Context<AdminEnv>): string => {
+	const email = c.get("email")
+	if (email === undefined) {
+		// the authentication middleware only lets admins through, and
+		// always sets their email
+		throw new Error("no admin email for an authenticated request")
+	}
+
+	return email
+}
+
+// renders a page as an HTML document
+const page = (c: Context<AdminEnv>, element: JSX.Element, status: ContentfulStatusCode = 200): Response | Promise<Response> => {
+	return c.html(html`<!DOCTYPE html>${element}`, status)
+}
 
 // sets the security headers on every response, see AdminSecurityHeaders
 const securityHeaders: MiddlewareHandler<AdminEnv> = async (c, next) => {
@@ -198,15 +222,53 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		return await next()
 	})
 
-	app.get("/", (c) => {
-		const email = c.get("email")
-		if (email === undefined) {
-			// the authentication middleware only lets admins through, and
-			// always sets their email
-			throw new Error("no admin email for an authenticated request")
+	app.get("/", (c) => c.redirect(certificatesPath("user")))
+
+	app.get("/:kind/certificates", async (c) => {
+		const kind = certificateKind(c.req.param("kind"))
+		if (kind === undefined) {
+			return c.notFound()
 		}
 
-		return c.html(html`<!DOCTYPE html>${<SignedInPage email={email} />}`)
+		const email = adminEmail(c)
+		const query = CertificateListQuery.safeParse(c.req.query())
+		if (!query.success) {
+			return page(c, <ErrorPage email={email} title="Invalid filters" message={`The filters are not valid: ${query.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join(", ")}.`} />, 400)
+		}
+
+		const { certificates, next } = await listCertificates(env, {
+			certificateType: certificateType(kind),
+			status: query.data.status,
+			principal: query.data.principal,
+			keyId: query.data.key_id,
+			serial: query.data.serial,
+			before: query.data.before,
+		})
+		const now = new Date()
+
+		return page(c, <CertificateListPage
+			email={email}
+			kind={kind}
+			query={query.data}
+			certificates={certificates.map((certificate) => ({ ...certificate, status: certificateStatus(certificate, now) }))}
+			nextPage={next === undefined ? undefined : certificatesLink(kind, { ...query.data, before: next })}
+		/>)
+	})
+
+	app.get("/:kind/certificates/:serial", async (c) => {
+		const kind = certificateKind(c.req.param("kind"))
+		if (kind === undefined) {
+			return c.notFound()
+		}
+
+		const email = adminEmail(c)
+		const serial = SerialString.safeParse(c.req.param("serial"))
+		const certificate = serial.success ? await getCertificate(env, serial.data, certificateType(kind)) : undefined
+		if (certificate === undefined) {
+			return page(c, <ErrorPage email={email} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
+		}
+
+		return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={certificateStatus(certificate)} />)
 	})
 
 	app.get(StylesheetPath.slice(AdminBasePath.length), (c) => {

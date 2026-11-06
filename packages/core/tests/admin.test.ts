@@ -1,7 +1,8 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { DatabaseSync } from "node:sqlite"
 import ca, { cloudflareClientIp, createSshCa, InvalidConfigurationError, type CaRateLimiter, type SshCa, type SshCaBindings } from "../src/index.js"
 import { AdminSecurityHeaders } from "../src/admin/index.js"
-import { bindingsFromEnv, secretFromString } from "../src/node/index.js"
+import { bindingsFromEnv, fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { makeEnv } from "./env.js"
 import { createProxy, type Proxy } from "./helpers/proxy.js"
 import { MockSecretStore } from "./helpers/secret.js"
@@ -38,6 +39,7 @@ const adminSettings = (): Partial<SshCaBindings> => ({
 })
 
 const adminEnv = (overrides: Partial<SshCaBindings> = {}): SshCaBindings => makeEnv({
+	DB: fromNodeSqlite(new DatabaseSync(":memory:")),
 	PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey),
 	...adminSettings(),
 	...overrides,
@@ -211,7 +213,7 @@ describe("admin configuration", () => {
 		})
 
 		const response = await createSshCa(env).fetch(await request("/admin", { jwt: await proxy.sign({ email: AdminEmail }, { key: "es256" }) }))
-		expect(response.status).toBe(200)
+		expect(response.status).toBe(302)
 	})
 
 	it("should treat empty admin variables in bindingsFromEnv as not set", () => {
@@ -236,8 +238,16 @@ describe("admin configuration", () => {
 })
 
 describe("admin UI", () => {
-	it("should show who is signed in, with their email exactly as the proxy gives it", async () => {
+	it("should redirect to the user certificates", async () => {
 		const response = await adminCa().fetch(await request("/admin"))
+
+		expect(response.status).toBe(302)
+		expect(response.headers.get("Location")).toBe("/admin/user/certificates")
+		expectSecurityHeaders(response)
+	})
+
+	it("should show who is signed in, with their email exactly as the proxy gives it", async () => {
+		const response = await adminCa().fetch(await request("/admin/user/certificates"))
 
 		expect(response.status).toBe(200)
 		expect(response.headers.get("Content-Type")).toMatch(/^text\/html/)
@@ -249,7 +259,7 @@ describe("admin UI", () => {
 
 	it("should escape the email on the page", async () => {
 		const jwt = await proxy.sign({ email: "<script>alert(1)</script>@example.com", groups: [AdminRole] })
-		const body = await (await adminCa().fetch(await request("/admin", { jwt }))).text()
+		const body = await (await adminCa().fetch(await request("/admin/user/certificates", { jwt }))).text()
 
 		expect(body).not.toContain("<script>")
 		expect(body).toContain("&lt;script&gt;alert(1)&lt;/script&gt;@example.com")
@@ -268,7 +278,7 @@ describe("admin UI", () => {
 
 	it("should be served by the Workers default export", async () => {
 		const response = await ca.fetch(await request("/admin"), adminEnv(), executionContext)
-		expect(response.status).toBe(200)
+		expect(response.status).toBe(302)
 	})
 
 	it("should not answer paths that only start with /admin", async () => {
@@ -279,7 +289,7 @@ describe("admin UI", () => {
 describe("admin hostname", () => {
 	it("should answer on the configured host name, compared case-insensitively", async () => {
 		const response = await adminCa({ ADMIN_HOSTNAME: "SSH-CA.example.com" }).fetch(await request("/admin"))
-		expect(response.status).toBe(200)
+		expect(response.status).toBe(302)
 	})
 
 	it("should answer every other host name with 404", async () => {
@@ -318,13 +328,13 @@ describe("admin authentication", () => {
 	it("should accept the algorithms configured", async () => {
 		const ca = adminCa({ ADMIN_JWT_ALGORITHMS: "ES256" })
 
-		expect((await ca.fetch(await request("/admin", { jwt: await proxy.sign({ email: AdminEmail }, { key: "es256" }) }))).status).toBe(200)
+		expect((await ca.fetch(await request("/admin", { jwt: await proxy.sign({ email: AdminEmail }, { key: "es256" }) }))).status).toBe(302)
 		expect((await ca.fetch(await request("/admin", { jwt: await proxy.sign({ email: AdminEmail }) }))).status).toBe(401)
 	})
 
 	it("should accept any of several audiences", async () => {
 		const ca = adminCa({ ADMIN_JWT_AUD: ["first-aud", proxy.audience] })
-		expect((await ca.fetch(await request("/admin"))).status).toBe(200)
+		expect((await ca.fetch(await request("/admin"))).status).toBe(302)
 	})
 
 	const forbidden: [string, Partial<SshCaBindings>, Record<string, unknown>][] = [
@@ -358,7 +368,7 @@ describe("admin authentication", () => {
 	it.each(admins)("should accept %s", async (_name, overrides, claims) => {
 		const response = await adminCa(overrides).fetch(await request("/admin", { jwt: await proxy.sign(claims) }))
 
-		expect(response.status).toBe(200)
+		expect(response.status).toBe(302)
 	})
 
 	it.each([
@@ -417,7 +427,7 @@ describe("admin cross-site requests", () => {
 
 	it("should not check GET requests", async () => {
 		const response = await adminCa().fetch(await request("/admin", { headers: { "Origin": "https://evil.example.com", "Sec-Fetch-Site": "cross-site" } }))
-		expect(response.status).toBe(200)
+		expect(response.status).toBe(302)
 	})
 })
 
@@ -450,7 +460,7 @@ describe("admin rate limiting", () => {
 	it("should not limit GETs", async () => {
 		const limiter = fakeLimiter(false)
 
-		expect((await limitedCa(limiter).fetch(await request("/admin"))).status).toBe(200)
+		expect((await limitedCa(limiter).fetch(await request("/admin"))).status).toBe(302)
 		expect(limiter.keys).toEqual([])
 	})
 
@@ -472,7 +482,7 @@ describe("admin logging", () => {
 		await ca.fetch(await request("/admin?serial=1234&status=valid"))
 		await ca.fetch(await request("/admin/style.css"))
 
-		expect(log).toHaveBeenCalledWith(expect.objectContaining({ level: "info", email: AdminEmail, method: "GET", path: "/admin?serial=1234&status=valid", status: 200 }))
+		expect(log).toHaveBeenCalledWith(expect.objectContaining({ level: "info", email: AdminEmail, method: "GET", path: "/admin?serial=1234&status=valid", status: 302 }))
 		expect(log).toHaveBeenCalledWith(expect.objectContaining({ level: "info", email: AdminEmail, method: "GET", path: "/admin/style.css", status: 200 }))
 	})
 

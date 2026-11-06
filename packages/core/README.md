@@ -547,9 +547,37 @@ cache.
 ### Admin UI
 
 The CA can serve an admin UI under `/admin`, on Workers and with
-`createSshCa`. At the moment it only shows who is signed in, which proves the
-identity-aware proxy in front of it is set up correctly. It is not part of the
-OpenAPI schema.
+`createSshCa`, where admins can see every certificate the CA has issued. It
+is not part of the OpenAPI schema.
+
+#### Pages
+
+| Path | Page |
+|---|---|
+| `/admin` | Redirects to `/admin/user/certificates` |
+| `/admin/user/certificates`, `/admin/host/certificates` | The user or host certificates, newest first, 50 at a time |
+| `/admin/user/certificates/<serial>`, `/admin/host/certificates/<serial>` | Everything recorded about one certificate |
+
+The lists are filtered by query parameters, which the filter form on the
+page sets, so a filtered view can be bookmarked:
+
+| Parameter | Filter |
+|---|---|
+| `status` | `valid` (the default), `expired`, `revoked` or `all`. A revoked certificate is `revoked` even once it has expired, and `expired` only lists certificates that were not revoked |
+| `principal` | Certificates with this principal, matched exactly and case-sensitively against each principal, so `root` does not find `rootless` |
+| `key_id` | Certificates whose key ID contains this, case-insensitively, so `alice` finds `alice@example.com`. `%` and `_` are matched literally |
+| `serial` | The certificate with this serial, in decimal |
+| `before` | Set by the "Next page" link, which keeps the other filters. Pages follow on from the last certificate shown, so they neither skip nor repeat certificates issued while paging |
+
+An invalid parameter gets a `400` page. A serial that does not exist, or is
+for the other certificate type, gets a `404` page.
+
+The detail page shows the serial, type, key ID, principals, extensions,
+validity, status, the SHA256 fingerprint of the certificate's public key and
+who requested it. For a revoked certificate it also shows when, by whom and
+why it was revoked. Values that were not recorded, such as the requester of a
+certificate issued before they were recorded, or the reason for a revocation
+by the key holder, are shown as "unknown".
 
 #### Security model
 
