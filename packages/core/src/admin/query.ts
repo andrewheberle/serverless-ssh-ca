@@ -63,12 +63,34 @@ const Filter = <T extends z.ZodType>(schema: T) => z.preprocess(
  * Parameters it does not name are ignored.
  */
 export const CertificateListQuery = z.object({
-	status: z.preprocess((v) => v === "" ? undefined : v, z.enum(["valid", "expired", "revoked", "all"]).default("valid")),
+	status: z.preprocess((v) => v === "" ? undefined : v, z.enum(["valid", "expired", "revoked", "all"], { message: "must be Valid, Expired, Revoked or All" }).default("valid")),
 	// principals cannot contain a comma, which separates them where they are recorded
-	principal: Filter(z.string().max(256).refine((v) => !v.includes(","), { message: "must not contain a comma" })),
-	key_id: Filter(z.string().max(256)),
+	principal: Filter(z.string().max(256, { message: "must be at most 256 characters" }).refine((v) => !v.includes(","), { message: "must be a single principal, without a comma" })),
+	key_id: Filter(z.string().max(256, { message: "must be at most 256 characters" })),
 	serial: Filter(SerialString),
-	before: Filter(z.string().regex(/^[1-9]\d{0,14}$/, { message: "must be a certificate ID" }).transform(Number)),
+	before: Filter(z.string().regex(/^[1-9]\d{0,14}$/, { message: "is not a page of this list, so start again from the first page" }).transform(Number)),
+})
+
+// the names of the query parameters, as the filter form labels them
+const QueryLabels: Record<string, string> = {
+	status: "Status",
+	principal: "Principal",
+	key_id: "Key ID",
+	serial: "Serial",
+	before: "The page",
+}
+
+/**
+ * Describes why the query parameters of a list of certificates are not
+ * valid, one sentence per problem, naming each parameter as the filter form
+ * labels it.
+ *
+ * @param error The error from parsing {@link CertificateListQuery}
+ * @returns The problems, such as "Status must be Valid, Expired, Revoked or All."
+ */
+export const describeQueryError = (error: z.ZodError): string[] => error.issues.map((issue) => {
+	const name = typeof issue.path[0] === "string" ? QueryLabels[issue.path[0]] : undefined
+	return `${name ?? "A filter"} ${issue.message}.`
 })
 
 /** The validated query parameters of a list of certificates, see {@link CertificateListQuery} */

@@ -99,7 +99,7 @@ const get = async (ca: SshCa, path: string): Promise<Response> => await ca.fetch
 const listedSerials = (body: string): string[] => [...body.matchAll(/<a href="\/admin\/(?:user|host)\/certificates\/(\d+)">/g)].map((m) => m[1] ?? "")
 
 // the link to the next page of a list page, if it has one
-const nextPage = (body: string): string | undefined => /<a href="([^"]+)" rel="next">/.exec(body)?.[1]?.replaceAll("&amp;", "&")
+const nextPage = (body: string): string | undefined => /<a class="button" href="([^"]+)" rel="next">/.exec(body)?.[1]?.replaceAll("&amp;", "&")
 
 const list = async (ca: SshCa, path: string): Promise<{ response: Response, body: string, serials: string[] }> => {
 	const response = await get(ca, path)
@@ -153,8 +153,8 @@ describe("certificate list", () => {
 		seed({ expiresIn: -1, revoked: { by: "key-holder", reason: null } })
 
 		const { body } = await list(ca, "/admin/user/certificates?status=all")
-		expect(body).toContain("<td>revoked</td>")
-		expect(body).not.toContain("<td>expired</td>")
+		expect(body).toContain(`<td><span class="badge revoked">Revoked</span></td>`)
+		expect(body).not.toContain(`class="badge expired"`)
 	})
 
 	it("should match a principal exactly", async () => {
@@ -265,7 +265,7 @@ describe("certificate list", () => {
 		const { ca } = await setup()
 
 		const { body } = await list(ca, "/admin/user/certificates?status=expired&principal=alice&key_id=example&serial=42")
-		expect(body).toContain(`<form class="filters" method="get" action="/admin/user/certificates">`)
+		expect(body).toContain(`<form class="filters card" method="get" action="/admin/user/certificates">`)
 		expect(body).toContain(`<option value="expired" selected="">Expired</option>`)
 		expect(body).toContain(`name="principal" value="alice"`)
 		expect(body).toContain(`name="key_id" value="example"`)
@@ -344,6 +344,23 @@ describe("certificate list", () => {
 		}
 	})
 
+	it("should describe each invalid filter as the form labels it", async () => {
+		const { ca } = await setup()
+
+		const body = await (await get(ca, "/admin/user/certificates?status=current&serial=abc&principal=a%2Cb")).text()
+		expect(body).toContain("<li>Status must be Valid, Expired, Revoked or All.</li>")
+		expect(body).toContain("<li>Principal must be a single principal, without a comma.</li>")
+		expect(body).toContain("<li>Serial must be a serial number in decimal.</li>")
+	})
+
+	it("should show times in UTC to the minute, with the exact time in the datetime attribute", async () => {
+		const { ca, seed } = await setup()
+		seed({})
+
+		const { body } = await list(ca, "/admin/user/certificates")
+		expect(body).toMatch(/<td><time datetime="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC<\/time><\/td>/)
+	})
+
 	it("should accept the largest serial", () => {
 		expect(CertificateListQuery.parse({ serial: "18446744073709551615" }).serial).toBe(18446744073709551615n)
 	})
@@ -387,14 +404,14 @@ describe("certificate detail", () => {
 		expect(response.status).toBe(200)
 		const body = await response.text()
 
-		expect(body).toContain(`<dt>Serial</dt><dd>${serial}</dd>`)
+		expect(body).toContain(`<dt>Serial</dt><dd class="mono">${serial}</dd>`)
 		expect(body).toContain("<dt>Certificate type</dt><dd>user</dd>")
 		expect(body).toContain("<dt>Key ID</dt><dd>alice@example.com</dd>")
 		expect(body).toContain(`<dt>Principals</dt><dd><ul class="plain"><li>alice</li><li>admins</li></ul></dd>`)
 		expect(body).toContain(`<dt>Extensions</dt><dd><ul class="plain"><li>permit-pty</li><li>permit-agent-forwarding</li></ul></dd>`)
-		expect(body).toMatch(/<dt>Valid from<\/dt><dd>\d{4}-\d{2}-\d{2}T[\d:.]+Z<\/dd>/)
-		expect(body).toMatch(/<dt>Valid until<\/dt><dd>\d{4}-\d{2}-\d{2}T[\d:.]+Z<\/dd>/)
-		expect(body).toContain("<dt>Status</dt><dd>valid</dd>")
+		expect(body).toMatch(/<dt>Valid from<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
+		expect(body).toMatch(/<dt>Valid until<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
+		expect(body).toContain(`<dt>Status</dt><dd><span class="badge valid">Valid</span></dd>`)
 		expect(body).toContain(`<dt>Public key fingerprint</dt><dd><code>${PublicKey.parse(ecdsaKey.user().publicKey).fingerprint()}</code></dd>`)
 		expect(body).toContain("<dt>Requested by</dt><dd>alice@example.com</dd>")
 		// the revocation fields are only shown for a revoked certificate
@@ -417,8 +434,8 @@ describe("certificate detail", () => {
 		const [serial] = seed({ revoked: { by: AdminEmail, reason: "key was lost" } })
 
 		const body = await (await get(ca, `/admin/user/certificates/${serial}`)).text()
-		expect(body).toContain("<dt>Status</dt><dd>revoked</dd>")
-		expect(body).toMatch(/<dt>Revoked at<\/dt><dd>\d{4}-\d{2}-\d{2}T[\d:.]+Z<\/dd>/)
+		expect(body).toContain(`<dt>Status</dt><dd><span class="badge revoked">Revoked</span></dd>`)
+		expect(body).toMatch(/<dt>Revoked at<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
 		expect(body).toContain(`<dt>Revoked by</dt><dd>${AdminEmail}</dd>`)
 		expect(body).toContain("<dt>Revocation reason</dt><dd>key was lost</dd>")
 	})
@@ -428,10 +445,10 @@ describe("certificate detail", () => {
 		const [serial] = seed({ requestedBy: null, publicKey: null, extensions: null, revoked: { by: null, reason: null } })
 
 		const body = await (await get(ca, `/admin/user/certificates/${serial}`)).text()
-		expect(body).toContain("<dt>Requested by</dt><dd>unknown</dd>")
-		expect(body).toContain("<dt>Revoked by</dt><dd>unknown</dd>")
-		expect(body).toContain("<dt>Revocation reason</dt><dd>unknown</dd>")
-		expect(body).toContain("<dt>Public key fingerprint</dt><dd><code>unknown</code></dd>")
+		expect(body).toContain(`<dt>Requested by</dt><dd><span class="unknown">unknown</span></dd>`)
+		expect(body).toContain(`<dt>Revoked by</dt><dd><span class="unknown">unknown</span></dd>`)
+		expect(body).toContain(`<dt>Revocation reason</dt><dd><span class="unknown">unknown</span></dd>`)
+		expect(body).toContain(`<dt>Public key fingerprint</dt><dd><span class="unknown">unknown</span></dd>`)
 		expect(body).toContain("<dt>Extensions</dt><dd>none</dd>")
 	})
 
@@ -440,7 +457,7 @@ describe("certificate detail", () => {
 		const [serial] = seed({ expiresIn: -1 })
 
 		const body = await (await get(ca, `/admin/user/certificates/${serial}`)).text()
-		expect(body).toContain("<dt>Status</dt><dd>expired</dd>")
+		expect(body).toContain(`<dt>Status</dt><dd><span class="badge expired">Expired</span></dd>`)
 	})
 
 	it.each([

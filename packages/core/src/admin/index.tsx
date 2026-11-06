@@ -10,7 +10,7 @@ import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { authenticateAdmin, type EnabledAdminConfig } from "./auth.js"
 import { CertificateDetailPage, CertificateListPage, ErrorPage, Stylesheet, StylesheetPath } from "./pages.js"
-import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, SerialString, type CertificateKind } from "./query.js"
+import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeQueryError, SerialString, type CertificateKind } from "./query.js"
 
 /** The path the admin UI is served under */
 export const AdminBasePath = "/admin"
@@ -233,7 +233,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		const email = adminEmail(c)
 		const query = CertificateListQuery.safeParse(c.req.query())
 		if (!query.success) {
-			return page(c, <ErrorPage email={email} title="Invalid filters" message={`The filters are not valid: ${query.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join(", ")}.`} />, 400)
+			return page(c, <ErrorPage email={email} title="Invalid filters" message="The list could not be shown because of these filters:" problems={describeQueryError(query.error)} />, 400)
 		}
 
 		const { certificates, next } = await listCertificates(env, {
