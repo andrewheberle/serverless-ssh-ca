@@ -265,20 +265,24 @@ export const getRevocationList = async (env: SshCaBindings, certificateType: Cer
  * Who is revoking a certificate, which decides whether they may.
  *
  * - `keyHolder`: the holder of the private key for `publicKey`, who has proven possession of it, may revoke a certificate issued for that key
+ * - `admin`: an admin, identified by `email` exactly as the identity-aware proxy's JWT gives it, may revoke any certificate that has not expired, and must give a `reason`
  */
 export type Revoker =
 	| { kind: "keyHolder", publicKey: PublicKey }
+	| { kind: "admin", email: string, reason: string }
 
 /**
  * The result of revoking a certificate.
  *
  * - `revoked`: the certificate was revoked at `revokedAt`, an ISO 8601 string
  * - `alreadyRevoked`: the certificate was already revoked, including by another request while this one was revoking it
+ * - `expired`: the certificate has expired, so an admin may not revoke it. Key holders are never refused because a certificate has expired
  * - `notFound`: there is no certificate of the type that the revoker may revoke
  */
 export type RevocationResult =
 	| { kind: "revoked", revokedAt: string }
 	| { kind: "alreadyRevoked" }
+	| { kind: "expired" }
 	| { kind: "notFound" }
 
 /** A certificate to revoke, and who is revoking it, see {@link Revoker} */
@@ -288,28 +292,71 @@ export type Revocation = {
 	revoker: Revoker
 }
 
-// what is recorded in revoked_by for a revoker
-const revokedBy = (revoker: Revoker): string => {
+// what is recorded in revoked_by and revocation_reason for a revoker. A key
+// holder gives no reason, as the API does not ask for one
+const revokedBy = (revoker: Revoker): { by: string, reason: string | null } => {
 	switch (revoker.kind) {
 		case "keyHolder":
-			return KeyHolderRevoker
+			return { by: KeyHolderRevoker, reason: null }
+		case "admin":
+			return { by: revoker.email, reason: revoker.reason }
 		default: {
-			const unknown: never = revoker.kind
-			throw new Error(`unknown revoker ${String(unknown)}`)
+			const unknown: never = revoker
+			throw new Error(`unknown revoker ${JSON.stringify(unknown)}`)
 		}
 	}
 }
 
-// whether a revoker may revoke a certificate issued for a recorded public key
-const mayRevoke = (revoker: Revoker, recordedKey: string): boolean => {
+// whether a revoker may revoke a certificate issued for a recorded public key,
+// which may not have been recorded for certificates issued by old versions
+const mayRevoke = (revoker: Revoker, recordedKey: string | null): boolean => {
 	switch (revoker.kind) {
 		case "keyHolder":
-			return isKey(recordedKey, revoker.publicKey)
+			return recordedKey !== null && isKey(recordedKey, revoker.publicKey)
+		case "admin":
+			return true
 		default: {
-			const unknown: never = revoker.kind
-			throw new Error(`unknown revoker ${String(unknown)}`)
+			const unknown: never = revoker
+			throw new Error(`unknown revoker ${JSON.stringify(unknown)}`)
 		}
 	}
+}
+
+// whether a revoker is refused once a certificate has expired, which only
+// admins are, as revoking an expired certificate only adds it to the KRL
+const refusedWhenExpired = (revoker: Revoker): boolean => {
+	switch (revoker.kind) {
+		case "keyHolder":
+			return false
+		case "admin":
+			return true
+		default: {
+			const unknown: never = revoker
+			throw new Error(`unknown revoker ${JSON.stringify(unknown)}`)
+		}
+	}
+}
+
+// the state of a recorded certificate that decides whether it may be revoked,
+// with whether it has expired compared in SQLite as other queries do
+const RevocationStateRow = z.object({
+	public_key: z.string().nullable(),
+	revoked_at: z.string().nullable(),
+	expired: z.union([z.literal(0), z.literal(1)]).transform((v) => v === 1),
+})
+
+const readRevocationState = async (env: StoreBindings, serial: bigint, certificateType: CertificateType): Promise<z.infer<typeof RevocationStateRow> | undefined> => {
+	const res = await env.DB.prepare("SELECT public_key, revoked_at, unixepoch('subsec') >= unixepoch(valid_before,'subsec') AS expired FROM certificates WHERE serial = ? AND certificate_type = ?")
+		.bind(`${serial}`, certificateType)
+		.all()
+
+	if (!res.success) {
+		throw new Error("error during query")
+	}
+
+	const [row] = z.array(RevocationStateRow).max(1).parse(res.results)
+
+	return row
 }
 
 /**
@@ -321,7 +368,9 @@ const mayRevoke = (revoker: Revoker, recordedKey: string): boolean => {
  * holder's key is compared by fingerprint, so a key with a different comment
  * to the one the certificate was issued for still matches, and a certificate
  * issued for another key is reported as not found so that revocations cannot
- * be used to discover which serials exist.
+ * be used to discover which serials exist. An admin may revoke any
+ * certificate, but not once it has expired, which is checked again as it is
+ * revoked so a revocation cannot race with expiry.
  *
  * A certificate is only revoked once, so when several requests revoke the
  * same certificate concurrently one of them revokes it and the time it was
@@ -335,35 +384,34 @@ const mayRevoke = (revoker: Revoker, recordedKey: string): boolean => {
  */
 export const revokeCertificate = async (env: SshCaBindings, revocation: Revocation): Promise<RevocationResult> => {
 	const { serial, certificateType, revoker } = revocation
+	const checkExpiry = refusedWhenExpired(revoker)
 
-	const qb = await connect(env)
-	const res = await qb.fetchOne({
-		tableName: "certificates",
-		fields: ["public_key", "revoked_at"],
-		where: {
-			conditions: "serial = ? AND certificate_type = ?",
-			params: [`${serial}`, certificateType]
-		}
-	}).execute()
+	// ensure migrations have been applied
+	await connect(env)
 
-	const recordedKey = res.results?.public_key
-	if (recordedKey == null || !mayRevoke(revoker, recordedKey)) {
+	const state = await readRevocationState(env, serial, certificateType)
+	if (state === undefined || !mayRevoke(revoker, state.public_key)) {
 		return { kind: "notFound" }
 	}
 
-	if (res.results?.revoked_at != null) {
+	if (state.revoked_at !== null) {
 		return { kind: "alreadyRevoked" }
 	}
 
+	if (checkExpiry && state.expired) {
+		return { kind: "expired" }
+	}
+
 	const revokedAt = (new Date).toISOString()
-	const by = revokedBy(revoker)
+	const { by, reason } = revokedBy(revoker)
 
 	// only the certificate the decision was made for is revoked, and only if
-	// another request has not revoked it since it was read. No reason is
-	// recorded, as the API does not ask for one
+	// another request has not revoked it since it was read, nor (for an
+	// admin) has it expired since
+	const expiry = checkExpiry ? " AND unixepoch('subsec') < unixepoch(valid_before,'subsec')" : ""
 	const results = await env.DB.batch([
-		env.DB.prepare("UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = NULL WHERE serial = ? AND certificate_type = ? AND public_key = ? AND revoked_at IS NULL")
-			.bind(revokedAt, by, `${serial}`, certificateType, recordedKey),
+		env.DB.prepare(`UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ? WHERE serial = ? AND certificate_type = ? AND public_key IS ? AND revoked_at IS NULL${expiry}`)
+			.bind(revokedAt, by, reason, `${serial}`, certificateType, state.public_key),
 		env.DB.prepare(BumpRevisionIfChanged).bind(certificateType),
 	])
 
@@ -372,10 +420,14 @@ export const revokeCertificate = async (env: SshCaBindings, revocation: Revocati
 	}
 
 	if (results[0]?.meta?.changes !== 1) {
-		return { kind: "alreadyRevoked" }
+		// another request revoked it first, or it expired in the meantime
+		const now = await readRevocationState(env, serial, certificateType)
+		return checkExpiry && now !== undefined && now.revoked_at === null && now.expired
+			? { kind: "expired" }
+			: { kind: "alreadyRevoked" }
 	}
 
-	logRevocation(env, serial, certificateType, by, null)
+	logRevocation(env, serial, certificateType, by, reason)
 
 	return { kind: "revoked", revokedAt }
 }
