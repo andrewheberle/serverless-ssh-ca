@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import ca, { createSshCa, InvalidConfigurationError, type SshCa, type SshCaBindings } from "../src/index.js"
+import { LandingStylesheet, LandingStylesheetPath } from "../src/landing/pages.js"
+import { assetHash } from "../src/web/assets.js"
 import { SecurityHeaders } from "../src/web/headers.js"
 import { bindingsFromEnv, fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { getPublic } from "../src/utils.js"
@@ -52,11 +54,11 @@ describe("landing page configuration", () => {
 		["not set", undefined],
 		["false", false],
 		["\"false\"", "false"],
-	])("should answer / and /style.css with 404 when LANDING_PAGE is %s", async (_name, value) => {
+	])("should answer / and its stylesheet with 404 when LANDING_PAGE is %s", async (_name, value) => {
 		const instance = landingCa({ LANDING_PAGE: value })
 
 		expect((await get(instance, "/")).status).toBe(404)
-		expect((await get(instance, "/style.css")).status).toBe(404)
+		expect((await get(instance, LandingStylesheetPath)).status).toBe(404)
 		// the rest of the CA is unaffected
 		expect((await get(instance, "/api/v4/ca")).status).toBe(200)
 	})
@@ -73,7 +75,7 @@ describe("landing page configuration", () => {
 	it("should answer every request with 500 from the Workers default export when LANDING_PAGE is invalid", async () => {
 		const env = landingEnv({ LANDING_PAGE: "yes" })
 
-		for (const path of ["/", "/style.css", "/api/v4/ca"]) {
+		for (const path of ["/", LandingStylesheetPath, "/api/v4/ca"]) {
 			const response = await ca.fetch(new Request(`${Origin}${path}`), env, executionContext)
 			expect(response.status, path).toBe(500)
 			expect(await response.text()).not.toContain("LANDING_PAGE")
@@ -151,16 +153,38 @@ describe("landing page", () => {
 		expect((await get(landingCa(), "/", "POST")).status).toBe(404)
 	})
 
+	it("should link its stylesheet, named after a hash of its content", async () => {
+		expect(LandingStylesheetPath).toMatch(/^\/style-[0-9a-f]{8}\.css$/)
+		expect(LandingStylesheetPath).toBe(`/style-${assetHash(LandingStylesheet)}.css`)
+		expect(await page(landingCa())).toContain(`<link rel="stylesheet" href="${LandingStylesheetPath}"/>`)
+	})
+
 	it("should serve its stylesheet as CSS", async () => {
-		const response = await get(landingCa(), "/style.css")
+		const response = await get(landingCa(), LandingStylesheetPath)
 
 		expect(response.status).toBe(200)
 		expect(response.headers.get("Content-Type")).toBe("text/css; charset=utf-8")
-		expect(await response.text()).toContain(".hero")
+		expect(await response.text()).toBe(LandingStylesheet)
 	})
 
-	it.each(["/", "/style.css"])("should send the security headers with %s", async (path) => {
-		expectSecurityHeaders(await get(landingCa(), path))
+	it("should send the security headers with /", async () => {
+		const response = await get(landingCa(), "/")
+
+		expectSecurityHeaders(response)
+		// the landing page has no client-side JavaScript
+		expect(response.headers.get("Content-Security-Policy")).not.toContain("script-src")
+	})
+
+	it("should send the security headers with its stylesheet, which anyone may cache for a year", async () => {
+		const response = await get(landingCa(), LandingStylesheetPath)
+
+		for (const [name, value] of Object.entries(SecurityHeaders)) {
+			expect(response.headers.get(name), name).toBe(name === "Cache-Control" ? "public, max-age=31536000, immutable" : value)
+		}
+	})
+
+	it.each(["/style.css", "/style-00000000.css"])("should answer %s, which is not the current name of its stylesheet, with 404", async (path) => {
+		expect((await get(landingCa(), path)).status).toBe(404)
 	})
 
 	it("should escape values that contain HTML", async () => {

@@ -1,7 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import ca, { cloudflareClientIp, createSshCa, InvalidConfigurationError, type CaRateLimiter, type SshCa, type SshCaBindings } from "../src/index.js"
-import { AdminSecurityHeaders } from "../src/admin/index.js"
+import { AdminAssets, AdminSecurityHeaders } from "../src/admin/index.js"
+import { StylesheetPath } from "../src/admin/pages.js"
+import { TimeScriptPath } from "../src/admin/time.js"
+import { assetHash } from "../src/web/assets.js"
 import { bindingsFromEnv, fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { makeEnv } from "./env.js"
 import { createProxy, type Proxy } from "./helpers/proxy.js"
@@ -71,6 +74,14 @@ const expectSecurityHeaders = (response: Response): void => {
 	}
 }
 
+// the security headers of a hashed asset, which only the admin's browser may
+// keep, for a year
+const expectAssetHeaders = (response: Response): void => {
+	for (const [name, value] of Object.entries(AdminSecurityHeaders)) {
+		expect(response.headers.get(name), name).toBe(name === "Cache-Control" ? "private, max-age=31536000, immutable" : value)
+	}
+}
+
 // an execution context for the Workers default export
 const executionContext = { waitUntil: () => undefined, passThroughOnException: () => undefined, props: {} }
 
@@ -94,7 +105,8 @@ describe("admin configuration", () => {
 		const response = await ca.fetch(await request("/admin"))
 		expect(response.status).toBe(404)
 		expectSecurityHeaders(response)
-		expect((await ca.fetch(await request("/admin/style.css"))).status).toBe(404)
+		expect((await ca.fetch(await request(StylesheetPath))).status).toBe(404)
+		expect((await ca.fetch(await request(TimeScriptPath))).status).toBe(404)
 
 		expect((await ca.fetch(new Request(`${Origin}/api/v4/ca`))).status).toBe(200)
 	})
@@ -254,7 +266,25 @@ describe("admin UI", () => {
 		const body = await response.text()
 		expect(body).toMatch(/^<!DOCTYPE html>/)
 		expect(body).toContain(`Signed in as ${AdminEmail}`)
-		expect(body).toContain(`<link rel="stylesheet" href="/admin/style.css"/>`)
+		expect(body).toContain(`<link rel="stylesheet" href="${StylesheetPath}"/>`)
+	})
+
+	it("should load its script and have a hidden switch between local times and UTC", async () => {
+		const body = await (await adminCa().fetch(await request("/admin/user/certificates"))).text()
+
+		expect(body).toContain(`<script src="${TimeScriptPath}" defer=""></script>`)
+		expect(body).toContain(`<div id="time-zone" class="time-zone" hidden="">`)
+		expect(body).toContain(`<button type="button" data-time-zone="local" aria-pressed="true">Local</button>`)
+		expect(body).toContain(`<button type="button" data-time-zone="utc" aria-pressed="false">UTC</button>`)
+	})
+
+	it("should allow its own script, but no inline script, in its policy", () => {
+		const policy = AdminSecurityHeaders["Content-Security-Policy"]
+
+		expect(policy).toContain("default-src 'none'")
+		expect(policy).toContain("script-src 'self';")
+		expect(policy).not.toContain("unsafe-inline")
+		expect(policy).not.toContain("unsafe-eval")
 	})
 
 	it("should escape the email on the page", async () => {
@@ -265,15 +295,35 @@ describe("admin UI", () => {
 		expect(body).toContain("&lt;script&gt;alert(1)&lt;/script&gt;@example.com")
 	})
 
-	it("should serve the stylesheet to admins", async () => {
+	it("should name its stylesheet and script after a hash of their content", () => {
+		expect(AdminAssets.map((a) => a.path)).toEqual([StylesheetPath, TimeScriptPath])
+		expect(StylesheetPath).toMatch(/^\/admin\/style-[0-9a-f]{8}\.css$/)
+		expect(TimeScriptPath).toMatch(/^\/admin\/time-[0-9a-f]{8}\.js$/)
+		for (const asset of AdminAssets) {
+			expect(asset.path).toContain(`-${assetHash(asset.content)}.`)
+		}
+	})
+
+	it.each([
+		["stylesheet", StylesheetPath, "text/css; charset=utf-8"],
+		["script", TimeScriptPath, "text/javascript; charset=utf-8"],
+	])("should serve its %s to admins, to be kept by their browser only", async (_name, path, contentType) => {
 		const ca = adminCa()
 
-		const response = await ca.fetch(await request("/admin/style.css"))
+		const response = await ca.fetch(await request(path))
 		expect(response.status).toBe(200)
-		expect(response.headers.get("Content-Type")).toBe("text/css; charset=utf-8")
-		expectSecurityHeaders(response)
+		expect(response.headers.get("Content-Type")).toBe(contentType)
+		expectAssetHeaders(response)
+		expect(await response.text()).toBe(AdminAssets.find((a) => a.path === path)?.content)
 
-		expect((await ca.fetch(await request("/admin/style.css", { jwt: null }))).status).toBe(401)
+		expect((await ca.fetch(await request(path, { jwt: null }))).status).toBe(401)
+	})
+
+	it.each(["/admin/style.css", "/admin/time.js", "/admin/style-00000000.css", "/admin/time-00000000.js"])("should answer %s, which is not the current name of an asset, with 404 that is not cached", async (path) => {
+		const response = await adminCa().fetch(await request(path))
+
+		expect(response.status).toBe(404)
+		expectSecurityHeaders(response)
 	})
 
 	it("should be served by the Workers default export", async () => {
@@ -295,7 +345,7 @@ describe("admin hostname", () => {
 	it("should answer every other host name with 404", async () => {
 		const ca = adminCa({ ADMIN_HOSTNAME: "ssh-ca.example.com" })
 
-		for (const path of ["/admin", "/admin/style.css"]) {
+		for (const path of ["/admin", StylesheetPath, TimeScriptPath]) {
 			const response = await ca.fetch(await request(path, { origin: "https://ssh-ca.workers.dev" }))
 			expect(response.status).toBe(404)
 			expectSecurityHeaders(response)
@@ -480,10 +530,10 @@ describe("admin logging", () => {
 		const ca = adminCa({ LOG_LEVEL: "info" })
 
 		await ca.fetch(await request("/admin?serial=1234&status=valid"))
-		await ca.fetch(await request("/admin/style.css"))
+		await ca.fetch(await request(StylesheetPath))
 
 		expect(log).toHaveBeenCalledWith(expect.objectContaining({ level: "info", email: AdminEmail, method: "GET", path: "/admin?serial=1234&status=valid", status: 302 }))
-		expect(log).toHaveBeenCalledWith(expect.objectContaining({ level: "info", email: AdminEmail, method: "GET", path: "/admin/style.css", status: 200 }))
+		expect(log).toHaveBeenCalledWith(expect.objectContaining({ level: "info", email: AdminEmail, method: "GET", path: StylesheetPath, status: 200 }))
 	})
 
 	it("should log refused requests", async () => {

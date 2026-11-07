@@ -69,6 +69,25 @@ const jwt = async (): Promise<string> => await new SignJWT({ email: adminEmail }
     .setExpirationTime("5m")
     .sign(privateKey)
 
+describe("admin assets on workerd", () => {
+    it("should serve the stylesheet and script its pages link, at their hashed names, for the admin's browser to cache", async () => {
+        const headers = { "Cf-Access-Jwt-Assertion": await jwt() }
+        const body = await (await fetch(new Request(`${origin}/admin/user/certificates`, { headers }))).text()
+        const stylesheet = body.match(/<link rel="stylesheet" href="(\/admin\/style-[0-9a-f]{8}\.css)"\/>/)?.[1]
+        const script = body.match(/<script src="(\/admin\/time-[0-9a-f]{8}\.js)" defer=""><\/script>/)?.[1]
+        expect(stylesheet).toBeDefined()
+        expect(script).toBeDefined()
+
+        for (const [path, contentType] of [[stylesheet, "text/css; charset=utf-8"], [script, "text/javascript; charset=utf-8"]]) {
+            const response = await fetch(new Request(`${origin}${path}`, { headers }))
+            expect(response.status, path).toBe(200)
+            expect(response.headers.get("Content-Type"), path).toBe(contentType)
+            expect(response.headers.get("Cache-Control"), path).toBe("private, max-age=31536000, immutable")
+            expect(response.headers.get("Content-Security-Policy"), path).toContain("script-src 'self'")
+        }
+    })
+})
+
 describe("admin revocation on workerd", () => {
     it("should revoke a certificate and record who revoked it and why", async () => {
         // apply the migrations, then record a user certificate to revoke

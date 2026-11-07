@@ -1,16 +1,16 @@
 import type { FC, PropsWithChildren } from "hono/jsx"
 import { KeyHolderRevoker, type CertificateDetails, type CertificateStatus, type RenewalLinks, type RenewalOf } from "../db/index.js"
 import { PublicKey } from "../ssh/keys.js"
+import { hashedAsset, type HashedAsset } from "../web/assets.js"
 import { BaseStylesheet } from "../web/styles.js"
 import { certificatesPath, MaxRevocationReason, type CertificateKind, type CertificateListQuery } from "./query.js"
-
-/** The path the admin UI's stylesheet is served at */
-export const StylesheetPath = "/admin/style.css"
+import { TimeScriptPath } from "./time.js"
 
 /**
  * The stylesheet of the admin UI, the styles shared with the CA's other
  * pages (see {@link BaseStylesheet}) followed by the admin UI's own, served
- * by the admin sub-app so the CSP can allow styles from `'self'` only.
+ * by the admin sub-app as {@link StylesheetAsset} so the CSP can allow
+ * styles from `'self'` only.
  */
 export const Stylesheet = `${BaseStylesheet}
 .site-header {
@@ -40,6 +40,28 @@ export const Stylesheet = `${BaseStylesheet}
 	color: var(--text-subtle);
 	font-size: 0.875rem;
 	margin: 0;
+}
+
+.site-header .header-end {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1rem;
+	/* the height of the time zone switch, so the header does not grow when
+	   the script reveals it */
+	min-height: 2.0625rem;
+}
+
+.time-zone {
+	align-items: center;
+	color: var(--text-subtle);
+	display: flex;
+	font-size: 0.875rem;
+	gap: 0.5rem;
+}
+
+.time-zone[hidden] {
+	display: none;
 }
 
 main {
@@ -72,20 +94,29 @@ main {
 	padding: 0.125rem;
 }
 
-.tabs a {
+.tabs a, .tabs button {
 	border-radius: 0.375rem;
 	color: var(--text-subtle);
 	font-size: 0.875rem;
 	padding: 0.25rem 0.75rem;
 }
 
-.tabs a:hover {
+.tabs button {
+	background: none;
+	border: 0;
+	cursor: pointer;
+	font-family: inherit;
+	line-height: inherit;
+	margin: 0;
+}
+
+.tabs a:hover, .tabs button:hover {
 	background: var(--tint);
 	color: var(--text);
 	text-decoration: none;
 }
 
-.tabs a[aria-current="page"] {
+.tabs a[aria-current="page"], .tabs button[aria-pressed="true"] {
 	background: var(--base);
 	box-shadow: 0 0 0 1px var(--line), 0 1px 2px oklch(0% 0 0 / 0.06);
 	color: var(--text);
@@ -371,12 +402,20 @@ input[type="checkbox"] {
 }
 `
 
+/** The admin UI's stylesheet, served under a name with a hash of {@link Stylesheet} */
+export const StylesheetAsset: HashedAsset = hashedAsset("/admin", "style", "css", Stylesheet)
+
+/** The path the admin UI's stylesheet is served at, such as `/admin/style-1a2b3c4d.css` */
+export const StylesheetPath = StylesheetAsset.path
+
 // shown for an audit value that was not recorded
 const Unknown: FC = () => <span class="unknown">unknown</span>
 
 /**
  * Formats a time in UTC for people to read, such as `2026-11-04 21:10 UTC`,
- * or to the second, such as `2026-11-04 21:10:54 UTC`.
+ * or to the second, such as `2026-11-04 21:10:54 UTC`. The admin UI's
+ * script ({@link TimeScriptPath}) shows it in the browser's time zone
+ * instead, in the same layout.
  *
  * @param date The time
  * @param precision Whether to show minutes or seconds
@@ -387,9 +426,22 @@ export const formatTimestamp = (date: Date, precision: "minute" | "second"): str
 	return `${iso.slice(0, 10)} ${iso.slice(11, precision === "minute" ? 16 : 19)} UTC`
 }
 
-// a time, readable on the page and exact in its datetime attribute
+// a time, readable on the page and exact in its datetime attribute, with
+// the precision the admin UI's script shows it in the browser's time zone with
 const Timestamp: FC<{ date: Date, precision: "minute" | "second" }> = ({ date, precision }) => (
-	<time datetime={date.toISOString()}>{formatTimestamp(date, precision)}</time>
+	<time datetime={date.toISOString()} data-precision={precision}>{formatTimestamp(date, precision)}</time>
+)
+
+// switches times between the browser's time zone and UTC. It is hidden until
+// the admin UI's script reveals it, so it is never shown when it cannot work
+const TimeZoneSwitch: FC = () => (
+	<div id="time-zone" class="time-zone" hidden>
+		<span id="time-zone-label">Times</span>
+		<div class="tabs" role="group" aria-labelledby="time-zone-label">
+			<button type="button" data-time-zone="local" aria-pressed="true">Local</button>
+			<button type="button" data-time-zone="utc" aria-pressed="false">UTC</button>
+		</div>
+	</div>
 )
 
 // the label of each status, as shown in a badge
@@ -405,8 +457,10 @@ const StatusBadge: FC<{ status: CertificateStatus }> = ({ status }) => (
 )
 
 /**
- * The page every admin UI page is rendered in, which shows who is signed in.
- * Values are escaped by JSX, so nothing passed to it is ever treated as HTML.
+ * The page every admin UI page is rendered in, which shows who is signed in
+ * and loads the admin UI's stylesheet and script, and has the switch between
+ * local times and UTC. Values are escaped by JSX, so nothing passed to it is
+ * ever treated as HTML.
  */
 export const Layout: FC<PropsWithChildren<{ title: string, email: string }>> = ({ title, email, children }) => (
 	<html lang="en">
@@ -415,12 +469,16 @@ export const Layout: FC<PropsWithChildren<{ title: string, email: string }>> = (
 			<meta name="viewport" content="width=device-width, initial-scale=1" />
 			<title>{title} - SSH CA admin</title>
 			<link rel="stylesheet" href={StylesheetPath} />
+			<script src={TimeScriptPath} defer></script>
 		</head>
 		<body>
 			<header class="site-header">
 				<div>
 					<h1>SSH CA admin</h1>
-					<p>Signed in as {email}</p>
+					<div class="header-end">
+						<TimeZoneSwitch />
+						<p>Signed in as {email}</p>
+					</div>
 				</div>
 			</header>
 			<main>{children}</main>

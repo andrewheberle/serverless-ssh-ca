@@ -4,8 +4,9 @@ import { AdminBasePath } from "../admin/index.js"
 import { caConfig, type AdminConfig } from "../config.js"
 import type { SshCaBindings } from "../types.js"
 import { getPublic } from "../utils.js"
+import { assetResponse } from "../web/assets.js"
 import { securityHeaders } from "../web/headers.js"
-import { LandingPage, LandingStylesheet, LandingStylesheetPath } from "./pages.js"
+import { LandingPage, LandingStylesheetAsset, LandingStylesheetPath } from "./pages.js"
 
 /** The path the landing page is served at */
 export const LandingPath = "/"
@@ -44,8 +45,10 @@ export const adminLink = (admin: AdminConfig): string | undefined => {
  *
  * It only has routes while `LANDING_PAGE` is set, and then only for
  * {@link LandingPath} and {@link LandingStylesheetPath}, so mounting it at the
- * root never answers for any other path. While it is turned off those paths
- * answer with 404, as they do without it.
+ * root never answers for any other path. The stylesheet is only served at
+ * its current hashed path, and may be cached by anyone, as the landing page
+ * is public. While it is turned off those paths answer with 404, as they do
+ * without it.
  *
  * @param env The bindings of the CA, whose configuration must be valid
  * @returns The landing page
@@ -68,9 +71,7 @@ export const createLandingApp = (env: SshCaBindings): Hono<LandingEnv> => {
 		/>}`)
 	})
 
-	app.get(LandingStylesheetPath, securityHeaders<LandingEnv>(), (c) => {
-		return c.body(LandingStylesheet, 200, { "Content-Type": "text/css; charset=utf-8" })
-	})
+	app.get(LandingStylesheetPath, securityHeaders<LandingEnv>(), (c) => assetResponse(c, LandingStylesheetAsset, "public"))
 
 	return app
 }

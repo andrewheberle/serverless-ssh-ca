@@ -42,11 +42,17 @@ describe("landing page on workerd", () => {
         expect(body).toContain(`curl -fsS ${origin}/api/v4/ca`)
     })
 
-    it("should serve its stylesheet", async () => {
-        const response = await fetch(new Request(`${origin}/style.css`))
+    it("should serve the stylesheet it links, at its hashed name, for anyone to cache", async () => {
+        const body = await (await fetch(new Request(`${origin}/`))).text()
+        const path = body.match(/<link rel="stylesheet" href="(\/style-[0-9a-f]{8}\.css)"\/>/)?.[1]
+        expect(path).toBeDefined()
+
+        const response = await fetch(new Request(`${origin}${path}`))
 
         expect(response.status).toBe(200)
         expect(response.headers.get("Content-Type")).toBe("text/css; charset=utf-8")
+        expect(response.headers.get("Cache-Control")).toBe("public, max-age=31536000, immutable")
+        expect((await fetch(new Request(`${origin}/style.css`))).status).toBe(404)
     })
 
     it("should answer with 404 while it is turned off", async () => {

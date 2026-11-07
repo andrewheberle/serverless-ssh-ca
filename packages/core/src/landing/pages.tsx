@@ -1,8 +1,6 @@
 import type { FC, PropsWithChildren } from "hono/jsx"
+import { hashedAsset, type HashedAsset } from "../web/assets.js"
 import { BaseStylesheet } from "../web/styles.js"
-
-/** The path the landing page's stylesheet is served at */
-export const LandingStylesheetPath = "/style.css"
 
 /** The ssh-ca-client repository, which users and hosts request certificates with */
 export const ClientRepositoryUrl = "https://github.com/andrewheberle/ssh-ca-client"
@@ -12,7 +10,7 @@ export const ClientRepositoryUrl = "https://github.com/andrewheberle/ssh-ca-clie
  * pages (see {@link BaseStylesheet}) followed by the landing page's own
  * layout: a centred hero with the padlock in a round tinted badge, cards
  * below it and a muted monospace footer, after the page ssh-ca-client shows
- * at the end of its login flow.
+ * at the end of its login flow. It is served as {@link LandingStylesheetAsset}.
  */
 export const LandingStylesheet = `${BaseStylesheet}
 body {
@@ -125,6 +123,12 @@ footer {
 	text-align: center;
 }
 `
+
+/** The landing page's stylesheet, served under a name with a hash of {@link LandingStylesheet} */
+export const LandingStylesheetAsset: HashedAsset = hashedAsset("", "style", "css", LandingStylesheet)
+
+/** The path the landing page's stylesheet is served at, such as `/style-1a2b3c4d.css` */
+export const LandingStylesheetPath = LandingStylesheetAsset.path
 
 /**
  * What the landing page shows, all of which the CA already publishes.

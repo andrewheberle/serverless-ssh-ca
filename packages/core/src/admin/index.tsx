@@ -9,20 +9,34 @@ import { caConfig } from "../config.js"
 import { certificateStatus, getCertificate, getRenewalLinks, listCertificates, revokeCertificate } from "../db/index.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
+import { assetResponse, type HashedAsset } from "../web/assets.js"
 import { SecurityHeaders, securityHeaders } from "../web/headers.js"
 import { authenticateAdmin, type EnabledAdminConfig } from "./auth.js"
-import { CertificateDetailPage, CertificateListPage, ErrorPage, Stylesheet, StylesheetPath } from "./pages.js"
+import { CertificateDetailPage, CertificateListPage, ErrorPage, StylesheetAsset } from "./pages.js"
 import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeQueryError, RevokeForm, SerialString, type CertificateKind } from "./query.js"
+import { TimeScriptAsset } from "./time.js"
 
 /** The path the admin UI is served under */
 export const AdminBasePath = "/admin"
 
 /**
  * The headers on every response from the admin UI, including errors and the
- * 404 it answers with while it is turned off, which are the headers of every
- * HTML page the CA serves, see {@link SecurityHeaders}.
+ * 404 it answers with while it is turned off: the headers of every HTML page
+ * the CA serves (see {@link SecurityHeaders}), with a policy that also
+ * allows the admin UI's own script, which only changes how times are
+ * displayed (see ADR-0004). Inline scripts are still refused.
  */
-export const AdminSecurityHeaders: Readonly<Record<string, string>> = SecurityHeaders
+export const AdminSecurityHeaders: Readonly<Record<string, string>> = {
+	...SecurityHeaders,
+	"Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+}
+
+/**
+ * The stylesheet and script of the admin UI, each served at its own hashed
+ * path (see {@link HashedAsset}) to admins only, and kept by their browser
+ * alone.
+ */
+export const AdminAssets: readonly HashedAsset[] = [StylesheetAsset, TimeScriptAsset]
 
 type AdminEnv = {
 	Bindings: SshCaBindings
@@ -98,7 +112,7 @@ export const createAdminApp = (env: SshCaBindings): Hono<AdminEnv> => {
 		return c.text("Internal Server Error", 500)
 	})
 
-	app.use(securityHeaders<AdminEnv>())
+	app.use(securityHeaders<AdminEnv>(AdminSecurityHeaders))
 
 	switch (config.kind) {
 		case "disabled":
@@ -324,9 +338,11 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		}
 	})
 
-	app.get(StylesheetPath.slice(AdminBasePath.length), (c) => {
-		return c.body(Stylesheet, 200, { "Content-Type": "text/css; charset=utf-8" })
-	})
+	// only the current hashed path of each asset is served, so a browser is
+	// never given different content under a name it may keep for a year
+	for (const asset of AdminAssets) {
+		app.get(asset.path.slice(AdminBasePath.length), (c) => assetResponse(c, asset, "private"))
+	}
 
 	return app
 }
