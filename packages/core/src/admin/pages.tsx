@@ -1,5 +1,5 @@
 import type { FC, PropsWithChildren } from "hono/jsx"
-import type { CertificateDetails, CertificateStatus, RenewalLinks, RenewalOf } from "../db/index.js"
+import { KeyHolderRevoker, type CertificateDetails, type CertificateStatus, type RenewalLinks, type RenewalOf } from "../db/index.js"
 import { PublicKey } from "../ssh/keys.js"
 import { BaseStylesheet } from "../web/styles.js"
 import { certificatesPath, MaxRevocationReason, type CertificateKind, type CertificateListQuery } from "./query.js"
@@ -625,10 +625,12 @@ const RenewalOfValue: FC<{ kind: CertificateKind, renewalOf: RenewalOf }> = ({ k
 /**
  * Everything recorded about one certificate. The revocation details are only
  * shown for a revoked certificate, and audit values that were not recorded
- * are shown as "unknown". A renewal has no requester, and links to the
- * certificate it is a renewal of, while a certificate revoked for renewal
- * links to the certificate that renewed it. A valid certificate has a form to
- * revoke it, while revoked and expired certificates are read-only.
+ * are shown as "unknown". The revocation address is only shown for a
+ * revocation by the key holder, as one by an admin records no address. A
+ * renewal has no requester, and links to the certificate it is a renewal of,
+ * while a certificate revoked for renewal links to the certificate that
+ * renewed it. A valid certificate has a form to revoke it, while revoked and
+ * expired certificates are read-only.
  */
 export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind, certificate, status, renewal, revokeForm }) => {
 	const extensions = certificate.extensions === null || certificate.extensions === "" ? [] : certificate.extensions.split(",")
@@ -667,6 +669,8 @@ export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind,
 						<dt>Renewal of</dt>
 						<dd><RenewalOfValue kind={kind} renewalOf={renewal.renewalOf} /></dd>
 					</>}
+					<dt>Request address</dt>
+					<dd>{certificate.request_address === null ? <Unknown /> : <span class="mono">{certificate.request_address}</span>}</dd>
 				</dl>
 			</section>
 			{certificate.revoked_at !== null && (
@@ -679,6 +683,10 @@ export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind,
 						<dd>{certificate.revoked_by ?? <Unknown />}</dd>
 						<dt>Revocation reason</dt>
 						<dd>{certificate.revocation_reason ?? <Unknown />}</dd>
+						{certificate.revoked_by === KeyHolderRevoker && <>
+							<dt>Revocation address</dt>
+							<dd>{certificate.revocation_address === null ? <Unknown /> : <span class="mono">{certificate.revocation_address}</span>}</dd>
+						</>}
 						{(renewal.renewedAs !== undefined || certificate.revocation_reason === "renewal") && <>
 							<dt>Renewed as</dt>
 							<dd>{renewal.renewedAs === undefined ? <Unknown /> : <CertificateLink kind={kind} serial={renewal.renewedAs} />}</dd>

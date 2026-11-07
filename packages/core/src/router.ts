@@ -8,8 +8,15 @@ import { HTTPException } from "hono/http-exception"
 import { logger } from "./logger.js"
 import { TooManyRequestsException } from "chanfana"
 import type { SshCaBindings } from "./types.js"
+import { clientAddressOf, type ClientAddress, type ClientAddressSource } from "./client-address.js"
 
-export type AppContext = Context<{ Bindings: SshCaBindings }>
+/** The values set on the context of each request, see {@link AppContext} */
+export type AppVariables = {
+    /** The client address of the request, when it is known, see {@link SshCaOptions.clientAddress} */
+    clientAddress: ClientAddress | undefined
+}
+
+export type AppContext = Context<{ Bindings: SshCaBindings, Variables: AppVariables }>
 
 /**
  * Returns the key a request is rate limited by, or undefined if the request
@@ -29,6 +36,15 @@ export interface SshCaOptions {
      * Workers default export always uses {@link cloudflareClientIp}.
      */
     rateLimitKey?: RateLimitKey
+    /**
+     * Returns the client address of a request, which is recorded with the
+     * certificates it issues, renews or revokes and shown in the admin UI. Use
+     * a value the client cannot set itself, as for `rateLimitKey`. A value
+     * that is not an IPv4 or IPv6 address is not recorded. When this is not
+     * set, `createSshCa` records no client address, while the Workers default
+     * export always uses {@link cloudflareClientIp}.
+     */
+    clientAddress?: ClientAddressSource
 }
 
 /**
@@ -43,11 +59,46 @@ export const cloudflareClientIp: RateLimitKey = (req) => req.headers.get("CF-Con
 const ReadMethods = new Set(["GET", "HEAD", "OPTIONS"])
 
 export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
-    const hono = new Hono<{ Bindings: SshCaBindings }>()
+    const hono = new Hono<{ Bindings: SshCaBindings, Variables: AppVariables }>()
     const rateLimitKey = options.rateLimitKey ?? cloudflareClientIp
     // whether a request without a rate limit key has been reported, as
     // requests without one are not limited
     let reportedMissingKey = false
+    // whether a client address that is not an IP address has been reported
+    let reportedInvalidAddress = false
+
+    // the client address of requests that issue, renew and revoke
+    // certificates, which is recorded with them
+    hono.use("/api/*", async (c, next) => {
+        if (ReadMethods.has(c.req.method)) {
+            return await next()
+        }
+
+        const result = clientAddressOf(options.clientAddress, c.req.raw)
+        switch (result.kind) {
+            case "known":
+                c.set("clientAddress", result.address)
+                break
+            case "none":
+                break
+            case "invalid": {
+                const l = logger(env).with("in", "clientAddress")
+                if (!reportedInvalidAddress) {
+                    reportedInvalidAddress = true
+                    l.warn("client addresses that are not IP addresses are not recorded", "value", result.value)
+                } else {
+                    l.debug("client address is not an IP address", "value", result.value)
+                }
+                break
+            }
+            default: {
+                const unknown: never = result
+                throw new Error(`unknown client address ${JSON.stringify(unknown)}`)
+            }
+        }
+
+        return await next()
+    })
 
     // limit requests to issue, renew and revoke certificates
     hono.use("/api/*", async (c, next) => {

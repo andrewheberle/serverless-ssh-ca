@@ -47,6 +47,8 @@ type Seed = {
 	requestedBy?: string | null
 	/** The serial of the certificate it is a renewal of */
 	renewalOf?: string
+	requestAddress?: string
+	revocationAddress?: string
 }
 
 // a CA whose admin UI is turned on, with an in-memory database that
@@ -66,8 +68,8 @@ const setup = async (): Promise<{ ca: SshCa, env: SshCaBindings, seed: (...seeds
 
 	let next = 1
 	const insert = sqlite.prepare(`INSERT INTO certificates
-		(serial, key_id, principals, extensions, valid_after, valid_before, revoked_at, certificate_type, public_key, requested_by, revoked_by, revocation_reason, renewal_of)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		(serial, key_id, principals, extensions, valid_after, valid_before, revoked_at, certificate_type, public_key, requested_by, revoked_by, revocation_reason, renewal_of, request_address, revocation_address)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
 	// records certificates in order, so later ones are newer, and returns their serials
 	const seed = (...seeds: Seed[]): string[] => seeds.map((s) => {
@@ -87,6 +89,8 @@ const setup = async (): Promise<{ ca: SshCa, env: SshCaBindings, seed: (...seeds
 			s.revoked?.by ?? null,
 			s.revoked?.reason ?? null,
 			s.renewalOf ?? null,
+			s.requestAddress ?? null,
+			s.revocationAddress ?? null,
 		)
 		return serial
 	})
@@ -494,6 +498,39 @@ describe("certificate detail", () => {
 		expect(body).toContain("<dt>Requested by</dt><dd>user@example.com</dd>")
 		expect(body).not.toContain("Renewal of")
 		expect(body).not.toContain("Renewed as")
+	})
+
+	it("should show the request address, or unknown when it was not recorded", async () => {
+		const { ca, seed } = await setup()
+		const [recorded, unrecorded] = seed({ requestAddress: "2001:db8::1" }, {})
+
+		const recordedBody = await (await get(ca, `/admin/user/certificates/${recorded}`)).text()
+		expect(recordedBody).toContain(`<dt>Request address</dt><dd><span class="mono">2001:db8::1</span></dd>`)
+
+		const unrecordedBody = await (await get(ca, `/admin/user/certificates/${unrecorded}`)).text()
+		expect(unrecordedBody).toContain(`<dt>Request address</dt><dd><span class="unknown">unknown</span></dd>`)
+	})
+
+	it("should show the revocation address of a revocation by the key holder, or unknown when it was not recorded", async () => {
+		const { ca, seed } = await setup()
+		const [recorded, unrecorded] = seed(
+			{ revoked: { by: "key-holder", reason: null }, revocationAddress: "198.51.100.7" },
+			{ revoked: { by: "key-holder", reason: null } },
+		)
+
+		const recordedBody = await (await get(ca, `/admin/user/certificates/${recorded}`)).text()
+		expect(recordedBody).toContain(`<dt>Revocation address</dt><dd><span class="mono">198.51.100.7</span></dd>`)
+
+		const unrecordedBody = await (await get(ca, `/admin/user/certificates/${unrecorded}`)).text()
+		expect(unrecordedBody).toContain(`<dt>Revocation address</dt><dd><span class="unknown">unknown</span></dd>`)
+	})
+
+	it("should not show a revocation address for a revocation by an admin or a certificate that is not revoked", async () => {
+		const { ca, seed } = await setup()
+		const [byAdmin, valid] = seed({ revoked: { by: AdminEmail, reason: "key was lost" } }, {})
+
+		expect(await (await get(ca, `/admin/user/certificates/${byAdmin}`)).text()).not.toContain("Revocation address")
+		expect(await (await get(ca, `/admin/user/certificates/${valid}`)).text()).not.toContain("Revocation address")
 	})
 
 	it("should show an expired certificate as expired", async () => {

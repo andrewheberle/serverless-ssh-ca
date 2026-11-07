@@ -32,6 +32,10 @@ _Avoid_: Role (roles are identity token principals used to decide who may reques
 Issuing a new host certificate for the same key and principals as a current host certificate from this CA, in exchange for revoking it, proven by possession of the host key rather than by tokens. A renewed certificate has no requester of its own; it records the certificate it is a renewal of, which leads back to the request the chain began with.
 _Avoid_: Refresh, re-issue
 
+**Client address**:
+The IP address a request to the CA came from, as reported by a proxy the CA is configured to trust. It records where a request came from, not who made it.
+_Avoid_: Source IP, remote address, requester IP
+
 **Admin**:
 A person allowed to see every certificate the CA has issued and to revoke any of them, as established by an identity-aware proxy in front of the CA rather than by the tokens a requester presents.
 _Avoid_: Administrator, operator, superuser

@@ -315,7 +315,7 @@ export const certificateResponse = async (c: AppContext, l: Logger, result: Prom
 export const revoke = async (c: AppContext, l: Logger, serial: bigint, publicKey: PublicKey, certificateType: CertificateType): Promise<Response> => {
 	let result: RevocationResult
 	try {
-		result = await revokeCertificate(c.env, { serial, certificateType, revoker: { kind: "keyHolder", publicKey } })
+		result = await revokeCertificate(c.env, { serial, certificateType, revoker: { kind: "keyHolder", publicKey, clientAddress: c.get("clientAddress") } })
 	} catch (err) {
 		l.error("unhandled error", "error", err)
 		throw new InternalServerErrorException("internal server error")

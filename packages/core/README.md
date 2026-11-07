@@ -505,6 +505,41 @@ Workers default export does.
 Requests for which `rateLimitKey` returns `undefined` are not limited, and the
 first such request is logged as a warning.
 
+### Client Addresses
+
+The CA records the client address (the IP address a request came from) of
+each request that issues or renews a certificate, and of each request a key
+holder revokes a certificate with. A renewal records the same address as the
+request address of the new certificate and the revocation address of the
+certificate it renewed. Revocations by an admin record no address, as the
+admin is recorded by their email. The addresses are shown on the certificate's
+page in the [admin UI](#admin-ui), included as `client_address` in the log
+lines for issuing and revoking certificates, and kept for as long as the
+certificate is (see `DB_CERTIFICATE_RETENTION`).
+
+On Workers, the address is read from the `CF-Connecting-IP` header, which
+Cloudflare sets.
+
+With `createSshCa`, no address is recorded unless the `clientAddress` option
+is set. It is a function from the request to its address, and the same
+warning applies as for `rateLimitKey`: a client can send any header it likes,
+so only read a header that a proxy you control overwrites or appends to.
+Behind the single trusted reverse proxy from the example above:
+
+```ts
+const ca = createSshCa(bindings, {
+    // the address appended by the one trusted proxy in front of the CA
+    clientAddress: (req) => req.headers.get("X-Forwarded-For")?.split(",").at(-1)?.trim() || undefined,
+})
+```
+
+When `createSshCa` runs behind Cloudflare, pass `clientAddress:
+cloudflareClientIp` to record addresses as the Workers default export does.
+
+Only IPv4 and IPv6 addresses are recorded. A value that is not one is left
+out, and the first such value is logged as a warning, but the certificate is
+still issued, renewed or revoked.
+
 ### KRL Caching
 
 Generating and signing a KRL reads every revoked certificate from the
@@ -619,9 +654,11 @@ An invalid parameter gets a `400` page. A serial that does not exist, or is
 for the other certificate type, gets a `404` page.
 
 The detail page shows the serial, type, key ID, principals, extensions,
-validity, status, the SHA256 fingerprint of the certificate's public key and
-who requested it. For a revoked certificate it also shows when, by whom and
-why it was revoked. Values that were not recorded, such as the requester of a
+validity, status, the SHA256 fingerprint of the certificate's public key, who
+requested it and the [client address](#client-addresses) it was requested
+from. For a revoked certificate it also shows when, by whom and why it was
+revoked, and for a revocation by the key holder the client address it was
+revoked from. Values that were not recorded, such as the requester of a
 certificate issued before they were recorded, or the reason for a revocation
 by the key holder, are shown as "unknown".
 
