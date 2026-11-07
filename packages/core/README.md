@@ -246,9 +246,14 @@ currently presented
 4. It has not been revoked, or already renewed
 
 The certificate that was renewed is revoked and added to the host KRL, so it
-cannot be used to renew again. SSH clients that check the host KRL will no
-longer accept it, so `sshd` must be reloaded to present the renewed
-certificate once it has been written to disk.
+cannot be used to renew again, and SSH clients that check the host KRL will no
+longer accept it. From OpenSSH 9.8, `sshd` only reads host certificates when
+it starts or is reloaded, so it must be reloaded to present the renewed
+certificate once it has been written to disk; until then it keeps presenting
+the revoked one. OpenSSH 9.7 and earlier read the certificate for each
+connection, so present the renewed certificate without a reload. The client's
+`host --renew --reload-command` option reloads `sshd` only when a certificate
+was renewed.
 
 This means the OIDC authentication flow is not required in this case as shown
 below when `ssh-ca-client-cli host --renew` is run:
