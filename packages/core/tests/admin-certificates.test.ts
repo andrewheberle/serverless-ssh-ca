@@ -45,6 +45,8 @@ type Seed = {
 	revoked?: { by: string | null, reason: string | null } | undefined
 	publicKey?: string | null
 	requestedBy?: string | null
+	/** The serial of the certificate it is a renewal of */
+	renewalOf?: string
 }
 
 // a CA whose admin UI is turned on, with an in-memory database that
@@ -64,8 +66,8 @@ const setup = async (): Promise<{ ca: SshCa, env: SshCaBindings, seed: (...seeds
 
 	let next = 1
 	const insert = sqlite.prepare(`INSERT INTO certificates
-		(serial, key_id, principals, extensions, valid_after, valid_before, revoked_at, certificate_type, public_key, requested_by, revoked_by, revocation_reason)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		(serial, key_id, principals, extensions, valid_after, valid_before, revoked_at, certificate_type, public_key, requested_by, revoked_by, revocation_reason, renewal_of)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 
 	// records certificates in order, so later ones are newer, and returns their serials
 	const seed = (...seeds: Seed[]): string[] => seeds.map((s) => {
@@ -84,6 +86,7 @@ const setup = async (): Promise<{ ca: SshCa, env: SshCaBindings, seed: (...seeds
 			s.requestedBy === undefined ? "user@example.com" : s.requestedBy,
 			s.revoked?.by ?? null,
 			s.revoked?.reason ?? null,
+			s.renewalOf ?? null,
 		)
 		return serial
 	})
@@ -450,6 +453,47 @@ describe("certificate detail", () => {
 		expect(body).toContain(`<dt>Revocation reason</dt><dd><span class="unknown">unknown</span></dd>`)
 		expect(body).toContain(`<dt>Public key fingerprint</dt><dd><span class="unknown">unknown</span></dd>`)
 		expect(body).toContain("<dt>Extensions</dt><dd>none</dd>")
+	})
+
+	it("should show a renewal without a requester, linked to the certificate it renewed and back", async () => {
+		const { ca, seed } = await setup()
+		const [previous] = seed({ type: CertificateType.Host, revoked: { by: "key-holder", reason: "renewal" } })
+		const [renewed, unlinked] = seed(
+			{ type: CertificateType.Host, requestedBy: null, renewalOf: previous },
+			// revoked for renewal before renewals recorded what they renewed
+			{ type: CertificateType.Host, revoked: { by: "key-holder", reason: "renewal" } },
+		)
+
+		const renewedBody = await (await get(ca, `/admin/host/certificates/${renewed}`)).text()
+		expect(renewedBody).toContain(`<dt>Requested by</dt><dd><span class="unknown">none (renewal)</span></dd>`)
+		expect(renewedBody).toContain(`<dt>Renewal of</dt><dd><a class="mono" href="/admin/host/certificates/${previous}">${previous}</a></dd>`)
+		expect(renewedBody).not.toContain("Renewed as")
+
+		const previousBody = await (await get(ca, `/admin/host/certificates/${previous}`)).text()
+		expect(previousBody).toContain(`<dt>Renewed as</dt><dd><a class="mono" href="/admin/host/certificates/${renewed}">${renewed}</a></dd>`)
+		expect(previousBody).not.toContain("Renewal of")
+
+		const unlinkedBody = await (await get(ca, `/admin/host/certificates/${unlinked}`)).text()
+		expect(unlinkedBody).toContain(`<dt>Renewed as</dt><dd><span class="unknown">unknown</span></dd>`)
+	})
+
+	it("should show the serial of a renewed certificate that is no longer recorded without a link", async () => {
+		const { ca, seed } = await setup()
+		const [renewed] = seed({ type: CertificateType.Host, requestedBy: null, renewalOf: "999999" })
+
+		const body = await (await get(ca, `/admin/host/certificates/${renewed}`)).text()
+		expect(body).toContain(`<dt>Requested by</dt><dd><span class="unknown">none (renewal)</span></dd>`)
+		expect(body).toContain(`<dt>Renewal of</dt><dd><span class="mono">999999</span> <span class="unknown">(no longer recorded)</span></dd>`)
+	})
+
+	it("should not show renewal links for a certificate that is not a renewal and was not renewed", async () => {
+		const { ca, seed } = await setup()
+		const [serial] = seed({ type: CertificateType.Host, revoked: { by: AdminEmail, reason: "decommissioned" } })
+
+		const body = await (await get(ca, `/admin/host/certificates/${serial}`)).text()
+		expect(body).toContain("<dt>Requested by</dt><dd>user@example.com</dd>")
+		expect(body).not.toContain("Renewal of")
+		expect(body).not.toContain("Renewed as")
 	})
 
 	it("should show an expired certificate as expired", async () => {

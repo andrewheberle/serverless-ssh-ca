@@ -6,7 +6,7 @@ import { csrf } from "hono/csrf"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
 import type { JSX } from "hono/jsx/jsx-runtime"
 import { caConfig } from "../config.js"
-import { certificateStatus, getCertificate, listCertificates, revokeCertificate } from "../db/index.js"
+import { certificateStatus, getCertificate, getRenewalLinks, listCertificates, revokeCertificate } from "../db/index.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { SecurityHeaders, securityHeaders } from "../web/headers.js"
@@ -261,7 +261,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 			return page(c, <ErrorPage email={email} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
 		}
 
-		return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={certificateStatus(certificate)} />)
+		return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={certificateStatus(certificate)} renewal={await getRenewalLinks(env, certificate)} />)
 	})
 
 	// revokes a certificate. Revocations are permanent, so the reason and
@@ -297,7 +297,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		const form = RevokeForm.safeParse(body)
 		if (!form.success) {
 			const reason = typeof body.reason === "string" ? body.reason : ""
-			return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={status} revokeForm={{ reason, errors: form.error.issues.map((i) => i.message) }} />, 422)
+			return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={status} renewal={await getRenewalLinks(env, certificate)} revokeForm={{ reason, errors: form.error.issues.map((i) => i.message) }} />, 422)
 		}
 
 		// the operation decides again, as the certificate may have been

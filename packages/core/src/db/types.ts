@@ -23,8 +23,10 @@ export type CertificateRecord = {
 	revoked_at: Date | null
 	certificate_type: CertificateType
 	public_key: string | null
-	/** The email address of the requester who asked for the certificate, or null if not known */
+	/** The email address of the requester who asked for the certificate, or null if it is a renewal or not known */
 	requested_by: string | null
+	/** The serial of the host certificate this certificate is a renewal of, or null if it is not a renewal or not known */
+	renewal_of: string | null
 	/** Who revoked the certificate, such as "key-holder", or null if it is not revoked or not known */
 	revoked_by: string | null
 	/** Why the certificate was revoked, such as "renewal", or null if no reason was given */
