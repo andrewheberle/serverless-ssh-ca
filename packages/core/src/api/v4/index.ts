@@ -89,7 +89,7 @@ const IssueUserCertificateEndpoint = (env: SshCaBindings) => {
 			await verifyProof(l, data.headers[ProofHeader], data.body.public_key, "POST", "/user/certificates")
 
 			return await certificateResponse(c, l,
-				issueUserCertificate(c.env, requester, data.body.public_key, { lifetime: data.body.lifetime, extensions: data.body.extensions }, l),
+				issueUserCertificate(c.env, requester, data.body.public_key, { lifetime: data.body.lifetime, extensions: data.body.extensions, clientAddress: c.get("clientAddress") }, l),
 			)
 		}
 	}
@@ -133,7 +133,7 @@ const IssueHostCertificateEndpoint = (env: SshCaBindings) => {
 			await verifyProof(l, data.headers[ProofHeader], data.body.public_key, "POST", "/host/certificates")
 
 			return await certificateResponse(c, l,
-				issueHostCertificate(c.env, requester, data.body.public_key, { principals: data.body.principals, lifetime: data.body.lifetime }, l),
+				issueHostCertificate(c.env, requester, data.body.public_key, { principals: data.body.principals, lifetime: data.body.lifetime, clientAddress: c.get("clientAddress") }, l),
 			)
 		}
 	}
@@ -165,7 +165,7 @@ const RenewHostCertificateEndpoint = (env: SshCaBindings) => {
 			await verifyProof(l, data.headers[ProofHeader], data.body.certificate.publicKey, "POST", `/host/certificates/${serial}/renew`)
 
 			return await certificateResponse(c, l,
-				renewHostCertificate(c.env, data.body.certificate, { lifetime: data.body.lifetime }, l),
+				renewHostCertificate(c.env, data.body.certificate, { lifetime: data.body.lifetime, clientAddress: c.get("clientAddress") }, l),
 			)
 		}
 	}

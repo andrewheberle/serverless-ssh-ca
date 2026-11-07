@@ -2,6 +2,7 @@ import { group, type Logger } from "@andrewheberle/ts-slog"
 import { isRevoked, recordCertificate, recordRenewal } from "./db/index.js"
 import { CertificateType } from "./db/types.js"
 import type { Requester } from "./requester.js"
+import type { ClientAddress } from "./client-address.js"
 import { signCertificate, type CertificateFields, type SshCertificate } from "./ssh/certificate.js"
 import { KeyParseError, type PrivateKey, type PublicKey } from "./ssh/keys.js"
 import { createSigner } from "./ssh/signer.js"
@@ -134,32 +135,33 @@ const tryStore = async <T>(l: Logger, use: () => Promise<T>, message: string): P
 // a certificate that is not recorded cannot be revoked, so it is not issued
 const RecordingProblem = "there was a problem recording the issued certificate"
 
-const issued = (l: Logger, certificate: SshCertificate, renews?: SshCertificate): { kind: "issued", certificate: SshCertificate } => {
+const issued = (l: Logger, certificate: SshCertificate, clientAddress: ClientAddress | undefined, renews?: SshCertificate): { kind: "issued", certificate: SshCertificate } => {
 	l.info("completed issuing certificate",
 		...group(
 			"certificate", "principals",
 			certificate.principals.join(","), "serial", certificate.serial,
 		),
 		...(renews === undefined ? [] : group("renewed", "serial", renews.serial)),
+		...(clientAddress === undefined ? [] : ["client_address", clientAddress]),
 	)
 
 	return { kind: "issued", certificate }
 }
 
 // signs and records a certificate that is not a renewal, as requested by a
-// requester
-const issue = async (config: AuthorityConfig, l: Logger, certificateType: CertificateType, requester: Requester, signed: () => Promise<SshCertificate>): Promise<IssueResult> => {
+// requester from a client address, when it is known
+const issue = async (config: AuthorityConfig, l: Logger, certificateType: CertificateType, requester: Requester, clientAddress: ClientAddress | undefined, signed: () => Promise<SshCertificate>): Promise<IssueResult> => {
 	const result = await trySign(l, signed)
 	if (result.kind !== "signed") {
 		return result
 	}
 
-	const recorded = await tryStore(l, async () => await recordCertificate(config, result.certificate, result.certificate.keyId, certificateType, requester.email), RecordingProblem)
+	const recorded = await tryStore(l, async () => await recordCertificate(config, result.certificate, result.certificate.keyId, certificateType, requester.email, clientAddress), RecordingProblem)
 	if (recorded.kind !== "stored") {
 		return recorded
 	}
 
-	return issued(l, result.certificate)
+	return issued(l, result.certificate, clientAddress)
 }
 
 /**
@@ -170,11 +172,11 @@ const issue = async (config: AuthorityConfig, l: Logger, certificateType: Certif
  * @param config The bindings of the CA, see {@link AuthorityConfig}
  * @param requester The requester the certificate is issued to, whose email address is its key ID
  * @param publicKey The key the certificate is issued for
- * @param options The lifetime in seconds, which is no longer than `SSH_CERTIFICATE_LIFETIME`, and the extensions, which must be from `SSH_CERTIFICATE_EXTENSIONS` and are all of those when not given
+ * @param options The lifetime in seconds, which is no longer than `SSH_CERTIFICATE_LIFETIME`, the extensions, which must be from `SSH_CERTIFICATE_EXTENSIONS` and are all of those when not given, and the client address of the request, which is recorded when it is known
  * @param l The logger for the request
  * @returns The certificate, or why it was not issued, see {@link IssueResult}
  */
-export const issueUserCertificate = async (config: AuthorityConfig, requester: Requester, publicKey: PublicKey, options: { lifetime?: number, extensions?: string[] }, l: Logger): Promise<IssueResult> => {
+export const issueUserCertificate = async (config: AuthorityConfig, requester: Requester, publicKey: PublicKey, options: { lifetime?: number, extensions?: string[], clientAddress?: ClientAddress | undefined }, l: Logger): Promise<IssueResult> => {
 	const key = await loadKey(config, l)
 	if (key.kind !== "loaded") {
 		return key
@@ -188,7 +190,7 @@ export const issueUserCertificate = async (config: AuthorityConfig, requester: R
 		...settings.principals,
 	]
 
-	return await issue(config, l, CertificateType.User, requester, async () => {
+	return await issue(config, l, CertificateType.User, requester, options.clientAddress, async () => {
 		// the principals come from the identity token and the configuration,
 		// so are checked whichever they came from
 		const invalid = principals.map((principal) => principalIssue("user", principal)).find((issue) => issue !== undefined)
@@ -231,17 +233,17 @@ const signHostCertificate = async (config: AuthorityConfig, key: PrivateKey, pub
  * @param config The bindings of the CA, see {@link AuthorityConfig}
  * @param requester The requester who asked for the certificate, who is recorded as having requested it
  * @param publicKey The key the certificate is issued for
- * @param options The principals, of which there must be at least one, and the lifetime in seconds, which is no longer than `SSH_HOST_CERTIFICATE_LIFETIME`
+ * @param options The principals, of which there must be at least one, the lifetime in seconds, which is no longer than `SSH_HOST_CERTIFICATE_LIFETIME`, and the client address of the request, which is recorded when it is known
  * @param l The logger for the request
  * @returns The certificate, or why it was not issued, see {@link IssueResult}
  */
-export const issueHostCertificate = async (config: AuthorityConfig, requester: Requester, publicKey: PublicKey, options: { principals: string[], lifetime?: number }, l: Logger): Promise<IssueResult> => {
+export const issueHostCertificate = async (config: AuthorityConfig, requester: Requester, publicKey: PublicKey, options: { principals: string[], lifetime?: number, clientAddress?: ClientAddress | undefined }, l: Logger): Promise<IssueResult> => {
 	const key = await loadKey(config, l)
 	if (key.kind !== "loaded") {
 		return key
 	}
 
-	return await issue(config, l, CertificateType.Host, requester, async () => await signHostCertificate(config, key.key, publicKey, options.principals, options.lifetime))
+	return await issue(config, l, CertificateType.Host, requester, options.clientAddress, async () => await signHostCertificate(config, key.key, publicKey, options.principals, options.lifetime))
 }
 
 // returns why a certificate cannot be renewed, or undefined if it can be,
@@ -298,11 +300,11 @@ const renewalIssue = async (config: AuthorityConfig, key: PrivateKey, certificat
  *
  * @param config The bindings of the CA, see {@link AuthorityConfig}
  * @param certificate The certificate presented for renewal
- * @param options The lifetime in seconds, which is no longer than that of the certificate presented or `SSH_HOST_CERTIFICATE_LIFETIME`
+ * @param options The lifetime in seconds, which is no longer than that of the certificate presented or `SSH_HOST_CERTIFICATE_LIFETIME`, and the client address of the request, which is recorded when it is known
  * @param l The logger for the request
  * @returns The renewed certificate, or why it was not renewed, see {@link RenewResult}
  */
-export const renewHostCertificate = async (config: AuthorityConfig, certificate: SshCertificate, options: { lifetime?: number }, l: Logger): Promise<RenewResult> => {
+export const renewHostCertificate = async (config: AuthorityConfig, certificate: SshCertificate, options: { lifetime?: number, clientAddress?: ClientAddress | undefined }, l: Logger): Promise<RenewResult> => {
 	const key = await loadKey(config, l)
 	if (key.kind !== "loaded") {
 		return key
@@ -332,7 +334,7 @@ export const renewHostCertificate = async (config: AuthorityConfig, certificate:
 	// the certificate presented is revoked in the same transaction as the
 	// renewal is recorded, so it is only renewed once however many requests
 	// renew it at the same time
-	const recorded = await tryStore(l, async () => await recordRenewal(config, certificate, result.certificate), RecordingProblem)
+	const recorded = await tryStore(l, async () => await recordRenewal(config, certificate, result.certificate, options.clientAddress), RecordingProblem)
 	if (recorded.kind !== "stored") {
 		return recorded
 	}
@@ -341,5 +343,5 @@ export const renewHostCertificate = async (config: AuthorityConfig, certificate:
 		return { kind: "revokedDuringRenewal" }
 	}
 
-	return issued(l, result.certificate, certificate)
+	return issued(l, result.certificate, options.clientAddress, certificate)
 }

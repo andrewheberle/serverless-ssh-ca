@@ -52,7 +52,7 @@ const UserCertificateRequestEndpoint = (env: SshCaBindings) => {
 			)
 
 			return await certificateResponse(c, l,
-				issueUserCertificate(c.env, requester, data.body.public_key, { lifetime: data.body.lifetime, extensions: data.body.extensions }, l),
+				issueUserCertificate(c.env, requester, data.body.public_key, { lifetime: data.body.lifetime, extensions: data.body.extensions, clientAddress: c.get("clientAddress") }, l),
 			)
 		}
 	}
@@ -94,7 +94,7 @@ const HostCertificateRequestEndpoint = (env: SshCaBindings) => {
 			)
 
 			return await certificateResponse(c, l,
-				issueHostCertificate(c.env, requester, data.body.public_key, { principals: data.body.principals, lifetime: data.body.lifetime }, l),
+				issueHostCertificate(c.env, requester, data.body.public_key, { principals: data.body.principals, lifetime: data.body.lifetime, clientAddress: c.get("clientAddress") }, l),
 			)
 		}
 	}
@@ -117,7 +117,7 @@ const HostCertificateRenewEndpoint = (env: SshCaBindings) => {
 			)
 
 			return await certificateResponse(c, l,
-				renewHostCertificate(c.env, data.body.certificate, { lifetime: data.body.lifetime }, l),
+				renewHostCertificate(c.env, data.body.certificate, { lifetime: data.body.lifetime, clientAddress: c.get("clientAddress") }, l),
 			)
 		}
 	}

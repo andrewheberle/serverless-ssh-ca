@@ -31,6 +31,10 @@ export type CertificateRecord = {
 	revoked_by: string | null
 	/** Why the certificate was revoked, such as "renewal", or null if no reason was given */
 	revocation_reason: string | null
+	/** The client address of the request that issued or renewed the certificate, or null if not known */
+	request_address: string | null
+	/** The client address of the request its key holder revoked it with, or null if it is not revoked, was revoked by an admin, or not known */
+	revocation_address: string | null
 }
 
 /** A row in the `krl` table, holding the current version of the KRL for a {@link CertificateType} */

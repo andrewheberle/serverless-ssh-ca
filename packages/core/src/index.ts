@@ -2,10 +2,11 @@ import type { ExecutionContext } from "hono"
 import { caConfig, InvalidConfigurationError, parseConfig } from "./config.js"
 import { dbCleanup } from "./db/index.js"
 import { logger } from "./logger.js"
-import { createApp, type SshCaOptions } from "./router.js"
+import { cloudflareClientIp, createApp, type SshCaOptions } from "./router.js"
 import type { SshCaBindings } from "./types.js"
 export type { CaCache, CaDatabase, CaDatabaseQueryResult, CaDatabaseResult, CaPreparedStatement, CaRateLimiter, CaSecret, SshCaBindings } from "./types.js"
 export { cloudflareClientIp, type RateLimitKey, type SshCaOptions } from "./router.js"
+export type { ClientAddressSource } from "./client-address.js"
 export { InvalidConfigurationError } from "./config.js"
 
 // the handlers the CA exposes, compatible with a Cloudflare Workers ExportedHandler
@@ -99,7 +100,7 @@ export default {
 
         let app = apps.get(env)
         if (app === undefined) {
-            app = createApp(env)
+            app = createApp(env, { clientAddress: cloudflareClientIp })
             apps.set(env, app)
         }
 

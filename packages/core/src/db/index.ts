@@ -8,6 +8,7 @@ import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
 import { migrations } from "./migrations/index.js"
 import { CertificateType, type DatabaseSchema, type KrlRecord } from "./types.js"
+import type { ClientAddress } from "../client-address.js"
 
 /**
  * The bindings used to read and record certificates.
@@ -39,8 +40,8 @@ const BumpAllRevisions = "UPDATE krl SET revision = revision + 1"
 // previous statement in the same batch changed a row
 const BumpRevisionIfChanged = "UPDATE krl SET revision = revision + 1 WHERE certificate_type = ? AND changes() = 1"
 
-// recorded in revoked_by for a certificate revoked by the holder of its key
-const KeyHolderRevoker = "key-holder"
+/** Recorded in `revoked_by` for a certificate revoked by the holder of its key */
+export const KeyHolderRevoker = "key-holder"
 
 // a certificate presented for renewal is revoked by its key holder, as
 // possession of the host key is what a renewal is proven by
@@ -48,12 +49,13 @@ const RenewalRevoker = KeyHolderRevoker
 const RenewalReason = "renewal"
 
 // logs a revocation for the audit trail, however the certificate was revoked
-const logRevocation = (env: StoreBindings, serial: bigint, certificateType: CertificateType, by: string, reason: string | null): void => {
+const logRevocation = (env: StoreBindings, serial: bigint, certificateType: CertificateType, by: string, reason: string | null, address: ClientAddress | undefined): void => {
 	logger(env).info("certificate revoked",
 		"serial", `${serial}`,
 		"certificate_type", CertificateType[certificateType].toLowerCase(),
 		"revoked_by", by,
 		"revocation_reason", reason,
+		...(address === undefined ? [] : ["client_address", address]),
 	)
 }
 
@@ -147,12 +149,13 @@ const certificateValues = (certificate: SshCertificate, keyid: string, certifica
  * @param keyid The key ID of the certificate
  * @param certificateType The type of certificate
  * @param requestedBy The email address of the requester who asked for the certificate, when known
+ * @param requestAddress The client address of the request, when known
  */
-export const recordCertificate = async (env: StoreBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User, requestedBy?: string) => {
+export const recordCertificate = async (env: StoreBindings, certificate: SshCertificate, keyid: string, certificateType: CertificateType = CertificateType.User, requestedBy?: string, requestAddress?: ClientAddress) => {
 	const qb = await connect(env)
 	const res = await qb.insert({
 		tableName: "certificates",
-		data: { ...certificateRecord(certificate, keyid, certificateType), requested_by: requestedBy ?? null },
+		data: { ...certificateRecord(certificate, keyid, certificateType), requested_by: requestedBy ?? null, request_address: requestAddress ?? null },
 	}).execute()
 
 	if (!res.success) {
@@ -175,13 +178,17 @@ export const recordCertificate = async (env: StoreBindings, certificate: SshCert
  * because of the renewal, and the renewed certificate records the serial of
  * the certificate it is a renewal of without a requester, as a renewal is
  * proven by possession of the host key rather than by a requester's tokens.
+ * The client address of the renewal request, when known, is recorded as both
+ * the request address of the renewed certificate and the revocation address
+ * of the certificate that was renewed.
  *
  * @param env The CA bindings
  * @param previous The certificate that was presented for renewal
  * @param certificate The certificate issued by the renewal
+ * @param clientAddress The client address of the renewal request, when known
  * @returns true if the renewal was recorded, or false if the previous certificate was already revoked
  */
-export const recordRenewal = async (env: StoreBindings, previous: SshCertificate, certificate: SshCertificate): Promise<boolean> => {
+export const recordRenewal = async (env: StoreBindings, previous: SshCertificate, certificate: SshCertificate, clientAddress?: ClientAddress): Promise<boolean> => {
 	// ensure migrations have been applied
 	await connect(env)
 
@@ -192,11 +199,11 @@ export const recordRenewal = async (env: StoreBindings, previous: SshCertificate
 	const results = await env.DB.batch([
 		env.DB.prepare(`INSERT INTO certificates (${columns}) VALUES (${placeholders}) ON CONFLICT (serial) DO NOTHING`)
 			.bind(...certificateValues(previous, previous.keyId, CertificateType.Host)),
-		env.DB.prepare("UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ? WHERE serial = ? AND certificate_type = ? AND revoked_at IS NULL")
-			.bind(revokedAt, RenewalRevoker, RenewalReason, `${previous.serial}`, CertificateType.Host),
+		env.DB.prepare("UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ?, revocation_address = ? WHERE serial = ? AND certificate_type = ? AND revoked_at IS NULL")
+			.bind(revokedAt, RenewalRevoker, RenewalReason, clientAddress ?? null, `${previous.serial}`, CertificateType.Host),
 		// changes() is the number of rows revoked by the previous statement
-		env.DB.prepare(`INSERT INTO certificates (${columns}, renewal_of) SELECT ${placeholders}, ? WHERE changes() = 1`)
-			.bind(...certificateValues(certificate, certificate.keyId, CertificateType.Host), `${previous.serial}`),
+		env.DB.prepare(`INSERT INTO certificates (${columns}, renewal_of, request_address) SELECT ${placeholders}, ?, ? WHERE changes() = 1`)
+			.bind(...certificateValues(certificate, certificate.keyId, CertificateType.Host), `${previous.serial}`, clientAddress ?? null),
 		// the previous certificate was revoked if the renewed one was recorded
 		env.DB.prepare(BumpRevisionIfChanged).bind(CertificateType.Host),
 	])
@@ -207,7 +214,7 @@ export const recordRenewal = async (env: StoreBindings, previous: SshCertificate
 
 	const renewed = results[2]?.meta?.changes === 1
 	if (renewed) {
-		logRevocation(env, previous.serial, CertificateType.Host, RenewalRevoker, RenewalReason)
+		logRevocation(env, previous.serial, CertificateType.Host, RenewalRevoker, RenewalReason, clientAddress)
 	}
 
 	return renewed
@@ -264,11 +271,11 @@ export const getRevocationList = async (env: SshCaBindings, certificateType: Cer
 /**
  * Who is revoking a certificate, which decides whether they may.
  *
- * - `keyHolder`: the holder of the private key for `publicKey`, who has proven possession of it, may revoke a certificate issued for that key
+ * - `keyHolder`: the holder of the private key for `publicKey`, who has proven possession of it, may revoke a certificate issued for that key. The `clientAddress` of their request is recorded when it is known
  * - `admin`: an admin, identified by `email` exactly as the identity-aware proxy's JWT gives it, may revoke any certificate that has not expired, and must give a `reason`
  */
 export type Revoker =
-	| { kind: "keyHolder", publicKey: PublicKey }
+	| { kind: "keyHolder", publicKey: PublicKey, clientAddress?: ClientAddress | undefined }
 	| { kind: "admin", email: string, reason: string }
 
 /**
@@ -292,14 +299,15 @@ export type Revocation = {
 	revoker: Revoker
 }
 
-// what is recorded in revoked_by and revocation_reason for a revoker. A key
-// holder gives no reason, as the API does not ask for one
-const revokedBy = (revoker: Revoker): { by: string, reason: string | null } => {
+// what is recorded in revoked_by, revocation_reason and revocation_address
+// for a revoker. A key holder gives no reason, as the API does not ask for
+// one, and an admin is identified by their email rather than an address
+const revokedBy = (revoker: Revoker): { by: string, reason: string | null, address: ClientAddress | undefined } => {
 	switch (revoker.kind) {
 		case "keyHolder":
-			return { by: KeyHolderRevoker, reason: null }
+			return { by: KeyHolderRevoker, reason: null, address: revoker.clientAddress }
 		case "admin":
-			return { by: revoker.email, reason: revoker.reason }
+			return { by: revoker.email, reason: revoker.reason, address: undefined }
 		default: {
 			const unknown: never = revoker
 			throw new Error(`unknown revoker ${JSON.stringify(unknown)}`)
@@ -403,15 +411,15 @@ export const revokeCertificate = async (env: SshCaBindings, revocation: Revocati
 	}
 
 	const revokedAt = (new Date).toISOString()
-	const { by, reason } = revokedBy(revoker)
+	const { by, reason, address } = revokedBy(revoker)
 
 	// only the certificate the decision was made for is revoked, and only if
 	// another request has not revoked it since it was read, nor (for an
 	// admin) has it expired since
 	const expiry = checkExpiry ? " AND unixepoch('subsec') < unixepoch(valid_before,'subsec')" : ""
 	const results = await env.DB.batch([
-		env.DB.prepare(`UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ? WHERE serial = ? AND certificate_type = ? AND public_key IS ? AND revoked_at IS NULL${expiry}`)
-			.bind(revokedAt, by, reason, `${serial}`, certificateType, state.public_key),
+		env.DB.prepare(`UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ?, revocation_address = ? WHERE serial = ? AND certificate_type = ? AND public_key IS ? AND revoked_at IS NULL${expiry}`)
+			.bind(revokedAt, by, reason, address ?? null, `${serial}`, certificateType, state.public_key),
 		env.DB.prepare(BumpRevisionIfChanged).bind(certificateType),
 	])
 
@@ -427,7 +435,7 @@ export const revokeCertificate = async (env: SshCaBindings, revocation: Revocati
 			: { kind: "alreadyRevoked" }
 	}
 
-	logRevocation(env, serial, certificateType, by, reason)
+	logRevocation(env, serial, certificateType, by, reason, address)
 
 	return { kind: "revoked", revokedAt }
 }
@@ -580,6 +588,8 @@ const CertificateRow = z.object({
 	renewal_of: z.string().nullable(),
 	revoked_by: z.string().nullable(),
 	revocation_reason: z.string().nullable(),
+	request_address: z.string().nullable(),
+	revocation_address: z.string().nullable(),
 })
 
 /** A recorded certificate as it is shown to an admin, see {@link listCertificates} and {@link getCertificate} */

@@ -17,7 +17,7 @@ describe("database migrations", () => {
 		expect(responses.map(r => r.status)).toEqual(Array.from({ length: 10 }, () => 200))
 
 		const { results } = await env.DB.prepare("SELECT name FROM migrations").all()
-		expect(results).toEqual([{ name: "0001_initial_schema" }, { name: "0002_krl_version" }, { name: "0003_krl_revision" }, { name: "0004_certificate_audit" }, { name: "0005_renewal_of" }])
+		expect(results).toEqual([{ name: "0001_initial_schema" }, { name: "0002_krl_version" }, { name: "0003_krl_revision" }, { name: "0004_certificate_audit" }, { name: "0005_renewal_of" }, { name: "0006_client_address" }])
 	})
 
 	it("link renewals recorded before 0005_renewal_of on D1", async () => {
