@@ -95,13 +95,19 @@ describe("applyMigrations", () => {
 		raw.exec("INSERT INTO migrations (name) VALUES ('0001_initial_schema')")
 		// the certificates table as created by that migration, without any of
 		// the columns added since
-		raw.exec("CREATE TABLE certificates (id INTEGER PRIMARY KEY, serial TEXT)")
+		raw.exec(`CREATE TABLE certificates (id INTEGER PRIMARY KEY, serial TEXT UNIQUE NOT NULL, key_id TEXT NOT NULL,
+			principals TEXT NOT NULL, extensions TEXT, valid_after TIMESTAMP NOT NULL, valid_before TIMESTAMP NOT NULL,
+			revoked_at TIMESTAMP, certificate_type INTEGER NOT NULL DEFAULT 0, public_key TEXT)`)
 
 		const applied = await applyMigrations(db, migrations)
 
 		// only migrations added since are applied, so the table is not created again
-		expect(applied.map(m => m.name)).toEqual(["0002_krl_version", "0003_krl_revision", "0004_certificate_audit"])
-		expect(columns(raw, "certificates")).toEqual(["id", "serial", "requested_by", "revoked_by", "revocation_reason"])
+		expect(applied.map(m => m.name)).toEqual(["0002_krl_version", "0003_krl_revision", "0004_certificate_audit", "0005_renewal_of"])
+		expect(columns(raw, "certificates")).toEqual([
+			"id", "serial", "key_id", "principals", "extensions", "valid_after",
+			"valid_before", "revoked_at", "certificate_type", "public_key",
+			"requested_by", "revoked_by", "revocation_reason", "renewal_of",
+		])
 	})
 
 	it("should create the certificates schema", async () => {
@@ -109,11 +115,11 @@ describe("applyMigrations", () => {
 
 		await applyMigrations(db, migrations)
 
-		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version", "0003_krl_revision", "0004_certificate_audit"])
+		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version", "0003_krl_revision", "0004_certificate_audit", "0005_renewal_of"])
 		expect(columns(raw, "certificates")).toEqual([
 			"id", "serial", "key_id", "principals", "extensions", "valid_after",
 			"valid_before", "revoked_at", "certificate_type", "public_key",
-			"requested_by", "revoked_by", "revocation_reason",
+			"requested_by", "revoked_by", "revocation_reason", "renewal_of",
 		])
 	})
 

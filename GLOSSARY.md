@@ -29,7 +29,7 @@ A user name or host name that a certificate is valid for.
 _Avoid_: Role (roles are identity token principals used to decide who may request host certificates), group
 
 **Renewal**:
-Issuing a new host certificate for the same key and principals as a current host certificate from this CA, in exchange for revoking it, proven by possession of the host key rather than by tokens.
+Issuing a new host certificate for the same key and principals as a current host certificate from this CA, in exchange for revoking it, proven by possession of the host key rather than by tokens. A renewed certificate has no requester of its own; it records the certificate it is a renewal of, which leads back to the request the chain began with.
 _Avoid_: Refresh, re-issue
 
 **Admin**:

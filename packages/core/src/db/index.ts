@@ -172,9 +172,9 @@ export const recordCertificate = async (env: StoreBindings, certificate: SshCert
  * revoked.
  *
  * The certificate that was renewed is recorded as revoked by its key holder
- * because of the renewal, and the renewed certificate keeps the requester of
- * the certificate that was renewed, as a renewal is proven by possession of
- * the host key rather than by a requester's tokens.
+ * because of the renewal, and the renewed certificate records the serial of
+ * the certificate it is a renewal of without a requester, as a renewal is
+ * proven by possession of the host key rather than by a requester's tokens.
  *
  * @param env The CA bindings
  * @param previous The certificate that was presented for renewal
@@ -195,7 +195,7 @@ export const recordRenewal = async (env: StoreBindings, previous: SshCertificate
 		env.DB.prepare("UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ? WHERE serial = ? AND certificate_type = ? AND revoked_at IS NULL")
 			.bind(revokedAt, RenewalRevoker, RenewalReason, `${previous.serial}`, CertificateType.Host),
 		// changes() is the number of rows revoked by the previous statement
-		env.DB.prepare(`INSERT INTO certificates (${columns}, requested_by) SELECT ${placeholders}, (SELECT requested_by FROM certificates WHERE serial = ?) WHERE changes() = 1`)
+		env.DB.prepare(`INSERT INTO certificates (${columns}, renewal_of) SELECT ${placeholders}, ? WHERE changes() = 1`)
 			.bind(...certificateValues(certificate, certificate.keyId, CertificateType.Host), `${previous.serial}`),
 		// the previous certificate was revoked if the renewed one was recorded
 		env.DB.prepare(BumpRevisionIfChanged).bind(CertificateType.Host),
@@ -577,6 +577,7 @@ const CertificateRow = z.object({
 	certificate_type: z.enum(CertificateType),
 	public_key: z.string().nullable(),
 	requested_by: z.string().nullable(),
+	renewal_of: z.string().nullable(),
 	revoked_by: z.string().nullable(),
 	revocation_reason: z.string().nullable(),
 })
@@ -742,4 +743,64 @@ export const getCertificate = async (env: StoreBindings, serial: bigint, certifi
 	const [row] = z.array(CertificateRow).max(1).parse(res.results)
 
 	return row
+}
+
+/**
+ * The certificates a host certificate is linked to by renewal: the one it is
+ * a renewal of, and the one that renewed it.
+ */
+export type RenewalLinks = {
+	/** The certificate this one is a renewal of, or undefined if it is not a renewal or not known, see {@link RenewalOf} */
+	renewalOf: RenewalOf | undefined
+	/** The serial of the certificate that is a renewal of this one, or undefined if it was not renewed or that is not known */
+	renewedAs: string | undefined
+}
+
+/**
+ * The certificate a renewal renewed, which is `recorded` while it is still in
+ * the database and `notRecorded` once it has been removed by
+ * {@link dbCleanup}, or if it was never recorded.
+ */
+export type RenewalOf =
+	| { kind: "recorded", serial: string }
+	| { kind: "notRecorded", serial: string }
+
+const SerialRows = z.array(z.object({ serial: z.string() })).max(1)
+
+/**
+ * Returns the certificates a certificate is linked to by renewal, see
+ * {@link RenewalLinks}. Only host certificates are renewed, so a user
+ * certificate has no links.
+ *
+ * @param env The CA bindings
+ * @param certificate The certificate, see {@link getCertificate}
+ * @returns The certificates it is linked to
+ */
+export const getRenewalLinks = async (env: StoreBindings, certificate: Pick<CertificateDetails, "serial" | "certificate_type" | "renewal_of">): Promise<RenewalLinks> => {
+	if (certificate.certificate_type !== CertificateType.Host) {
+		return { renewalOf: undefined, renewedAs: undefined }
+	}
+
+	// ensure migrations have been applied
+	await connect(env)
+
+	const serialOf = async (query: string, value: string): Promise<string | undefined> => {
+		const res = await env.DB.prepare(query).bind(value, CertificateType.Host).all()
+		if (!res.success) {
+			throw new Error("error during query")
+		}
+
+		return SerialRows.parse(res.results)[0]?.serial
+	}
+
+	const renewedAs = await serialOf("SELECT serial FROM certificates WHERE renewal_of = ? AND certificate_type = ? LIMIT 1", certificate.serial)
+	if (certificate.renewal_of === null) {
+		return { renewalOf: undefined, renewedAs }
+	}
+
+	const previous = await serialOf("SELECT serial FROM certificates WHERE serial = ? AND certificate_type = ?", certificate.renewal_of)
+	return {
+		renewalOf: { kind: previous === undefined ? "notRecorded" : "recorded", serial: certificate.renewal_of },
+		renewedAs,
+	}
 }

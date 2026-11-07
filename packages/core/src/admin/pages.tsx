@@ -1,5 +1,5 @@
 import type { FC, PropsWithChildren } from "hono/jsx"
-import type { CertificateDetails, CertificateStatus } from "../db/index.js"
+import type { CertificateDetails, CertificateStatus, RenewalLinks, RenewalOf } from "../db/index.js"
 import { PublicKey } from "../ssh/keys.js"
 import { BaseStylesheet } from "../web/styles.js"
 import { certificatesPath, MaxRevocationReason, type CertificateKind, type CertificateListQuery } from "./query.js"
@@ -569,6 +569,8 @@ export type CertificateDetailProps = {
 	kind: CertificateKind
 	certificate: CertificateDetails
 	status: CertificateStatus
+	/** The certificates it is linked to by renewal, see {@link RenewalLinks} */
+	renewal: RenewalLinks
 	/** The revoke form as it was sent, when it is shown again because it was not valid */
 	revokeForm?: { reason: string, errors: string[] } | undefined
 }
@@ -601,13 +603,34 @@ const RevokeSection: FC<{ kind: CertificateKind, serial: string, form: Certifica
 	)
 }
 
+// a link to a certificate of the same kind
+const CertificateLink: FC<{ kind: CertificateKind, serial: string }> = ({ kind, serial }) =>
+	<a class="mono" href={`${certificatesPath(kind)}/${serial}`}>{serial}</a>
+
+// the certificate a renewal renewed, which is only linked to while it is
+// still recorded
+const RenewalOfValue: FC<{ kind: CertificateKind, renewalOf: RenewalOf }> = ({ kind, renewalOf }) => {
+	switch (renewalOf.kind) {
+		case "recorded":
+			return <CertificateLink kind={kind} serial={renewalOf.serial} />
+		case "notRecorded":
+			return <><span class="mono">{renewalOf.serial}</span> <span class="unknown">(no longer recorded)</span></>
+		default: {
+			const unknown: never = renewalOf
+			throw new Error(`unknown renewal ${JSON.stringify(unknown)}`)
+		}
+	}
+}
+
 /**
  * Everything recorded about one certificate. The revocation details are only
  * shown for a revoked certificate, and audit values that were not recorded
- * are shown as "unknown". A valid certificate has a form to revoke it, while
- * revoked and expired certificates are read-only.
+ * are shown as "unknown". A renewal has no requester, and links to the
+ * certificate it is a renewal of, while a certificate revoked for renewal
+ * links to the certificate that renewed it. A valid certificate has a form to
+ * revoke it, while revoked and expired certificates are read-only.
  */
-export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind, certificate, status, revokeForm }) => {
+export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind, certificate, status, renewal, revokeForm }) => {
 	const extensions = certificate.extensions === null || certificate.extensions === "" ? [] : certificate.extensions.split(",")
 	const keyFingerprint = fingerprint(certificate.public_key)
 
@@ -639,7 +662,11 @@ export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind,
 					<dt>Public key fingerprint</dt>
 					<dd>{keyFingerprint === undefined ? <Unknown /> : <code>{keyFingerprint}</code>}</dd>
 					<dt>Requested by</dt>
-					<dd>{certificate.requested_by ?? <Unknown />}</dd>
+					<dd>{certificate.requested_by ?? (renewal.renewalOf === undefined ? <Unknown /> : <span class="unknown">none (renewal)</span>)}</dd>
+					{renewal.renewalOf !== undefined && <>
+						<dt>Renewal of</dt>
+						<dd><RenewalOfValue kind={kind} renewalOf={renewal.renewalOf} /></dd>
+					</>}
 				</dl>
 			</section>
 			{certificate.revoked_at !== null && (
@@ -652,6 +679,10 @@ export const CertificateDetailPage: FC<CertificateDetailProps> = ({ email, kind,
 						<dd>{certificate.revoked_by ?? <Unknown />}</dd>
 						<dt>Revocation reason</dt>
 						<dd>{certificate.revocation_reason ?? <Unknown />}</dd>
+						{(renewal.renewedAs !== undefined || certificate.revocation_reason === "renewal") && <>
+							<dt>Renewed as</dt>
+							<dd>{renewal.renewedAs === undefined ? <Unknown /> : <CertificateLink kind={kind} serial={renewal.renewedAs} />}</dd>
+						</>}
 					</dl>
 				</section>
 			)}
