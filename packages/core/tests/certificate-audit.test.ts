@@ -331,7 +331,7 @@ describe("migration 0005_renewal_of", () => {
 		["another key", { publicKey: "ssh-ed25519 AAAA2" }],
 		["other principals", { principals: "CN=other.example.com" }],
 		["another requester", { requestedBy: "other@example.com" }],
-		["a validity that started more than a minute before the revocation", { validAfter: "2026-01-01T23:58:00.000Z" }],
+		["a validity that started 15 seconds or more before the revocation", { validAfter: "2026-01-01T23:59:45.250Z" }],
 		["a validity that started after the revocation", { validAfter: "2026-01-02T00:00:01.000Z" }],
 		["a user certificate", { type: 0 }],
 	])("should not link a certificate with %s", async (_name, change) => {
@@ -343,6 +343,15 @@ describe("migration 0005_renewal_of", () => {
 		const rows = await migrate(raw)
 
 		expect(rows["2"]).toEqual({ requested_by: change.requestedBy ?? Requester, renewal_of: null })
+	})
+
+	it("should link a certificate whose validity started just under 15 seconds before the revocation", async () => {
+		const raw = await existing(
+			{ serial: "1", validAfter: "2026-01-01T00:00:00.000Z", renewedAt: "2026-01-02T00:00:00.250Z" },
+			{ serial: "2", validAfter: "2026-01-01T23:59:45.500Z" },
+		)
+
+		expect((await migrate(raw))["2"]).toEqual({ requested_by: null, renewal_of: "1" })
 	})
 
 	it("should not link a certificate recorded before the one revoked", async () => {

@@ -12,7 +12,7 @@ export const migration: Migration = {
 		// renewals recorded before this migration kept the requester of the
 		// certificate they renewed. Each certificate revoked for renewal is
 		// matched with the host certificate recorded after it for the same key,
-		// principals and requester, whose validity started at most a minute
+		// principals and requester, whose validity started at most 15 seconds
 		// before the revocation (a renewal is signed, then recorded with the
 		// revocation). A match is only used when neither certificate matches
 		// any other, so a certificate that cannot be told apart is left as it
@@ -29,7 +29,7 @@ export const migration: Migration = {
 				AND previous.principals = renewed.principals
 				AND previous.requested_by IS renewed.requested_by
 				AND unixepoch(previous.revoked_at, 'subsec') >= unixepoch(renewed.valid_after, 'subsec')
-				AND unixepoch(previous.revoked_at, 'subsec') < unixepoch(renewed.valid_after, 'subsec', '+60 seconds')
+				AND unixepoch(previous.revoked_at, 'subsec') < unixepoch(renewed.valid_after, 'subsec', '+15 seconds')
 			WHERE renewed.certificate_type = 1
 		),
 		unique_matches AS (
