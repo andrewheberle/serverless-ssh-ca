@@ -620,8 +620,11 @@ page answers on every host name. Every visitor sees the link, as the CA cannot
 tell who is an admin outside `/admin`.
 
 The page has no client-side JavaScript or forms and loads only its own
-stylesheet (`/style.css`), and is sent with the same security headers as the
-admin UI.
+stylesheet, and is sent with the same security headers as the admin UI,
+except that its `Content-Security-Policy` allows no scripts. The stylesheet
+is served at `/style-<hash>.css`, named after its content as described in
+[Stylesheet and script](#stylesheet-and-script), and as the page is public
+it is sent with `Cache-Control: public, max-age=31536000, immutable`.
 
 The CA's URL in the instructions is the origin the page was requested on. On
 Workers this is always the public URL. On Node.js, behind a reverse proxy that
@@ -666,6 +669,28 @@ revoked, and for a revocation by the key holder the client address it was
 revoked from. Values that were not recorded, such as the requester of a
 certificate issued before they were recorded, or the reason for a revocation
 by the key holder, are shown as "unknown".
+
+#### Times
+
+Times are recorded in UTC, and the server always renders them in UTC, such
+as `2026-11-04 21:10 UTC`, to the minute in the lists and to the second on
+the detail page.
+
+The admin UI's script then shows them in the browser's time zone, in the same
+layout with the UTC offset of each time in place of `UTC`, such as
+`2026-11-05 05:10 UTC+8`, `UTC+5:30`, `UTC-3:30` or `UTC+0`. Each time has
+its own offset, so the two ends of a certificate's validity can show
+different offsets either side of a change to or from daylight saving time.
+Hovering over a time shows it the other way.
+
+The header has a **Times: Local | UTC** switch to show times in UTC instead.
+The choice is remembered by the browser (in `localStorage`, under
+`admin-time-zone`), and times are shown in local time until a choice is made,
+or when the browser does not allow it to be remembered.
+
+The script only changes how times are displayed. Without it, times are shown
+in UTC, the switch is hidden, and everything else works the same. See
+[ADR-0004](../../docs/adr/0004-admin-ui-javascript-is-display-only.md).
 
 #### Revoking certificates
 
@@ -720,7 +745,11 @@ for why.
   them. `GET` requests are not limited.
 - Every response has a strict `Content-Security-Policy`, `Cache-Control:
   no-store`, `Referrer-Policy: same-origin` and `X-Content-Type-Options:
-  nosniff`. Pages are plain HTML without JavaScript. Other sites are never
+  nosniff`. The policy allows scripts and styles from the admin UI itself
+  only, and no inline scripts. The only script is the one that shows
+  [times](#times) in the browser's time zone, and pages work without it. The
+  stylesheet and script are the only responses that may be cached, see
+  [Stylesheet and script](#stylesheet-and-script). Other sites are never
   sent a referrer. `no-referrer` is not used because browsers then send
   `Origin: null` on the admin UI's own forms, which would be refused.
 - Every request is logged at info level with the admin's email, the method,
@@ -729,6 +758,20 @@ for why.
 Make sure the proxy protects every hostname the CA answers on, or set
 `ADMIN_HOSTNAME` to the one it protects. On Workers this includes the
 `workers.dev` hostname unless `workers_dev` is `false`.
+
+#### Stylesheet and script
+
+The admin UI's stylesheet and script are served at
+`/admin/style-<hash>.css` and `/admin/time-<hash>.js`, where `<hash>` is the
+first 8 hex characters of the SHA-256 of the file's content. The name changes
+whenever the content does, so browsers can keep them for a year
+(`Cache-Control: private, max-age=31536000, immutable`) and are never given
+an old copy after the CA is updated. They are `private` as they are only
+served to admins, behind the proxy.
+
+Only the current name of each file is served. Any other name, such as
+`/admin/style.css` or the name of an earlier version, gets a `404` that is not
+cached. Pages are never cached, so they always link the current names.
 
 #### Settings
 

@@ -360,12 +360,12 @@ describe("certificate list", () => {
 		expect(body).toContain("<li>Serial must be a serial number in decimal.</li>")
 	})
 
-	it("should show times in UTC to the minute, with the exact time in the datetime attribute", async () => {
+	it("should show times in UTC to the minute, with the exact time in the datetime attribute and the precision for the script", async () => {
 		const { ca, seed } = await setup()
 		seed({})
 
 		const { body } = await list(ca, "/admin/user/certificates")
-		expect(body).toMatch(/<td><time datetime="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC<\/time><\/td>/)
+		expect(body).toMatch(/<td><time datetime="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z" data-precision="minute">\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC<\/time><\/td>/)
 	})
 
 	it("should accept the largest serial", () => {
@@ -416,8 +416,8 @@ describe("certificate detail", () => {
 		expect(body).toContain("<dt>Key ID</dt><dd>alice@example.com</dd>")
 		expect(body).toContain(`<dt>Principals</dt><dd><ul class="plain"><li>alice</li><li>admins</li></ul></dd>`)
 		expect(body).toContain(`<dt>Extensions</dt><dd><ul class="plain"><li>permit-pty</li><li>permit-agent-forwarding</li></ul></dd>`)
-		expect(body).toMatch(/<dt>Valid from<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
-		expect(body).toMatch(/<dt>Valid until<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
+		expect(body).toMatch(/<dt>Valid from<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z" data-precision="second">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
+		expect(body).toMatch(/<dt>Valid until<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z" data-precision="second">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
 		expect(body).toContain(`<dt>Status</dt><dd><span class="badge valid">Valid</span></dd>`)
 		expect(body).toContain(`<dt>Public key fingerprint</dt><dd><code>${PublicKey.parse(ecdsaKey.user().publicKey).fingerprint()}</code></dd>`)
 		expect(body).toContain("<dt>Requested by</dt><dd>alice@example.com</dd>")
@@ -442,7 +442,7 @@ describe("certificate detail", () => {
 
 		const body = await (await get(ca, `/admin/user/certificates/${serial}`)).text()
 		expect(body).toContain(`<dt>Status</dt><dd><span class="badge revoked">Revoked</span></dd>`)
-		expect(body).toMatch(/<dt>Revoked at<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
+		expect(body).toMatch(/<dt>Revoked at<\/dt><dd><time datetime="\d{4}-\d{2}-\d{2}T[\d:.]+Z" data-precision="second">\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC<\/time><\/dd>/)
 		expect(body).toContain(`<dt>Revoked by</dt><dd>${AdminEmail}</dd>`)
 		expect(body).toContain("<dt>Revocation reason</dt><dd>key was lost</dd>")
 	})
