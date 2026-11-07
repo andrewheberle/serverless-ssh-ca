@@ -6,14 +6,14 @@ import { csrf } from "hono/csrf"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
 import type { JSX } from "hono/jsx/jsx-runtime"
 import { caConfig } from "../config.js"
-import { certificateStatus, getCertificate, getRenewalLinks, listCertificates, revokeCertificate } from "../db/index.js"
+import { certificateStatus, getCertificate, getCertificates, getRenewalLinks, listCertificates, MaxBulkRevocation, revokeCertificate, revokeCertificates } from "../db/index.js"
 import { logger } from "../logger.js"
 import type { SshCaBindings } from "../types.js"
 import { assetResponse, type HashedAsset } from "../web/assets.js"
 import { SecurityHeaders, securityHeaders } from "../web/headers.js"
 import { authenticateAdmin, type EnabledAdminConfig } from "./auth.js"
-import { CertificateDetailPage, CertificateListPage, ErrorPage, StylesheetAsset } from "./pages.js"
-import { CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeQueryError, RevokeForm, SerialString, type CertificateKind } from "./query.js"
+import { BulkRevokePage, BulkRevokeResultPage, CertificateDetailPage, CertificateListPage, ErrorPage, StylesheetAsset } from "./pages.js"
+import { BulkRevokeForm, bulkRevocationFilters, CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeBulkRevokeError, describeQueryError, formValues, RevokeForm, SerialString, type CertificateKind } from "./query.js"
 import { TimeScriptAsset } from "./time.js"
 
 /** The path the admin UI is served under */
@@ -77,7 +77,8 @@ const adminEmail = (c: Context<AdminEnv>): string => {
 }
 
 // the largest request body accepted by the admin UI, which is far more than
-// the revoke form sends
+// the revoke forms send, even with every certificate of a bulk revocation
+// ticked
 const MaxBodySize = 16 * 1024
 
 // renders a page as an HTML document
@@ -260,6 +261,91 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 			certificates={certificates.map((certificate) => ({ ...certificate, status: certificateStatus(certificate, now) }))}
 			nextPage={next === undefined ? undefined : certificatesLink(kind, { ...query.data, before: next })}
 		/>)
+	})
+
+	// confirms revoking the valid certificates that match a list's filters,
+	// which must be narrowed by a principal or key ID. This is registered
+	// before the detail page, whose serial would otherwise match "revoke"
+	app.get("/:kind/certificates/revoke", async (c) => {
+		const kind = certificateKind(c.req.param("kind"))
+		if (kind === undefined) {
+			return c.notFound()
+		}
+
+		const email = adminEmail(c)
+		const query = CertificateListQuery.safeParse(c.req.query())
+		if (!query.success) {
+			return page(c, <ErrorPage email={email} title="Invalid filters" message="The certificates to revoke could not be found because of these filters:" problems={describeQueryError(query.error)} />, 400)
+		}
+
+		const filters = bulkRevocationFilters(query.data)
+		if (filters === undefined) {
+			return page(c, <ErrorPage email={email} title="Filter the certificates first" message="Certificates can only be revoked together from a list of valid certificates filtered by principal or key ID." />, 400)
+		}
+
+		const { certificates, next } = await listCertificates(env, {
+			certificateType: certificateType(kind),
+			status: "valid",
+			principal: filters.principal,
+			keyId: filters.key_id,
+			serial: filters.serial,
+		})
+		const now = new Date()
+
+		return page(c, <BulkRevokePage
+			email={email}
+			kind={kind}
+			filters={filters}
+			certificates={certificates.map((certificate) => ({ ...certificate, status: certificateStatus(certificate, now) }))}
+			more={next !== undefined}
+		/>)
+	})
+
+	// revokes the certificates ticked on the bulk revocation page, with one
+	// reason for them all, and shows what happened to each. Revocations are
+	// permanent, so the reason and confirmation are required, and the
+	// cross-site and rate limiting middleware above apply as to every POST
+	app.post("/:kind/certificates/revoke", bodyLimit({ maxSize: MaxBodySize, onError: (c) => c.text("Payload Too Large", 413) }), async (c) => {
+		const kind = certificateKind(c.req.param("kind"))
+		if (kind === undefined) {
+			return c.notFound()
+		}
+
+		const email = adminEmail(c)
+		const body = await c.req.parseBody({ all: true })
+		const form = BulkRevokeForm.safeParse(body)
+		if (!form.success) {
+			// list the certificates that were sent, as those that were
+			// unticked are not, and keep what else was entered
+			const serials = formValues(body.serial).flatMap((v) => {
+				const serial = SerialString.safeParse(v)
+				return serial.success ? [serial.data] : []
+			})
+			const certificates = await getCertificates(env, [...new Set(serials)].slice(0, MaxBulkRevocation), certificateType(kind))
+			const filters = BulkRevokeForm.pick({ principal: true, key_id: true }).safeParse(body)
+			const reason = typeof body.reason === "string" ? body.reason : ""
+			const now = new Date()
+
+			return page(c, <BulkRevokePage
+				email={email}
+				kind={kind}
+				filters={filters.success ? filters.data : {}}
+				certificates={certificates.map((certificate) => ({ ...certificate, status: certificateStatus(certificate, now) }))}
+				more={false}
+				form={{ reason, errors: describeBulkRevokeError(form.error) }}
+			/>, 422)
+		}
+
+		// the operation decides for each certificate, as any may have been
+		// revoked or have expired since the page was shown
+		const results = await revokeCertificates(env, {
+			serials: form.data.serial,
+			certificateType: certificateType(kind),
+			email,
+			reason: form.data.reason,
+		})
+
+		return page(c, <BulkRevokeResultPage email={email} kind={kind} filters={{ principal: form.data.principal, key_id: form.data.key_id }} results={results} />)
 	})
 
 	app.get("/:kind/certificates/:serial", async (c) => {

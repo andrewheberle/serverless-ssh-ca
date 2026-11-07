@@ -124,6 +124,44 @@ describe("admin revocation on workerd", () => {
         expect(await detail.text()).toContain("<dt>Revocation reason</dt><dd>Laptop stolen</dd>")
     })
 
+    it("should revoke several certificates together, with one KRL revision", async () => {
+        // apply the migrations, then record two valid user certificates and an expired one
+        expect((await fetch(new Request(`${origin}/api/v4/user/krl`))).status).toBe(200)
+        const now = Date.now()
+        const record = async (serial: string, validBefore: number): Promise<void> => {
+            await env.DB.prepare("INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before, certificate_type, public_key, requested_by) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)")
+                .bind(serial, "bob@example.com", "UID=bob", "permit-pty", new Date(now - 7_200_000).toISOString(), new Date(validBefore).toISOString(), null, "bob@example.com")
+                .run()
+        }
+        await record("515151", now + 3_600_000)
+        await record("525252", now + 3_600_000)
+        await record("535353", now - 60_000)
+        const revision = async (): Promise<unknown> => (await env.DB.prepare("SELECT revision FROM krl WHERE certificate_type = 0").first())?.revision
+        const before = await revision()
+
+        const response = await fetch(new Request(`${origin}/admin/user/certificates/revoke`, {
+            method: "POST",
+            headers: {
+                "Cf-Access-Jwt-Assertion": await jwt(),
+                "Origin": origin,
+                "Sec-Fetch-Site": "same-origin",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: "serial=515151&serial=525252&serial=535353&reason=Offboarding&confirm=yes&key_id=bob",
+        }))
+
+        expect(response.status).toBe(200)
+        expect(await response.text()).toContain("Revoked 2 of 3 certificates")
+
+        const { results } = await env.DB.prepare("SELECT serial, revoked_by, revocation_reason FROM certificates WHERE serial IN ('515151', '525252', '535353') ORDER BY serial").all()
+        expect(results).toEqual([
+            { serial: "515151", revoked_by: adminEmail, revocation_reason: "Offboarding" },
+            { serial: "525252", revoked_by: adminEmail, revocation_reason: "Offboarding" },
+            { serial: "535353", revoked_by: null, revocation_reason: null },
+        ])
+        expect(await revision()).toBe(Number(before) + 1)
+    })
+
     it("should refuse a cross-site revocation", async () => {
         const response = await fetch(new Request(`${origin}/admin/user/certificates/1/revoke`, {
             method: "POST",

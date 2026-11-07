@@ -730,6 +730,154 @@ export const listCertificates = async (env: StoreBindings, filter: CertificateFi
 	}
 }
 
+/** The most certificates {@link revokeCertificates} revokes at once, which is a page of {@link listCertificates} */
+export const MaxBulkRevocation = CertificatePageSize
+
+/** Certificates an admin is revoking together, for the same reason, see {@link revokeCertificates} */
+export type BulkRevocation = {
+	/** The serials of the certificates, at most {@link MaxBulkRevocation} once any given more than once are removed */
+	serials: readonly bigint[]
+	certificateType: CertificateType
+	/** The email of the admin, exactly as the identity-aware proxy's JWT gives it */
+	email: string
+	reason: string
+}
+
+/** What happened to one certificate of a {@link BulkRevocation}, see {@link RevocationResult} */
+export type BulkRevocationResult = {
+	serial: bigint
+	result: RevocationResult
+}
+
+// increments the revision of the KRL for a certificate type, but only if the
+// previous statement in the same batch changed any rows
+const BumpRevisionIfAnyChanged = "UPDATE krl SET revision = revision + 1 WHERE certificate_type = ? AND changes() > 0"
+
+// the state of each certificate after a bulk revocation, which decides what
+// happened to it
+const BulkRevocationStateRows = z.array(z.object({
+	serial: z.string(),
+	revoked_at: z.string().nullable(),
+	revoked_by: z.string().nullable(),
+	revocation_reason: z.string().nullable(),
+	expired: z.union([z.literal(0), z.literal(1)]).transform((v) => v === 1),
+}))
+
+/**
+ * Revokes several certificates of one type for an admin, with the same
+ * reason, as {@link revokeCertificate} does for one, see
+ * {@link BulkRevocation}.
+ *
+ * Every certificate that is still valid is revoked in a single transaction,
+ * which increments the KRL revision for the certificate type once if any
+ * were revoked. Certificates that are already revoked, have expired or are
+ * not of the type are left as they are and reported, so one that changed
+ * since the admin chose it does not stop the others being revoked.
+ *
+ * @param env The CA bindings
+ * @param revocation The certificates to revoke and who is revoking them
+ * @returns What happened to each certificate, in the order they were given, with any given more than once reported once
+ * @throws {RangeError} If more than {@link MaxBulkRevocation} certificates are given
+ */
+export const revokeCertificates = async (env: StoreBindings, revocation: BulkRevocation): Promise<BulkRevocationResult[]> => {
+	const { certificateType, email, reason } = revocation
+	const serials = [...new Set(revocation.serials)]
+	if (serials.length > MaxBulkRevocation) {
+		throw new RangeError(`at most ${MaxBulkRevocation} certificates can be revoked at once`)
+	}
+	if (serials.length === 0) {
+		return []
+	}
+
+	// ensure migrations have been applied
+	await connect(env)
+
+	const revokedAt = (new Date).toISOString()
+	const list = serials.map(() => "?").join(", ")
+	const values = serials.map((serial) => `${serial}`)
+
+	// only certificates that are still valid as they are revoked are
+	// revoked, so a revocation by another request is never overwritten
+	const results = await env.DB.batch([
+		env.DB.prepare(`UPDATE certificates SET revoked_at = ?, revoked_by = ?, revocation_reason = ?, revocation_address = NULL WHERE certificate_type = ? AND serial IN (${list}) AND revoked_at IS NULL AND unixepoch('subsec') < unixepoch(valid_before,'subsec')`)
+			.bind(revokedAt, email, reason, certificateType, ...values),
+		env.DB.prepare(BumpRevisionIfAnyChanged).bind(certificateType),
+	])
+
+	if (results.some((res) => !res.success)) {
+		throw new Error("error during query")
+	}
+
+	// read back what happened to each certificate. One this request revoked
+	// has exactly the time, admin and reason it was revoked with, which
+	// another request could only also have if the same admin revoked it with
+	// the same reason in the same millisecond
+	const res = await env.DB.prepare(`SELECT serial, revoked_at, revoked_by, revocation_reason, unixepoch('subsec') >= unixepoch(valid_before,'subsec') AS expired FROM certificates WHERE certificate_type = ? AND serial IN (${list})`)
+		.bind(certificateType, ...values)
+		.all()
+
+	if (!res.success) {
+		throw new Error("error during query")
+	}
+
+	const states = new Map(BulkRevocationStateRows.parse(res.results).map((row) => [row.serial, row]))
+
+	return serials.map((serial): BulkRevocationResult => {
+		const state = states.get(`${serial}`)
+		if (state === undefined) {
+			return { serial, result: { kind: "notFound" } }
+		}
+		if (state.revoked_at === revokedAt && state.revoked_by === email && state.revocation_reason === reason) {
+			logRevocation(env, serial, certificateType, email, reason, undefined)
+			return { serial, result: { kind: "revoked", revokedAt } }
+		}
+		if (state.revoked_at !== null) {
+			return { serial, result: { kind: "alreadyRevoked" } }
+		}
+		if (state.expired) {
+			return { serial, result: { kind: "expired" } }
+		}
+
+		// a certificate that is neither revoked nor expired now was valid
+		// when the batch ran, so it would have been revoked
+		throw new Error(`certificate ${serial} was valid but not revoked`)
+	})
+}
+
+/**
+ * Returns recorded certificates of one type by their serials, newest first,
+ * see {@link getCertificate}. Serials with no certificate of the type are
+ * left out.
+ *
+ * @param env The CA bindings
+ * @param serials The serials, at most {@link MaxBulkRevocation} once any given more than once are removed
+ * @param certificateType The type of the certificates
+ * @returns The certificates
+ * @throws {RangeError} If more than {@link MaxBulkRevocation} serials are given
+ */
+export const getCertificates = async (env: StoreBindings, serials: readonly bigint[], certificateType: CertificateType): Promise<CertificateDetails[]> => {
+	const values = [...new Set(serials)].map((serial) => `${serial}`)
+	if (values.length > MaxBulkRevocation) {
+		throw new RangeError(`at most ${MaxBulkRevocation} certificates can be read at once`)
+	}
+	if (values.length === 0) {
+		return []
+	}
+
+	// ensure migrations have been applied
+	await connect(env)
+
+	const res = await env.DB.prepare(`SELECT ${CertificateRowColumns} FROM certificates WHERE certificate_type = ? AND serial IN (${values.map(() => "?").join(", ")}) ORDER BY id DESC`)
+		.bind(certificateType, ...values)
+		.all()
+
+	if (!res.success) {
+		throw new Error("error during query")
+	}
+
+	return z.array(CertificateRow).parse(res.results)
+}
+
 /**
  * Returns a recorded certificate by its serial and type.
  *

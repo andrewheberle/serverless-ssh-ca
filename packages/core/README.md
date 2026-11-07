@@ -646,6 +646,8 @@ revoke any that are still valid. It is not part of the OpenAPI schema.
 | `/admin/user/certificates`, `/admin/host/certificates` | The user or host certificates, newest first, 50 at a time |
 | `/admin/user/certificates/<serial>`, `/admin/host/certificates/<serial>` | Everything recorded about one certificate, and a form to revoke it while it is valid |
 | `POST /admin/user/certificates/<serial>/revoke`, `POST /admin/host/certificates/<serial>/revoke` | Revokes the certificate, sent by the revoke form |
+| `/admin/user/certificates/revoke`, `/admin/host/certificates/revoke` | Confirms revoking the valid certificates that match a list's filters, see [Revoking several certificates](#revoking-several-certificates) |
+| `POST /admin/user/certificates/revoke`, `POST /admin/host/certificates/revoke` | Revokes the certificates ticked on that page |
 
 The lists are filtered by query parameters, which the filter form on the
 page sets, so a filtered view can be bookmarked:
@@ -718,6 +720,38 @@ and are rate limited, as described in the [security model](#security-model).
 Whether a certificate has expired or was already revoked is checked again as
 it is revoked, so concurrent revocations revoke it once, keeping the first,
 and a revocation cannot race with the certificate expiring.
+
+#### Revoking several certificates
+
+To revoke every valid certificate of a person, such as when they leave,
+filter the user certificates by their email as the key ID (user certificates
+are issued with the requester's email as their key ID) or by their principal.
+A list filtered to **Valid** certificates by principal or key ID has a
+**Revoke these certificates…** button, which opens a page listing the
+matching certificates, newest first, each with a ticked box. The key ID
+filter matches any key ID that contains it, so `bob@example.com` also finds
+`jimbob@example.com`: check the list, and untick any certificate that should
+not be revoked. A list that is unfiltered, filtered by serial alone, or shows
+other statuses has no button, and its filters are refused by the page with a
+`400`.
+
+At most 50 certificates are listed. When more match, the page says so; revoke
+those shown, then open the page again for the rest.
+
+Only the ticked certificates are sent, with one reason for them all and the
+confirmation box, so what is revoked is what the admin saw, not whatever
+matches the filters by then. Each certificate is recorded and logged as if it
+had been revoked on its own, with the same reason. They are revoked in one
+transaction, and the KRL revision for the type is incremented once.
+
+| Response | When |
+|---|---|
+| `200` with what happened to each certificate | The request was valid. Each certificate is shown as revoked, or as already revoked, expired or not found when it changed since the page was shown, and the others are still revoked |
+| `422` with the page again | The reason is missing, empty or too long, the box was not ticked, no certificates were ticked, a serial is not valid, or more than 50 were sent. The page lists only the certificates that were sent, and nothing is revoked |
+
+Reloading the result page may send the form again, which revokes nothing
+more and shows each certificate as already revoked. See
+[ADR-0005](../../docs/adr/0005-bulk-revocation-confirms-listed-certificates.md).
 
 #### Security model
 
