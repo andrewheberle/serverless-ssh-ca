@@ -1,4 +1,46 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"enabled": false
+	"extends": [
+		"config:recommended",
+		"customManagers:githubActionsVersions"
+	],
+	"rangeStrategy": "update-lockfile",
+	"lockFileMaintenance": {
+		"description": "Renovate cannot read the locked version of a workspace dependency that npm hoists to the root (renovatebot/renovate discussion #47546), so it never proposes in-range updates for most of core's dependencies. Refreshing the whole lockfile weekly brings those updates, including security fixes, in anyway; see #567 and #568.",
+		"enabled": true
+	},
+	"osvVulnerabilityAlerts": true,
+	"vulnerabilityAlerts": {
+		"description": "Never raise a range that core or testing publishes: a zod range above the copy chanfana gets installs a second zod that chanfana never extends (#510). A security fix that needs a new range is made by hand as fix(deps).",
+		"rangeStrategy": "update-lockfile"
+	},
+	"packageRules": [
+		{
+			"description": "npm updates only change the lockfile, which isn't published, so they don't trigger a release",
+			"matchManagers": [
+				"npm"
+			],
+			"semanticCommitType": "chore"
+		},
+		{
+			"description": "Majors change the ranges core and testing publish, so they are only raised when approved on the Dependency Dashboard (#510)",
+			"matchManagers": [
+				"npm"
+			],
+			"matchUpdateTypes": [
+				"major"
+			],
+			"dependencyDashboardApproval": true
+		},
+		{
+			"matchManagers": [
+				"npm"
+			],
+			"matchPackageNames": [
+				"vitest",
+				"@vitest/**"
+			],
+			"groupName": "vitest"
+		}
+	]
 }
