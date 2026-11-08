@@ -29,8 +29,12 @@ A user name or host name that a certificate is valid for.
 _Avoid_: Role (roles are identity token principals used to decide who may request host certificates), group
 
 **Renewal**:
-Issuing a new host certificate for the same key and principals as a current host certificate from this CA, in exchange for revoking it, proven by possession of the host key rather than by tokens. A renewed certificate has no requester of its own; it records the certificate it is a renewal of, which leads back to the request the chain began with.
+Issuing a new host certificate for the same key and principals as a current host certificate from this CA, in exchange for revoking it, proven by a **proof of possession** of the host key rather than by tokens. A renewed certificate has no requester of its own; it records the certificate it is a renewal of, which leads back to the request the chain began with.
 _Avoid_: Refresh, re-issue
+
+**Proof of possession**:
+A signature made with a key over a timestamp, the key's fingerprint and the request it is sent with, which shows that whoever sent the request holds that key. It is only valid for that one request, and only briefly.
+_Avoid_: PoP, proof, signature
 
 **Client address**:
 The IP address a request to the CA came from, as reported by a proxy the CA is configured to trust. It records where a request came from, not who made it.
@@ -45,5 +49,5 @@ Marking an issued certificate as no longer trusted, so it appears in the KRL for
 _Avoid_: Cancellation, deletion
 
 **Revoker**:
-Whoever is revoking a certificate, which decides whether they may: the holder of the key the certificate was issued for, proven by possession of that key, or an admin.
+Whoever is revoking a certificate, which decides whether they may: the holder of the key the certificate was issued for, proven by a **proof of possession** of that key, or an admin.
 _Avoid_: Requester (a requester is authenticated by tokens, a revoker by what they hold or who they are)
