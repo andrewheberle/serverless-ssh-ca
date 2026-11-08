@@ -1,4 +1,5 @@
 import z from "zod"
+import { MaxBulkRevocation } from "../db/index.js"
 import { CertificateType } from "../db/types.js"
 
 /** The kinds of certificate, as they appear in admin UI paths */
@@ -141,3 +142,104 @@ export const RevokeForm = z.object({
 
 /** A validated revoke form, see {@link RevokeForm} */
 export type RevokeForm = z.infer<typeof RevokeForm>
+
+/**
+ * The filters of a list of certificates that may be revoked together: only
+ * valid certificates, narrowed by a principal or key ID, so every valid
+ * certificate is never one click away. A serial filter alone matches one
+ * certificate at most, which its own revoke form covers.
+ */
+export type BulkRevocationFilters = {
+	principal?: string | undefined
+	key_id?: string | undefined
+	serial?: bigint | undefined
+}
+
+/**
+ * Returns the filters of a list of certificates if its certificates may be
+ * revoked together, see {@link BulkRevocationFilters}.
+ *
+ * @param query The filters of the list
+ * @returns The filters, or undefined if the list may not be revoked together
+ */
+export const bulkRevocationFilters = (query: CertificateListQuery): BulkRevocationFilters | undefined => {
+	if (query.status !== "valid" || (query.principal === undefined && query.key_id === undefined)) {
+		return undefined
+	}
+
+	return { principal: query.principal, key_id: query.key_id, serial: query.serial }
+}
+
+/**
+ * Returns the path of the page that confirms revoking certificates of a kind
+ * together, and that its form is sent to.
+ *
+ * @param kind The kind of certificate
+ * @returns The path, such as `/admin/user/certificates/revoke`
+ */
+export const bulkRevokePath = (kind: CertificateKind): string => `${certificatesPath(kind)}/revoke`
+
+/**
+ * Returns the link to the page that confirms revoking the certificates that
+ * match filters, see {@link bulkRevocationFilters}.
+ *
+ * @param kind The kind of certificate
+ * @param filters The filters
+ * @returns The path and query string
+ */
+export const bulkRevokeLink = (kind: CertificateKind, filters: BulkRevocationFilters): string => {
+	// the list's own link, without the page, as the same filters are used
+	const list = certificatesLink(kind, { status: "valid", principal: filters.principal, key_id: filters.key_id, serial: filters.serial, before: undefined })
+	return `${bulkRevokePath(kind)}${list.slice(certificatesPath(kind).length)}`
+}
+
+// the message for a selected serial that is not a serial
+const NotASerial = "A selected certificate is not a valid serial number."
+
+/**
+ * The values of a form field that may be sent several times, as Hono's
+ * `parseBody({ all: true })` gives them: none, one, or an array.
+ *
+ * @param value The field's value
+ * @returns The values
+ */
+export const formValues = (value: unknown): unknown[] => value === undefined ? [] : Array.isArray(value) ? value : [value]
+
+/**
+ * The form an admin revokes several certificates of one kind with, see
+ * {@link RevokeForm}: a `serial` field for each certificate that is ticked,
+ * at most {@link MaxBulkRevocation}, one reason for them all and the
+ * confirmation. The `principal` and `key_id` filters the certificates were
+ * found with are sent back so the admin can be returned to the list. Each
+ * message is shown to the admin as it is.
+ */
+export const BulkRevokeForm = z.object({
+	serial: z.preprocess(formValues, z.array(z.string({ message: NotASerial }).pipe(SerialString))
+		.min(1, { message: "Select at least one certificate to revoke." })
+		.max(MaxBulkRevocation, { message: `At most ${MaxBulkRevocation} certificates can be revoked at once.` })),
+	reason: RevokeForm.shape.reason,
+	confirm: RevokeForm.shape.confirm,
+	principal: CertificateListQuery.shape.principal,
+	key_id: CertificateListQuery.shape.key_id,
+})
+
+/** A validated bulk revoke form, see {@link BulkRevokeForm} */
+export type BulkRevokeForm = z.infer<typeof BulkRevokeForm>
+
+/**
+ * Describes why a bulk revoke form is not valid, once for each problem.
+ *
+ * @param error The error from parsing {@link BulkRevokeForm}
+ * @returns The problems, as they are shown to the admin
+ */
+export const describeBulkRevokeError = (error: z.ZodError): string[] => [...new Set(error.issues.map((issue) => {
+	const [field] = issue.path
+	if (field === "serial" && issue.path.length > 1) {
+		return NotASerial
+	}
+	if (field === "principal" || field === "key_id") {
+		return `${QueryLabels[field]} ${issue.message}.`
+	}
+
+	return issue.message
+}))]

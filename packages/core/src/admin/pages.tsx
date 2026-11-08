@@ -1,9 +1,9 @@
 import type { FC, PropsWithChildren } from "hono/jsx"
-import { KeyHolderRevoker, type CertificateDetails, type CertificateStatus, type RenewalLinks, type RenewalOf } from "../db/index.js"
+import { KeyHolderRevoker, MaxBulkRevocation, type BulkRevocationResult, type CertificateDetails, type CertificateStatus, type RenewalLinks, type RenewalOf, type RevocationResult } from "../db/index.js"
 import { PublicKey } from "../ssh/keys.js"
 import { hashedAsset, type HashedAsset } from "../web/assets.js"
 import { BaseStylesheet } from "../web/styles.js"
-import { certificatesPath, MaxRevocationReason, type CertificateKind, type CertificateListQuery } from "./query.js"
+import { bulkRevocationFilters, bulkRevokeLink, bulkRevokePath, certificatesLink, certificatesPath, MaxRevocationReason, type BulkRevocationFilters, type CertificateKind, type CertificateListQuery } from "./query.js"
 import { TimeScriptPath } from "./time.js"
 
 /**
@@ -259,11 +259,6 @@ td time {
 	text-align: center;
 }
 
-.pager {
-	display: flex;
-	justify-content: flex-end;
-}
-
 .details {
 	display: grid;
 	font-size: 0.875rem;
@@ -392,6 +387,21 @@ input[type="checkbox"] {
 
 .button.danger:hover {
 	background: color-mix(in oklch, var(--danger), black 10%);
+}
+
+.list-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	justify-content: space-between;
+}
+
+.notice {
+	background: var(--recessed);
+	border-radius: 0.5rem;
+	font-size: 0.875rem;
+	margin: 0;
+	padding: 0.75rem 1rem;
 }
 
 .form-errors {
@@ -617,9 +627,177 @@ export const CertificateListPage: FC<CertificateListProps> = ({ email, kind, que
 					</table>
 				)}
 		</div>
-		{nextPage !== undefined && <div class="pager"><a class="button" href={nextPage} rel="next">Next page</a></div>}
+		<ListActions kind={kind} query={query} listed={certificates.length} nextPage={nextPage} />
 	</Layout>
 )
+
+// the actions under a list: revoking the certificates its filters match,
+// when they may be revoked together, and the next page
+const ListActions: FC<{ kind: CertificateKind, query: CertificateListQuery, listed: number, nextPage: string | undefined }> = ({ kind, query, listed, nextPage }) => {
+	const filters = bulkRevocationFilters(query)
+	const revoke = filters !== undefined && listed > 0
+	if (!revoke && nextPage === undefined) {
+		return <></>
+	}
+
+	return (
+		<div class="list-actions">
+			{revoke ? <a class="button danger" href={bulkRevokeLink(kind, filters)}>Revoke these certificates…</a> : <span></span>}
+			{nextPage !== undefined && <a class="button" href={nextPage} rel="next">Next page</a>}
+		</div>
+	)
+}
+
+// the list of valid certificates matching the filters of a bulk revocation
+const filteredListLink = (kind: CertificateKind, filters: BulkRevocationFilters): string =>
+	certificatesLink(kind, { status: "valid", principal: filters.principal, key_id: filters.key_id, serial: filters.serial, before: undefined })
+
+// describes the filters of a bulk revocation, such as `key ID containing "alice"`
+const describeFilters = (filters: BulkRevocationFilters): string => [
+	filters.principal === undefined ? undefined : `principal "${filters.principal}"`,
+	filters.key_id === undefined ? undefined : `key ID containing "${filters.key_id}"`,
+	filters.serial === undefined ? undefined : `serial ${filters.serial}`,
+].filter((f) => f !== undefined).join(", ")
+
+/** The props of {@link BulkRevokePage} */
+export type BulkRevokeProps = {
+	email: string
+	kind: CertificateKind
+	/** The filters the certificates were found with */
+	filters: BulkRevocationFilters
+	/** The certificates to offer for revocation, each ticked */
+	certificates: (CertificateDetails & { status: CertificateStatus })[]
+	/** Whether more certificates match the filters than are offered */
+	more: boolean
+	/** The form as it was sent, when it is shown again because it was not valid */
+	form?: { reason: string, errors: string[] } | undefined
+}
+
+/**
+ * Confirms revoking several certificates of one kind together. Each
+ * certificate is listed with a ticked box, so the admin sees exactly what
+ * will be revoked and can leave any out, and only the certificates still
+ * ticked are sent. One reason and a confirmation are asked for, as for a
+ * single certificate. When it is shown again it lists the certificates that
+ * were sent, keeps the reason that was entered and lists what was wrong.
+ */
+export const BulkRevokePage: FC<BulkRevokeProps> = ({ email, kind, filters, certificates, more, form }) => {
+	const errors = form?.errors ?? []
+
+	return (
+		<Layout title={`Revoke ${kind} certificates`} email={email}>
+			<p><a href={filteredListLink(kind, filters)}>Back to {kindName(kind).toLowerCase()} certificates</a></p>
+			<h2>Revoke {kindName(kind).toLowerCase()} certificates</h2>
+			<p>Valid {kind} certificates with {describeFilters(filters)}. Check the key IDs and principals, and untick any certificate that should not be revoked.</p>
+			{more && <p class="notice" role="status">More than {MaxBulkRevocation} certificates match. The newest {MaxBulkRevocation} are shown; revoke these, then return to this page to revoke the rest.</p>}
+			<form class="revoke" method="post" action={bulkRevokePath(kind)}>
+				{filters.principal !== undefined && <input type="hidden" name="principal" value={filters.principal} />}
+				{filters.key_id !== undefined && <input type="hidden" name="key_id" value={filters.key_id} />}
+				<div class="card flush">
+					{certificates.length === 0
+						? <p class="empty">No valid certificates match these filters.</p>
+						: (
+							<table>
+								<thead>
+									<tr>
+										<th scope="col">Revoke</th>
+										<th scope="col">Serial</th>
+										<th scope="col">Key ID</th>
+										<th scope="col">Principals</th>
+										<th scope="col">Valid until</th>
+										<th scope="col">Status</th>
+									</tr>
+								</thead>
+								<tbody>
+									{certificates.map((c) => (
+										<tr>
+											<td><input type="checkbox" name="serial" value={c.serial} checked aria-label={`Revoke certificate ${c.serial}`} /></td>
+											<td class="mono"><a href={`${certificatesPath(kind)}/${c.serial}`}>{c.serial}</a></td>
+											<td>{c.key_id}</td>
+											<td><Principals principals={c.principals} /></td>
+											<td><Timestamp date={c.valid_before} precision="minute" /></td>
+											<td><StatusBadge status={c.status} /></td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						)}
+				</div>
+				<section class="card revoke">
+					<p>Revoking is permanent and cannot be undone. Each ticked certificate is added to the {kind} KRL until it expires, and access is restored by issuing a new certificate.</p>
+					{errors.length > 0 && <ul class="form-errors" role="alert">{errors.map((e) => <li>{e}</li>)}</ul>}
+					<label>
+						Reason, recorded for every certificate
+						<textarea name="reason" required maxlength={MaxRevocationReason} aria-invalid={errors.length > 0 ? "true" : undefined}>{form?.reason ?? ""}</textarea>
+					</label>
+					<label class="checkbox">
+						<input type="checkbox" name="confirm" value="yes" required />
+						I understand that these revocations cannot be undone
+					</label>
+					<button type="submit" class="button danger">Revoke ticked certificates</button>
+				</section>
+			</form>
+		</Layout>
+	)
+}
+
+// what happened to a certificate in a bulk revocation, as a badge
+const RevocationOutcome: FC<{ result: RevocationResult }> = ({ result }) => {
+	switch (result.kind) {
+		case "revoked":
+			return <span class="badge revoked">Revoked</span>
+		case "alreadyRevoked":
+			return <span class="badge expired">Already revoked</span>
+		case "expired":
+			return <span class="badge expired">Expired, not revoked</span>
+		case "notFound":
+			return <span class="badge expired">Not found</span>
+		default: {
+			const unknown: never = result
+			throw new Error(`unknown revocation result ${JSON.stringify(unknown)}`)
+		}
+	}
+}
+
+/** The props of {@link BulkRevokeResultPage} */
+export type BulkRevokeResultProps = {
+	email: string
+	kind: CertificateKind
+	/** The filters the certificates were found with, to return to the list */
+	filters: BulkRevocationFilters
+	results: BulkRevocationResult[]
+}
+
+/**
+ * What happened to each certificate an admin revoked together: revoked, or
+ * not because it was already revoked, had expired or was not found, as it
+ * may have changed since the admin chose it.
+ */
+export const BulkRevokeResultPage: FC<BulkRevokeResultProps> = ({ email, kind, filters, results }) => {
+	const revoked = results.filter((r) => r.result.kind === "revoked").length
+
+	return (
+		<Layout title={`Revoked ${kind} certificates`} email={email}>
+			<h2>Revoked {revoked} of {results.length} certificates</h2>
+			<div class="card flush">
+				<table>
+					<thead>
+						<tr>
+							<th scope="col">Serial</th>
+							<th scope="col">Outcome</th>
+						</tr>
+					</thead>
+					<tbody>
+						{results.map((r) => (
+							<tr><td><CertificateLink kind={kind} serial={`${r.serial}`} /></td><td><RevocationOutcome result={r.result} /></td></tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<p><a href={filteredListLink(kind, filters)}>Back to {kindName(kind).toLowerCase()} certificates</a></p>
+		</Layout>
+	)
+}
 
 /** The props of {@link CertificateDetailPage} */
 export type CertificateDetailProps = {
