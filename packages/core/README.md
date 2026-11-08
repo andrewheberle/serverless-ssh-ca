@@ -17,7 +17,9 @@ export default app
 
 This package is built for Cloudflare Workers and can also run on Node.js 24
 (see [Running on Node.js](#running-on-nodejs)). These are the only runtimes it
-is tested on.
+is tested on, see
+[Supported Platforms](https://github.com/andrewheberle/serverless-ssh-ca#supported-platforms)
+for the versions supported and what is best effort.
 
 The package doesn't use any Workers-specific APIs and doesn't depend on
 `@cloudflare/workers-types`. It needs:
