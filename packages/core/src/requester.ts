@@ -194,14 +194,20 @@ const verifyUserInfoAccessToken = async (l: Logger, url: string, token: string):
 	}
 }
 
+// the token in an Authorization header using the Bearer scheme, whose name
+// is case-insensitive (RFC 9110), or undefined when the header has none
+const bearerToken = (authorization: string): string | undefined => {
+	const match = /^bearer (.+)$/i.exec(authorization)
+	return match?.[1]
+}
+
 const verifyAccessToken = async (config: RequesterConfig, logger: Logger, authorization: string): Promise<TokenResult<AccessToken>> => {
 	const l = logger.with("in", "verifyAccessToken")
 
-	if (!authorization.startsWith("Bearer ") || authorization.length <= 7) {
+	const token = bearerToken(authorization)
+	if (token === undefined) {
 		return { kind: "invalid", message: "authorization header must be a Bearer token" }
 	}
-
-	const token = authorization.replace("Bearer ", "")
 
 	// when a userinfo endpoint is configured every access token is verified
 	// with it, rather than only those that are not JWTs, so a token cannot

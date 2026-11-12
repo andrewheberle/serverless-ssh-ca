@@ -47,7 +47,7 @@ describe("authenticate", () => {
 	})
 
 	it("should report both tokens when neither is accepted", async () => {
-		expect(await run({ access: "Bearer foo", identity: "foo" })).toEqual(invalid(
+		expect(await run({ access: "Bearer foo", identity: "bar" })).toEqual(invalid(
 			{ token: "access", message: "the access token was invalid" },
 			{ token: "identity", message: "problem parsing identity token" },
 		))
@@ -61,6 +61,12 @@ describe("authenticate", () => {
 		])("should not be accepted when the Authorization header %s", async (_case, authorization) => {
 			expect(await run({ access: authorization })).toEqual(invalid({ token: "access", message: "authorization header must be a Bearer token" }))
 		})
+
+		it.each(["bearer", "BEARER", "BeArEr"])("should be accepted with the scheme written as %s", async (scheme) => {
+			const authorization = (await accessToken({ sub, email })).replace(/^Bearer /, `${scheme} `)
+			expect(await run({ access: authorization })).toMatchObject({ kind: "authenticated" })
+		})
+
 
 		it("should not be accepted when it is not a JWT", async () => {
 			expect(await run({ access: "Bearer foo" })).toEqual(invalid({ token: "access", message: "the access token was invalid" }))
@@ -204,6 +210,11 @@ describe("authenticate", () => {
 
 		it("should be permitted for an allowed email address", async () => {
 			expect(await run({}, host({ SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: `admin@example.com,${email}` }))).toMatchObject({ kind: "authenticated" })
+		})
+
+		it.each(["ops team", "ops_team"])("should be permitted for a group with a space when the allowed role is %j", async (role) => {
+			const result = await run({ identity: { sub, email, groups: ["ops team"] } }, host({ SSH_HOST_CERTIFICATE_ALLOWED_ROLES: role }))
+			expect(result).toMatchObject({ kind: "authenticated" })
 		})
 
 		it("should compare allowed email addresses case-insensitively", async () => {

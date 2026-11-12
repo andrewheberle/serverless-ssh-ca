@@ -432,7 +432,11 @@ const ConfigSchema = ConfigFields.transform((env) => ({
 	principals: env.SSH_CERTIFICATE_PRINCIPALS,
 	/** The emails of requesters who may request host certificates, lowercased, as emails are compared case-insensitively */
 	hostAllowedEmails: env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS.map((email) => email.toLowerCase()),
-	hostAllowedRoles: env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES,
+	/**
+	 * The roles that may request host certificates, with spaces replaced by
+	 * underscores, as they are in the principals claim they are compared with
+	 */
+	hostAllowedRoles: env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES.map((role) => role.replaceAll(" ", "_")),
 	/** The maximum lifetime of a host certificate, in seconds */
 	hostCertificateLifetime: env.SSH_HOST_CERTIFICATE_LIFETIME,
 	retention: env.DB_CERTIFICATE_RETENTION,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { ProofOfPossession, RequestNamespace } from "../src/proof.js"
+import { PossessionParseError, ProofOfPossession, RequestNamespace } from "../src/proof.js"
 import { verify } from "../src/sshsig/index.js"
 import { PublicKey } from "../src/ssh/keys.js"
 
@@ -97,14 +97,58 @@ const tests: testSig[] = [
         want: false
     },
     {
-        name: "should fail verify due to bad signature",
+        name: "should fail verify due to a signature that is not base64",
         sig: "invalid",
+        data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg",
+        from:  1765696790000,
+        wantErr: "signature was not valid base64",
+        want: false
+    },
+    {
+        name: "should fail verify due to bad signature",
+        sig: Buffer.from("invalid").toString("base64"),
         data: "1765696780805.SHA256:4A33TPWJZ8trpUhhn0mpK1wISFzVGhWlWShoGylLUbg",
         from:  1765696790000,
         wantErr: "signature could not be parsed",
         want: false
     },
 ]
+
+// the fixture of a valid ED25519 proof, whose timestamp and signature are
+// changed to check how strictly a proof is parsed
+const ed25519 = tests.find((tt) => tt.name === "ED25519 key should parse and verify")
+if (ed25519 === undefined) {
+    throw new Error("missing ED25519 fixture")
+}
+const fingerprint = ed25519.data.split(".")[1]
+
+describe("ProofOfPossession parsing", () => {
+    it.each([
+        ["trailing text", "1765696780805junk"],
+        ["a leading zero", "01765696780805"],
+        ["a sign", "+1765696780805"],
+        ["a decimal point", "1765696780805.0"],
+        ["whitespace", " 1765696780805"],
+        ["an exponent", "1.765696780805e12"],
+        ["too many digits", "12345678901234567"],
+    ])("should refuse a timestamp with %s", (_name, timestamp) => {
+        expect(() => new ProofOfPossession(`${timestamp}.${fingerprint}.${ed25519.sig}`, { from: ed25519.from })).toThrow(PossessionParseError)
+    })
+
+    it.each([
+        ["missing a character", ed25519.sig.slice(0, -1)],
+        ["with padding that is not needed", `${ed25519.sig}==`],
+        ["in the URL-safe alphabet", ed25519.sig.replaceAll("+", "-").replaceAll("/", "_") + "-"],
+        ["with whitespace", ` ${ed25519.sig}`],
+        ["with characters that are not base64", `${ed25519.sig.slice(0, -4)}!!!=`],
+    ])("should refuse a signature %s", (_name, sig) => {
+        expect(() => new ProofOfPossession(`${ed25519.data}.${sig}`, { from: ed25519.from })).toThrow(PossessionParseError)
+    })
+
+    it("should accept the fixture as it is", () => {
+        expect(() => new ProofOfPossession(`${ed25519.data}.${ed25519.sig}`, { from: ed25519.from })).not.toThrow()
+    })
+})
 
 describe("ProofOfPossession", async () => {
     const timestamp = 1765696780805

@@ -8,6 +8,13 @@ import { group, Logger, LogLevel } from "@andrewheberle/ts-slog"
 // a SHA256 fingerprint as shown by ssh-keygen -l, which is unpadded base64
 const FingerprintFormat = /^SHA256:[A-Za-z0-9+/]{43}$/
 
+// a timestamp in milliseconds since the Unix epoch, without a sign or leading
+// zeros, of at most 16 digits so it is an exact number
+const TimestampFormat = /^[1-9][0-9]{0,15}$/
+
+// standard base64 with padding, the length of which is checked separately
+const Base64Format = /^[A-Za-z0-9+/]+={0,2}$/
+
 /**
  * The namespace proofs of possession are signed in. Proofs are always bound to
  * a request (see {@link requestBinding}); the `request-` prefix is kept from
@@ -71,11 +78,11 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 
 		const [timestampStr, fingerprintString, signatureBase64] = parts
 
-		// verify timestamp
-		const timestamp: number = parseInt(timestampStr!, 10)
-		if (isNaN(timestamp)) {
+		// verify timestamp, which must be only digits so a proof has one form
+		if (!TimestampFormat.test(timestampStr!)) {
 			throw new PossessionParseError("timestamp was not a number")
 		}
+		const timestamp = Number(timestampStr)
 
 		const now = options?.from !== undefined ? options?.from : Date.now()
 		const age = now - timestamp
@@ -92,7 +99,11 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 				throw new PossessionParseError("proof of possession fingerprint was an invalid format")
 			}
 
-			// convert siganture from base64
+			// convert signature from base64, which must be padded standard base64
+			// so a proof has one form
+			if (!Base64Format.test(signatureBase64!) || signatureBase64!.length % 4 !== 0) {
+				throw new PossessionParseError("proof of possession signature was not valid base64")
+			}
 			const signature = Buffer.from(signatureBase64!, "base64").toString()
 
 			// set values
