@@ -6,14 +6,6 @@ const paths = createApp(makeEnv()).schema.paths ?? {}
 
 describe("OpenAPI schema", () => {
 	it.each([
-		["/api/v3/ca", "get", "CA"],
-		["/api/v3/user/certificate", "post", "User"],
-		["/api/v3/user/krl", "get", "User"],
-		["/api/v3/user/revoke", "post", "User"],
-		["/api/v3/host/certificate", "post", "Host"],
-		["/api/v3/host/renew", "post", "Host"],
-		["/api/v3/host/krl", "get", "Host"],
-		["/api/v3/host/revoke", "post", "Host"],
 		["/api/v4/ca", "get", "CA"],
 		["/api/v4/user/certificates", "post", "User"],
 		["/api/v4/user/certificates/{serial}", "delete", "User"],
@@ -46,6 +38,10 @@ describe("OpenAPI schema", () => {
 		for (const operation of operations) {
 			expect(operation.parameters).toContainEqual(expect.objectContaining({ name: "Proof-Of-Possession", in: "header", required: true }))
 		}
+	})
+
+	it("should not document API v3", () => {
+		expect(Object.keys(paths).filter((p) => p.startsWith("/api/v3"))).toEqual([])
 	})
 
 	it("should not use a path parameter for the certificate type", () => {

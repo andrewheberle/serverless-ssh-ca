@@ -5,7 +5,7 @@ import { createSshCa, type SshCa } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateUnboundProof, generateRequestProof } from "./helpers/proof.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import type { TestKey } from "./keys/types.js"
@@ -181,14 +181,14 @@ describe("v4 API", () => {
 			expect(await errorMessages(response)).toContain("proof of possession signature validation failed")
 		})
 
-		it("should reject a v3 proof", async () => {
-			const response = await issueUserCertificate(userKey, generateProof(userKey))
+		it("should reject a proof that is not bound to a request, as API v3 used", async () => {
+			const response = await issueUserCertificate(userKey, generateUnboundProof(userKey))
 
 			expect(response.status).toBe(400)
 			expect(await errorMessages(response)).toContain("proof of possession signature validation failed")
 		})
 
-		it("should reject a proof made for the request with the v3 namespace", async () => {
+		it("should reject a proof made for the request in the namespace API v3 used", async () => {
 			const proof = generateRequestProof(userKey, "POST", "/api/v4/user/certificates", { namespace: "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle" })
 			const response = await issueUserCertificate(userKey, proof)
 
@@ -339,7 +339,7 @@ describe("v4 API", () => {
 				generateRequestProof(hostKey, "DELETE", `/api/v4/host/certificates/${serial}`),
 				generateRequestProof(hostKey, "POST", "/api/v4/host/certificates"),
 				generateRequestProof(hostKey, "POST", `/api/v4/host/certificates/${serial + 1n}/renew`),
-				generateProof(hostKey),
+				generateUnboundProof(hostKey),
 			]) {
 				const response = await request(ca, "POST", `/api/v4/host/certificates/${serial}/renew`, { body, proof })
 				expect(response.status).toBe(400)

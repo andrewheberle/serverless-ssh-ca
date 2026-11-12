@@ -7,16 +7,17 @@ import { fingerprint } from "./ssh-keygen.js"
 
 // the namespaces and signed data are written out here rather than taken from
 // the CA, so the tests check the format the CA expects
-const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
+const UnboundNamespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 const RequestNamespace = "request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 
 /**
- * Generates a proof of possession as used by the v3 API
+ * Generates a proof of possession that is not bound to a request, in the
+ * format the removed API v3 used, so tests can check it is not accepted
  */
-export const generateProof = (key: TestKey): string => {
+export const generateUnboundProof = (key: TestKey): string => {
     const data = `${Date.now()}.${fingerprint(key.publicKey)}`
 
-    return `${data}.${sign(key, data, Namespace)}`
+    return `${data}.${sign(key, data, UnboundNamespace)}`
 }
 
 /**

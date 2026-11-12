@@ -69,7 +69,7 @@ describe("post /api/v4/user/certificates", () => {
     })
 
     it("request with a proof that is not bound to the request returns 400", async () => {
-        expect((await issue(inject("testProof"))).status).toBe(400)
+        expect((await issue(inject("testRevokeRequestProof"))).status).toBe(400)
     })
 })
 

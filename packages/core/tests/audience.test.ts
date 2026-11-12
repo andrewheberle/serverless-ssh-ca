@@ -5,7 +5,7 @@ import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 
@@ -38,24 +38,7 @@ const requestV4 = async (ca: SshCa, aud: { access: string, identity: string }): 
 	}))
 }
 
-// requests a user certificate from the v3 API with tokens issued for the given audiences
-const requestV3 = async (ca: SshCa, aud: { access: string, identity: string }): Promise<Response> => {
-	return await ca.fetch(new Request("http://example.com/api/v3/user/certificate", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			"Authorization": await getAccessToken({ ...claims, aud: aud.access }),
-		},
-		body: JSON.stringify({
-			public_key: publicKey,
-			proof: generateProof(userKey),
-			identity: await getIdentityToken({ ...claims, aud: aud.identity }),
-		}),
-	}))
-}
-
 describe.each([
-	["v3", requestV3],
 	["v4", requestV4],
 ])("token audience (%s)", (_version, request) => {
 	afterEach(() => {

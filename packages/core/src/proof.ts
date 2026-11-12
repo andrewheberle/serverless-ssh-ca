@@ -8,12 +8,10 @@ import { group, Logger, LogLevel } from "@andrewheberle/ts-slog"
 // a SHA256 fingerprint as shown by ssh-keygen -l, which is unpadded base64
 const FingerprintFormat = /^SHA256:[A-Za-z0-9+/]{43}$/
 
-export const Namespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
-
 /**
- * The namespace used for proofs of possession that are bound to a request,
- * kept separate from {@link Namespace} so a proof made for one form can never
- * be accepted as the other.
+ * The namespace proofs of possession are signed in. Proofs are always bound to
+ * a request (see {@link requestBinding}); the `request-` prefix is kept from
+ * when another namespace existed, as changing it would break every client.
  */
 export const RequestNamespace = "request-proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
 
@@ -48,8 +46,9 @@ export class PossessionParseError extends Error {
  * possesses the private key corresponding to the public key in the certificate
  * request.
  *
- * The proof of possession is a signed message containing a timestamp and the
- * fingerprint of the public key.
+ * The proof of possession is a signed message containing a timestamp, the
+ * fingerprint of the public key and the request it is sent with, see
+ * {@link ProofOfPossession.verifyRequest}.
  *
  * The signature is made with the private key corresponding to the public key
  * in the certificate request and is a BASE64 encoded SSHSIG signature.
@@ -131,14 +130,6 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 	}
 
 	/**
-	 *
-	 * @returns true if signature is valid, false otherwise
-	 */
-	async verify(namespace?: string): Promise<boolean> {
-		return await verify(this.signature, this.data, { namespace: namespace || Namespace })
-	}
-
-	/**
 	 * Verifies the proof was made for a specific request, so it cannot be
 	 * replayed against another endpoint or with other path parameters (such
 	 * as a different certificate serial).
@@ -180,45 +171,6 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 			return true
 		} catch (err) {
 			this.logger.error("matches() error", "in", "ProofOfPossession", "error", err)
-			throw err
-		}
-	}
-}
-
-export class PossessionMatchError extends Error {
-	constructor(message: string, cause?: unknown) {
-		super(message)
-		this.name = "PossessionMatchError"
-		this.cause = cause
-
-		// This is necessary for proper stack trace in TypeScript
-		Object.setPrototypeOf(this, PossessionMatchError.prototype)
-	}
-}
-
-export class RenewalProofOfPossession extends ProofOfPossession {
-	override matches(key: PublicKey): never
-	override matches(...keys: PublicKey[]): boolean
-
-	override matches(...keys: PublicKey[]): boolean {
-		this.logger.debug("matches() called", "in", "RenewalProofOfPossession", "keys", keys.length)
-		if (keys.length === 1) {
-			throw new PossessionMatchError("must verify both public key and certificate")
-		}
-
-		try {
-			for (const key of keys) {
-				this.logger.debug("comparing fingerprint", "in", "RenewalProofOfPossession", "fingerprint", this.fingerprint, "key", key.toString())
-				if (this.fingerprint !== key.fingerprint())
-					return false
-				this.logger.debug("comparing signature public key", "in", "RenewalProofOfPossession", "signaturePubkey", this.signaturePubkey.fingerprint(), "key", key.toString())
-				if (!this.signaturePubkey.equals(key))
-					return false
-			}
-			this.logger.debug("matches() completed", "in", "RenewalProofOfPossession", "keys", keys.length)
-			return true
-		} catch (err) {
-			this.logger.error("error in matches()", "in", "RenewalProofOfPossession", "error", err)
 			throw err
 		}
 	}

@@ -56,19 +56,6 @@ export const openapiStringByte = z.base64()
 	})
 	.openapi({ format: "byte" })
 
-export const proofOfPossession = z.string()
-	.meta({
-		description: "Proof of possession comprising of ${timestamp}.${fingerprint}.${signature}",
-		example: "1765696780805.SHA256:79mq0wtpQMTvS4+Of8VzLN0qmYWNUyTXYmqKwhEgSLs.LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KVTFOSVUwbEhBQUFBQVFBQUFHZ0FBQUFUWldOa2MyRXRjMmhoTWkxdWFYTjBjREkxTmdBQUFBaHVhWE4wY0RJMQpOZ0FBQUVFRUR6Ymk4OE10alBYSDFCb1JURU9HaS96aEc4QnhQNVZUUW5OQkFNMGZtMExtekErUUZkUlNVYVRFCkdNN2l0QjhINmZNZFAydlAxcElQcGUyOWVLQkJZd0FBQUFSbWFXeGxBQUFBQUFBQUFBWnphR0UxTVRJQUFBQmsKQUFBQUUyVmpaSE5oTFhOb1lUSXRibWx6ZEhBeU5UWUFBQUJKQUFBQUlHdmZVZGNDQkRXa3ZwL0ZHS3NkakgrRQpKZzZXN0EvWUJVZng2Z0srQ01raEFBQUFJUUQxOFd5cDNZejZ0eXNvdllXbEJHTXprRnlYbFRrSHM5blVVRXJqCkczNWVPQT09Ci0tLS0tRU5EIFNTSCBTSUdOQVRVUkUtLS0tLQo="
-	})
-
-export const publicKey = openapiStringByte
-	.transform(transformPublicKey)
-	.meta({
-		description: "SSH public key to sign",
-		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
-	})
-
 export const subjectPublicKey = openapiStringByte
 	.transform(transformPublicKey)
 	.superRefine(refineSubjectKey)
@@ -93,10 +80,6 @@ export const accessToken = z.string()
 
 export const krl = openapiStringByte
 	.meta({ description: "Key Revocation List" })
-
-export const accessTokenHeaders = z.object({
-	"Authorization": accessToken,
-})
 
 export const certificate = openapiStringByte
 	.meta({ description: "Issued Certificate" })

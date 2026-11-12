@@ -13,8 +13,8 @@ await admin.create(leadingZeroPrivateKeyString)
 
 describe("Ed25519 CA key with a leading zero seed byte", () => {
 	it.each([
-		"/api/v3/user/krl",
-		"/api/v3/host/krl",
+		"/api/v4/user/krl",
+		"/api/v4/host/krl",
 	])("GET %s responds with a signed KRL", async (path) => {
 		const response = await exports.default.fetch(`http://example.com${path}`)
 

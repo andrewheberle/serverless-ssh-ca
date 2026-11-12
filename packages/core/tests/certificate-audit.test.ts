@@ -9,7 +9,7 @@ import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { SshCertificate } from "../src/ssh/certificate.js"
 import { makeEnv } from "./env.js"
 import { hostCertificate } from "./helpers/certificate.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { isRevoked } from "./helpers/ssh-keygen.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
@@ -70,13 +70,6 @@ describe("certificate audit trail", () => {
 		"Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/host/certificates"),
 	})
 
-	const issueHostV3 = async (key: TestKey, principals: string[]): Promise<Response> => await post(ca, "/api/v3/host/certificate", {
-		public_key: base64(key.publicKey),
-		proof: generateProof(key),
-		identity: await getIdentityToken(claims),
-		principals,
-	}, { "Authorization": await getAccessToken(claims) })
-
 	const renewV4 = async (issued: { text: string, certificate: SshCertificate }, key: TestKey): Promise<Response> => {
 		const path = `/api/v4/host/certificates/${issued.certificate.serial}/renew`
 		return await post(ca, path, { certificate: base64(issued.text) }, { "Proof-Of-Possession": generateRequestProof(key, "POST", path) })
@@ -103,28 +96,15 @@ describe("certificate audit trail", () => {
 			expect(audit(certificate.serial)).toEqual({ requested_by: email, revoked_by: null, revocation_reason: null })
 		})
 
-		it.each([
-			["v3", issueHostV3],
-			["v4", (key: TestKey, principals: string[]) => issueHostV4(key, principals)],
-		])("should record who requested a host certificate (%s)", async (_version, issue) => {
-			const { certificate } = await certificateOf(await issue(ecdsaKey.host(), ["audit.example.com"]))
+		it("should record who requested a host certificate", async () => {
+			const { certificate } = await certificateOf(await issueHostV4(ecdsaKey.host(), ["audit.example.com"]))
 
 			expect(audit(certificate.serial)).toEqual({ requested_by: email, revoked_by: null, revocation_reason: null })
 		})
 	})
 
 	describe("revocation by the key holder", () => {
-		it("should record the key holder as the revoker (v3)", async () => {
-			const key = ecdsaKey.user()
-			const { certificate } = await certificateOf(await issueUserV4(key))
-
-			const response = await post(ca, "/api/v3/user/revoke", { serial: `${certificate.serial}`, public_key: base64(key.publicKey), proof: generateProof(key) })
-			expect(response.status).toBe(200)
-
-			expect(audit(certificate.serial)).toEqual({ requested_by: email, revoked_by: "key-holder", revocation_reason: null })
-		})
-
-		it("should record the key holder as the revoker (v4)", async () => {
+		it("should record the key holder as the revoker", async () => {
 			const key = ecdsaKey.user()
 			const { certificate } = await certificateOf(await issueUserV4(key))
 
@@ -144,7 +124,11 @@ describe("certificate audit trail", () => {
 			const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
 			ca = createSshCa(makeEnv({ DB: fromNodeSqlite(sqlite), PRIVATE_KEY: secretFromString(ed25519Key.ca().privateKey), LOG_LEVEL: "info" }))
 
-			const response = await post(ca, "/api/v3/user/revoke", { serial: `${certificate.serial}`, public_key: base64(key.publicKey), proof: generateProof(key) })
+			const path = `/api/v4/user/certificates/${certificate.serial}`
+			const response = await ca.fetch(new Request(`http://example.com${path}`, {
+				method: "DELETE",
+				headers: { "Proof-Of-Possession": generateRequestProof(key, "DELETE", path) },
+			}))
 			expect(response.status).toBe(200)
 
 			expect(log).toHaveBeenCalledWith(expect.objectContaining({

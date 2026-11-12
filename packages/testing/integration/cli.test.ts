@@ -61,11 +61,11 @@ describe.each(["node", "workerd"])("serverless-ssh-ca-test-server --runtime %s",
 
 		const port = await waitForPort(current, files.portFile)
 
-		const ok = await fetch(`http://127.0.0.1:${port}/api/v3/ca`)
+		const ok = await fetch(`http://127.0.0.1:${port}/api/v4/ca`)
 		expect(ok.status).toBe(200)
 		expect(await ok.text()).toContain("ssh-ed25519")
 
-		const rejected = await fetch(`http://127.0.0.1:${port}/api/v3/user/certificate`, {
+		const rejected = await fetch(`http://127.0.0.1:${port}/api/v4/user/certificates`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: "{}",
@@ -83,8 +83,8 @@ describe.each(["node", "workerd"])("serverless-ssh-ca-test-server --runtime %s",
 				return []
 			}
 		})
-		expect(lines).toContainEqual({ level: "info", message: "harness request", method: "GET", url: "/api/v3/ca", status: 200 })
-		expect(lines).toContainEqual({ level: "info", message: "harness request", method: "POST", url: "/api/v3/user/certificate", status: rejected.status, body })
+		expect(lines).toContainEqual({ level: "info", message: "harness request", method: "GET", url: "/api/v4/ca", status: 200 })
+		expect(lines).toContainEqual({ level: "info", message: "harness request", method: "POST", url: "/api/v4/user/certificates", status: rejected.status, body })
 		expect(lines.filter(l => l.level === "error" && String(l.message).startsWith("harness"))).toEqual([])
 	})
 })

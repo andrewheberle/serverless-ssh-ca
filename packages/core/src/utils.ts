@@ -2,7 +2,7 @@ import type { SshCaBindings } from "./types.js"
 import { CertificateParseError, SshCertificate } from "./ssh/certificate.js"
 import { KeyParseError, MinimumRsaKeyBits, parsePrivateKey, PublicKey, rsaKeyBits, UnsupportedKeyError, type PrivateKey } from "./ssh/keys.js"
 import z from "zod"
-import { RenewalProofOfPossession, ProofOfPossession, PossessionParseError } from "./proof.js"
+import { ProofOfPossession, PossessionParseError } from "./proof.js"
 import { logger } from "./logger.js"
 import { caConfig } from "./config.js"
 import { principalIssue } from "./principals.js"
@@ -156,89 +156,6 @@ export const transformCertificate = (val: string | Buffer<ArrayBufferLike>, ctx:
 	}
 }
 
-type ParsedCertificateRequest = {
-	proof: ProofOfPossession
-	public_key: PublicKey
-	lifetime: number
-	identity: string
-	extensions: string[]
-}
-
-export const refineCertificateRequest = async (env: SshCaBindings, val: ParsedCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
-	const l = logger(env)
-	try {
-		// check proof of possession fingerprint matches public key
-		if (!val.proof.matches(val.public_key)) {
-			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
-		}
-
-		// verify proof of possession signature
-		const verified = await val.proof.verify()
-		if (!verified) {
-			return fatalIssue(ctx, "proof of possession signature validation failed", val)
-		}
-
-		return z.NEVER
-	} catch (err) {
-		l.error("proof of possession verification unhandled error", "in", "refineCertificateRequest", "error", err)
-		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
-	}
-}
-
-export const transformRenewalProofOfPossession = (env: SshCaBindings, val: string, ctx: z.RefinementCtx): RenewalProofOfPossession | never => {
-	const l = logger(env)
-	try {
-		return new RenewalProofOfPossession(val, { logger: l, skew: caConfig(env).requestTimeSkewMax })
-	} catch (err) {
-		if (err instanceof PossessionParseError) {
-			return fatalIssue(ctx, err.message, val)
-		}
-
-		l.error("proof of possession verification unhandled error", "in", "transformRenewalProofOfPossession", "error", err)
-		return fatalIssue(ctx, "proof of possession transform unhandled error", val)
-	}
-}
-
-type HostCertificateRequest = {
-	public_key: PublicKey
-	lifetime: number
-}
-
-type ParsedHostCertificateRequest = {
-	principals: string[]
-	proof: ProofOfPossession
-} & HostCertificateRequest
-
-export const refineHostCertificateRequest = async (env: SshCaBindings, val: ParsedHostCertificateRequest, ctx: z.RefinementCtx): Promise<never> => {
-	const l = logger(env).with("in", "refineHostCertificateRequest")
-
-	l.debug("started")
-
-	try {
-		// check proof of possession fingerprint matches public key
-		l.debug("checking val.proof.matches()", "public_key", val.public_key.toString())
-		if (!val.proof.matches(val.public_key)) {
-			l.warn("proof of possession fingerprint did not match public_key")
-			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
-		}
-
-		// verify proof of possession signature
-		l.debug("await val.proof.verify()")
-		const verified = await val.proof.verify()
-		if (!verified) {
-			l.warn("proof of possession signature validation failed")
-			return fatalIssue(ctx, "proof of possession signature validation failed", val)
-		}
-
-		l.debug("done")
-
-		return z.NEVER
-	} catch (err) {
-		l.error("proof of possession verification unhandled error", "error", err)
-		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
-	}
-}
-
 /**
  * Returns why a principal cannot be included on a host certificate, or
  * undefined if it can be, see {@link principalIssue}.
@@ -256,66 +173,6 @@ export const refineHostPrincipal = (val: string, ctx: z.RefinementCtx): void => 
 	const issue = hostPrincipalIssue(val)
 	if (issue !== undefined) {
 		fatalIssue(ctx, issue, val)
-	}
-}
-
-type ParsedHostCertificateRenewal = {
-	certificate: SshCertificate
-	proof: RenewalProofOfPossession
-	public_key: PublicKey
-}
-
-/**
- * Refines a v3 host certificate renewal so it is only accepted with a proof of
- * possession of the key of the certificate presented. Whether the certificate
- * can be renewed is checked once possession of its key is proven, see
- * `renewHostCertificate`.
- */
-export const refineRenewalProof = async (env: SshCaBindings, val: ParsedHostCertificateRenewal, ctx: z.RefinementCtx): Promise<never> => {
-	const l = logger(env)
-	try {
-		// check proof of possession fingerprint matches public key and certificate subject key
-		if (!val.proof.matches(val.public_key, val.certificate.publicKey)) {
-			return fatalIssue(ctx, "proof of possession fingerprints did not match public_key and/or certificate", val)
-		}
-
-		// verify proof of possession signature
-		const verified = await val.proof.verify()
-		if (!verified) {
-			return fatalIssue(ctx, "proof of possession signature validation failed", val)
-		}
-
-		return z.NEVER
-	} catch (err) {
-		l.error("proof of possession verification unhandled error", "in", "refineRenewalProof", "error", err)
-		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
-	}
-}
-
-type ParsedRevokeCertificate = {
-	serial: bigint
-	public_key: PublicKey
-	proof: ProofOfPossession
-}
-
-export const refineRevokeCertificate = async (env: SshCaBindings, val: ParsedRevokeCertificate, ctx: z.RefinementCtx): Promise<never> => {
-	const l = logger(env)
-	try {
-		// check proof of possession fingerprint matches public key
-		if (!val.proof.matches(val.public_key)) {
-			return fatalIssue(ctx, "proof of possession fingerprint did not match public_key", val)
-		}
-
-		// verify proof of possession signature
-		const verified = await val.proof.verify()
-		if (!verified) {
-			return fatalIssue(ctx, "proof of possession signature validation failed", val)
-		}
-
-		return z.NEVER
-	} catch (err) {
-		l.error("proof of possession verification unhandled error", "in", "refineRevokeCertificate", "error", err)
-		return fatalIssue(ctx, "proof of possession verification unhandled error", val)
 	}
 }
 
