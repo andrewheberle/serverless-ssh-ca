@@ -131,16 +131,6 @@ describe.each(endpoints)("responses to tokens that are not accepted ($name)", ({
 		})
 	})
 
-	it("should return 500 when no audience is configured", async () => {
-		const response = await request(newCa({ JWT_AUD: "" }), await validTokens())
-		expect(response.status).toBe(500)
-		expect(await response.json()).toEqual({
-			success: false,
-			result: {},
-			errors: [{ code: 7009, message: "Internal Error" }],
-		})
-	})
-
 	it("should return 500 when the userinfo endpoint cannot be reached", async () => {
 		const response = await request(newCa({ OIDC_USERINFO_URL: "http://localhost:1/userinfo" }), await validTokens())
 		expect(response.status).toBe(500)

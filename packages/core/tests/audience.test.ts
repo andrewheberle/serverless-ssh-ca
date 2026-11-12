@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from "vitest"
 import { DatabaseSync } from "node:sqlite"
-import { createSshCa, type SshCa } from "../src/index.js"
+import { createSshCa, InvalidConfigurationError, type SshCa } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
@@ -91,11 +91,9 @@ describe.each([
 		["empty", ""],
 		["an empty list", []],
 		["unset", undefined],
-	])("should return a server error when JWT_AUD is %s", async (_name, aud) => {
-		// JWT_AUD is required, but on Workers vars are not validated before use
-		const ca = createCa({ JWT_AUD: aud as SshCaBindings["JWT_AUD"] })
-
-		const response = await request(ca, { access: audience, identity: audience })
-		expect(response.status).toBe(500)
+	])("should refuse to start when JWT_AUD is %s", (_name, aud) => {
+		// the type does not allow these, but vars are not type checked on Workers
+		expect(() => createCa({ JWT_AUD: aud as SshCaBindings["JWT_AUD"] })).toThrow(InvalidConfigurationError)
+		expect(() => createCa({ JWT_AUD: aud as SshCaBindings["JWT_AUD"] })).toThrow("JWT_AUD")
 	})
 })

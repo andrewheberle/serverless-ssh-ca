@@ -28,47 +28,62 @@ const DurationFormat = /^\d+(\.\d+)? +(second|minute|hour|day|week|month|year)s?
  * Parses a duration such as "90 seconds" or "24 hours" to milliseconds.
  *
  * @param value The duration
- * @param allowZero Whether the duration may be zero
  * @returns The duration in milliseconds, or undefined if it is not a duration
- * with a unit itty-time recognises or is not positive (or zero when allowed)
+ * with a unit itty-time recognises
  */
-const durationMs = (value: string, allowZero: boolean): number | undefined => {
+const durationMs = (value: string): number | undefined => {
 	if (!DurationFormat.test(value)) {
 		return undefined
 	}
 
 	const duration = ms(value)
-	if (!Number.isFinite(duration) || duration < 0 || (!allowZero && duration === 0)) {
-		return undefined
-	}
-
-	return duration
+	return Number.isFinite(duration) && duration >= 0 ? duration : undefined
 }
 
-const durationMessage = (allowZero: boolean): string => allowZero
-	? "must be a duration such as \"90 seconds\""
-	: "must be a positive duration such as \"24 hours\""
-
-/**
- * A duration in the format accepted by itty-time, such as "90 seconds" or
- * "24 hours", which must have a unit and may only be zero when `allowZero` is
- * set.
- */
-export const DurationString = (opts: { allowZero: boolean }) => RequiredString.refine(
-	(v) => durationMs(v, opts.allowZero) !== undefined,
-	{ message: durationMessage(opts.allowZero) },
-)
-
-// a duration, see DurationString, parsed to milliseconds
-const Duration = (opts: { allowZero: boolean }) => RequiredString.transform((v, ctx): number => {
-	const duration = durationMs(v, opts.allowZero)
-	if (duration === undefined) {
-		ctx.issues.push({ code: "custom", message: durationMessage(opts.allowZero), input: v })
+// a duration, such as "90 seconds" or "24 hours", parsed to milliseconds and
+// then checked by `allowed`, which reports `message` when it is not allowed
+const Duration = (allowed: (duration: number) => boolean, message: string) => RequiredString.transform((v, ctx): number => {
+	const duration = durationMs(v)
+	if (duration === undefined || !allowed(duration)) {
+		ctx.issues.push({ code: "custom", message, input: v })
 		return z.NEVER
 	}
 
 	return duration
 })
+
+/** The shortest lifetime of a user certificate, in seconds, as the API also requires of a requested lifetime */
+export const MinUserCertificateLifetime = 5 * 60
+
+/** The shortest lifetime of a host certificate, in seconds, as the API also requires of a requested lifetime */
+export const MinHostCertificateLifetime = 24 * 60 * 60
+
+/**
+ * The longest clock skew allowed for proofs of possession, in milliseconds.
+ * The skew applies on both sides of the CA's clock, so a proof can be used
+ * for up to twice this long.
+ */
+export const MaxRequestTimeSkew = 5 * 60 * 1000
+
+// the number of whole seconds in a duration in milliseconds, or undefined
+// when it is not a whole number of seconds. A duration with a fraction, such
+// as "1.5 minutes", can be a whole number of seconds give or take rounding
+const wholeSeconds = (duration: number): number | undefined => {
+	const seconds = Math.round(duration / 1000)
+	return Math.abs(duration / 1000 - seconds) < 1e-6 ? seconds : undefined
+}
+
+// the lifetime of a certificate, in whole seconds of at least `min` seconds
+const Lifetime = (min: number, minDescription: string) => Duration(
+	(duration) => (wholeSeconds(duration) ?? 0) >= min,
+	`must be a duration of at least ${minDescription}, in whole seconds, such as "30 days"`,
+).transform((duration): number => wholeSeconds(duration) ?? 0)
+
+// the clock skew allowed for proofs of possession, see MaxRequestTimeSkew
+const RequestTimeSkew = Duration(
+	(duration) => duration > 0 && duration <= MaxRequestTimeSkew,
+	"must be a positive duration of at most 5 minutes, such as \"90 seconds\"",
+)
 
 // an SQLite date modifier for a positive period, such as "1 year" or "90 days"
 const RetentionPeriodFormat = /^\+?(\d+(\.\d+)?) (second|minute|hour|day|month|year)s?$/
@@ -92,19 +107,83 @@ const RetentionSetting = RetentionString.transform((v): Retention => v === "infi
 /** A boolean set as the string "true" or "false" */
 export const BooleanString = z.enum(["true", "false"], { message: "must be \"true\" or \"false\"" })
 
-/** An http or https URL */
-export const HttpUrl = z.url({ protocol: /^https?$/, message: "must be an http or https URL" })
+// whether the host of a URL is the local machine, which is reached without
+// crossing a network an attacker could be on
+const isLoopbackHost = (hostname: string): boolean =>
+	hostname === "localhost" || hostname === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)
+
+/**
+ * An https URL, or an http URL for the local machine (`localhost`,
+ * `127.0.0.0/8` or `[::1]`), such as a test identity provider. Anything that
+ * authenticates requesters is fetched over https elsewhere, so it cannot be
+ * changed on its way to the CA.
+ */
+export const HttpsOrLoopbackUrl = z.url({ protocol: /^https?$/, message: "must be an https URL" })
+	.refine((v) => {
+		// a value that is not a URL at all is reported by z.url, which does not
+		// stop this check from running
+		if (!URL.canParse(v)) {
+			return true
+		}
+
+		const url = new URL(v)
+		return url.protocol === "https:" || isLoopbackHost(url.hostname)
+	}, { message: "must be an https URL, or an http URL for localhost" })
 
 /** The levels the CA can log at */
 export const LogLevelName = z.enum(["none", "error", "warning", "info", "debug"])
 
-// a list, either as a comma separated string or as an array
-const List = z.union([z.string(), z.array(z.string())]).optional().transform((v): string[] => {
+/**
+ * The algorithms a JWT may be signed with, for requester and proxy JWTs alike.
+ * Only asymmetric algorithms are allowed, as the keys come from a public JWKS.
+ */
+export const JwtAlgorithms = ["RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA", "Ed25519"] as const
+
+// the entries of a list, trimmed so a space after a comma is allowed
+const listEntries = (v: string | string[]): string[] => (typeof v === "string" ? v.split(",") : v).map((entry) => entry.trim())
+
+const EmptyEntryMessage = "must be a comma separated list without empty entries"
+
+// a list, either as a comma separated string or as an array, which must have
+// at least one entry, whose entries are trimmed and must not be empty
+const NonEmptyList = z.union([z.string(), z.array(z.string())], { message: "must be set" }).transform((v, ctx): string[] => {
+	const entries = listEntries(v)
+	if (entries.length === 0 || (entries.length === 1 && entries[0] === "")) {
+		ctx.issues.push({ code: "custom", message: "must be set", input: v })
+		return z.NEVER
+	}
+	if (entries.some((entry) => entry === "")) {
+		ctx.issues.push({ code: "custom", message: EmptyEntryMessage, input: v })
+		return z.NEVER
+	}
+
+	return entries
+})
+
+// a list of the algorithms a JWT may be signed with, see JwtAlgorithms
+const JwtAlgorithmList = NonEmptyList.superRefine((entries, ctx) => {
+	for (const entry of entries) {
+		if (!(JwtAlgorithms as readonly string[]).includes(entry)) {
+			ctx.issues.push({ code: "custom", message: `"${entry}" is not one of ${JwtAlgorithms.join(", ")}`, input: entries })
+		}
+	}
+})
+
+// an optional list, either as a comma separated string or as an array, whose
+// entries are trimmed and must not be empty. A list that is not set, or is an
+// empty string (as an unset var may be on Workers), has no entries
+const List = z.union([z.string(), z.array(z.string())]).optional().transform((v, ctx): string[] => {
 	if (v === undefined || v === "") {
 		return []
 	}
 
-	return typeof v === "string" ? v.split(",") : v
+	const entries = listEntries(v)
+	if (entries.some((entry) => entry === "")) {
+		ctx.issues.push({ code: "custom", message: EmptyEntryMessage, input: v })
+		return z.NEVER
+	}
+
+	return entries
 })
 
 // reports each entry of a list of user certificate principals that cannot be
@@ -118,23 +197,22 @@ const checkPrincipals = (principals: string[], ctx: z.RefinementCtx): void => {
 	}
 }
 
-/**
- * A comma separated list of principals added to every user certificate, each
- * of which must be allowed by {@link principalIssue}. Entries are not
- * trimmed, so a space after a comma is refused.
- */
-export const PrincipalListString = z.string().optional().superRefine((v, ctx) => {
-	if (v !== undefined && v !== "") {
-		checkPrincipals(v.split(","), ctx)
-	}
-})
-
-// a list of principals added to every user certificate, see PrincipalListString
+// a list of principals added to every user certificate, each of which must be
+// allowed by principalIssue
 const PrincipalList = List.superRefine(checkPrincipals)
 
-// a list that must have at least one entry
-const RequiredList = z.union([RequiredString, z.array(RequiredString).min(1, { message: "must be set" })])
-	.transform((v): string[] => typeof v === "string" ? v.split(",") : v)
+// reports each extension name that is not one word, as the name of an SSH
+// certificate extension cannot contain whitespace and a comma separates them
+const checkExtensions = (extensions: string[], ctx: z.RefinementCtx): void => {
+	for (const extension of extensions) {
+		if (/[\s,]/.test(extension)) {
+			ctx.issues.push({ code: "custom", message: `extension "${extension}" must not contain whitespace or commas`, input: extension })
+		}
+	}
+}
+
+// the extensions included in user certificates by default
+const ExtensionList = List.superRefine(checkExtensions)
 
 // a flag, either as a boolean or as the string "true" or "false"
 const Flag = z.union([z.boolean(), BooleanString]).optional().transform((v): boolean => v === true || v === "true")
@@ -161,68 +239,7 @@ const HostnameFormat = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]
 /** A host name, such as "ssh-ca.example.com", without a scheme, port or path */
 export const HostnameString = z.string().regex(HostnameFormat, { message: "must be a host name such as \"ssh-ca.example.com\"" })
 
-/**
- * The algorithms a proxy JWT may be signed with. Only asymmetric algorithms
- * are allowed, as the keys come from a public JWKS.
- */
-export const AdminJwtAlgorithms = ["RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA", "Ed25519"] as const
 
-// the entries of a list, trimmed so a space after a comma is allowed
-const listEntries = (v: string | string[]): string[] => (typeof v === "string" ? v.split(",") : v).map((entry) => entry.trim())
-
-// reports a list without entries, or with an empty entry, which is more
-// likely to be a mistake than meant
-const listIssue = (entries: string[]): string | undefined => {
-	if (entries.length === 0 || entries.some((entry) => entry === "")) {
-		return "must be a comma separated list without empty entries"
-	}
-
-	return undefined
-}
-
-// reports each entry of a list of algorithms that a proxy JWT may not be
-// signed with
-const algorithmIssues = (entries: string[]): string[] => entries
-	.filter((entry) => !(AdminJwtAlgorithms as readonly string[]).includes(entry))
-	.map((entry) => `"${entry}" is not one of ${AdminJwtAlgorithms.join(", ")}`)
-
-/**
- * A comma separated list of values, each of which is trimmed and must not be
- * empty.
- */
-export const ListString = z.string().superRefine((v, ctx) => {
-	const issue = listIssue(listEntries(v))
-	if (issue !== undefined) {
-		ctx.issues.push({ code: "custom", message: issue, input: v })
-	}
-})
-
-/** A comma separated list of the algorithms in {@link AdminJwtAlgorithms} */
-export const AdminJwtAlgorithmListString = ListString.superRefine((v, ctx) => {
-	for (const message of algorithmIssues(listEntries(v))) {
-		ctx.issues.push({ code: "custom", message, input: v })
-	}
-})
-
-// a list, either as a comma separated string or as an array, whose entries are
-// trimmed and must not be empty
-const NonEmptyList = z.union([z.string(), z.array(z.string())]).transform((v, ctx): string[] => {
-	const entries = listEntries(v)
-	const issue = listIssue(entries)
-	if (issue !== undefined) {
-		ctx.issues.push({ code: "custom", message: issue, input: v })
-		return z.NEVER
-	}
-
-	return entries
-})
-
-// a list of algorithms a proxy JWT may be signed with, see AdminJwtAlgorithms
-const AdminJwtAlgorithmList = NonEmptyList.superRefine((entries, ctx) => {
-	for (const message of algorithmIssues(entries)) {
-		ctx.issues.push({ code: "custom", message, input: entries })
-	}
-})
 
 /**
  * Who may use the admin UI, from the settings that say which emails and
@@ -349,32 +366,27 @@ export type Retention =
 	| { kind: "infinite" }
 	| { kind: "period", modifier: string }
 
-/**
- * The configuration values of {@link SshCaBindings}, validated and parsed into
- * the types the CA uses. The database, private key, rate limiter and cache are
- * objects provided by the runtime, so are used as they are.
- */
-const ConfigSchema = z.object({
+// the configuration values of SshCaBindings, each validated and parsed into
+// the type the CA uses. The database, private key, rate limiter and cache are
+// objects provided by the runtime, so are used as they are
+const ConfigFields = z.object({
 	ISSUER_DN: RequiredString,
-	JWT_JWKS_URL: HttpUrl,
+	JWT_JWKS_URL: HttpsOrLoopbackUrl,
 	JWT_ISSUER: RequiredString,
-	JWT_ALGORITHMS: RequiredList,
-	// a missing audience is reported when a token is verified, so it fails
-	// closed without being refused here, see MissingAudienceError
-	JWT_AUD: List,
+	JWT_ALGORITHMS: JwtAlgorithmList,
+	JWT_AUD: NonEmptyList,
 	JWT_ACCESS_TOKEN_AUD: List,
-	// an empty string is the same as not set, as it may be on Workers
-	OIDC_USERINFO_URL: z.union([z.literal(""), HttpUrl]).optional().transform((v) => v === "" ? undefined : v),
+	OIDC_USERINFO_URL: OptionalSetting(HttpsOrLoopbackUrl),
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: RequiredString,
-	CERTIFICATE_REQUEST_TIME_SKEW_MAX: Duration({ allowZero: true }),
-	SSH_CERTIFICATE_EXTENSIONS: List,
+	CERTIFICATE_REQUEST_TIME_SKEW_MAX: RequestTimeSkew,
+	SSH_CERTIFICATE_EXTENSIONS: ExtensionList,
 	SSH_CERTIFICATE_INCLUDE_SELF: Flag,
 	SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: Flag,
-	SSH_CERTIFICATE_LIFETIME: Duration({ allowZero: false }),
+	SSH_CERTIFICATE_LIFETIME: Lifetime(MinUserCertificateLifetime, "5 minutes"),
 	SSH_CERTIFICATE_PRINCIPALS: PrincipalList,
 	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: List,
 	SSH_HOST_CERTIFICATE_ALLOWED_ROLES: List,
-	SSH_HOST_CERTIFICATE_LIFETIME: Duration({ allowZero: false }),
+	SSH_HOST_CERTIFICATE_LIFETIME: Lifetime(MinHostCertificateLifetime, "24 hours"),
 	DB_CERTIFICATE_RETENTION: RetentionSetting,
 	LOG_LEVEL: LogLevelName.optional(),
 	LANDING_PAGE: Flag,
@@ -384,12 +396,24 @@ const ConfigSchema = z.object({
 	ADMIN_JWKS_URL: OptionalSetting(HttpsUrl),
 	ADMIN_JWT_ISSUER: OptionalSetting(RequiredString),
 	ADMIN_JWT_AUD: OptionalSetting(NonEmptyList),
-	ADMIN_JWT_ALGORITHMS: OptionalSetting(AdminJwtAlgorithmList),
+	ADMIN_JWT_ALGORITHMS: OptionalSetting(JwtAlgorithmList),
 	ADMIN_ALLOWED_EMAILS: OptionalSetting(NonEmptyList),
 	ADMIN_ALLOWED_ROLES: OptionalSetting(NonEmptyList),
 	ADMIN_JWT_ROLES_CLAIM: OptionalSetting(RequiredString),
 	ADMIN_HOSTNAME: OptionalSetting(HostnameString),
-}).transform((env) => ({
+})
+
+/**
+ * The names of the configuration values in {@link SshCaBindings}, which are
+ * also the names of the environment variables read by `bindingsFromEnv`.
+ */
+export const ConfigNames = Object.keys(ConfigFields.shape)
+
+/**
+ * The configuration values of {@link SshCaBindings}, validated and parsed into
+ * the types the CA uses.
+ */
+const ConfigSchema = ConfigFields.transform((env) => ({
 	issuerDn: env.ISSUER_DN,
 	jwksUrl: env.JWT_JWKS_URL,
 	issuer: env.JWT_ISSUER,
@@ -404,12 +428,13 @@ const ConfigSchema = z.object({
 	includeSelf: env.SSH_CERTIFICATE_INCLUDE_SELF,
 	includeSelfEmail: env.SSH_CERTIFICATE_INCLUDE_SELF_EMAIL,
 	/** The maximum lifetime of a user certificate, in seconds */
-	certificateLifetime: env.SSH_CERTIFICATE_LIFETIME / 1000,
+	certificateLifetime: env.SSH_CERTIFICATE_LIFETIME,
 	principals: env.SSH_CERTIFICATE_PRINCIPALS,
-	hostAllowedEmails: env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS,
+	/** The emails of requesters who may request host certificates, lowercased, as emails are compared case-insensitively */
+	hostAllowedEmails: env.SSH_HOST_CERTIFICATE_ALLOWED_EMAILS.map((email) => email.toLowerCase()),
 	hostAllowedRoles: env.SSH_HOST_CERTIFICATE_ALLOWED_ROLES,
 	/** The maximum lifetime of a host certificate, in seconds */
-	hostCertificateLifetime: env.SSH_HOST_CERTIFICATE_LIFETIME / 1000,
+	hostCertificateLifetime: env.SSH_HOST_CERTIFICATE_LIFETIME,
 	retention: env.DB_CERTIFICATE_RETENTION,
 	/** Whether the landing page is served at `/` */
 	landingPage: env.LANDING_PAGE,

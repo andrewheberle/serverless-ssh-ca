@@ -92,7 +92,7 @@ describe("user certificate principals from the identity token", () => {
 
 describe("SSH_CERTIFICATE_PRINCIPALS", () => {
 	it.each([
-		["a space after a comma", "ssh-admin, ops"],
+		["a space inside a principal", "ssh-admin,ops team"],
 		["an empty entry", "ssh-admin,,ops"],
 		["a wildcard", "*"],
 	])("should be refused by createSshCa with %s", (_name, principals) => {
@@ -101,7 +101,12 @@ describe("SSH_CERTIFICATE_PRINCIPALS", () => {
 	})
 
 	it("should be refused by createSshCa when an entry of a list is invalid", () => {
-		expect(() => newCa({ SSH_CERTIFICATE_PRINCIPALS: ["ssh-admin", " ops"] })).toThrow("SSH_CERTIFICATE_PRINCIPALS")
+		expect(() => newCa({ SSH_CERTIFICATE_PRINCIPALS: ["ssh-admin", "ops team"] })).toThrow("SSH_CERTIFICATE_PRINCIPALS")
+	})
+
+	it("should trim each entry, as every list setting does", () => {
+		expect(() => newCa({ SSH_CERTIFICATE_PRINCIPALS: "ssh-admin, ops" })).not.toThrow()
+		expect(() => newCa({ SSH_CERTIFICATE_PRINCIPALS: ["ssh-admin", " ops "] })).not.toThrow()
 	})
 
 	it("should make the Workers default export answer with 500 when invalid", async () => {
@@ -112,7 +117,7 @@ describe("SSH_CERTIFICATE_PRINCIPALS", () => {
 		// the same request is served when the setting is valid
 		expect((await ca.fetch(new Request("http://example.com/api/v4/ca"), env("ssh-admin,ops"), ctx)).status).toBe(200)
 
-		const response = await ca.fetch(new Request("http://example.com/api/v4/ca"), env("ssh-admin, ops"), ctx)
+		const response = await ca.fetch(new Request("http://example.com/api/v4/ca"), env("ssh-admin,ops team"), ctx)
 		expect(response.status).toBe(500)
 	})
 
@@ -132,8 +137,8 @@ describe("SSH_CERTIFICATE_PRINCIPALS", () => {
 			DB_CERTIFICATE_RETENTION: "1 year",
 		}
 
-		expect(() => bindingsFromEnv({ DB: db, PRIVATE_KEY: secretFromString("key") }, { ...source, SSH_CERTIFICATE_PRINCIPALS: "ssh-admin, ops" }))
-			.toThrow(/user certificate principal " ops"[\s\S]*SSH_CERTIFICATE_PRINCIPALS/)
+		expect(() => bindingsFromEnv({ DB: db, PRIVATE_KEY: secretFromString("key") }, { ...source, SSH_CERTIFICATE_PRINCIPALS: "ssh-admin,ops team" }))
+			.toThrow(/user certificate principal "ops team"[\s\S]*SSH_CERTIFICATE_PRINCIPALS/)
 		expect(() => bindingsFromEnv({ DB: db, PRIVATE_KEY: secretFromString("key") }, { ...source, SSH_CERTIFICATE_PRINCIPALS: "ssh-admin,ops" }))
 			.not.toThrow()
 	})
