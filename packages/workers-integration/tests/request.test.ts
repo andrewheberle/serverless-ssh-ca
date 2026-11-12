@@ -13,7 +13,7 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>
 
 // fetch a KRL and return the version from its header
 const krlVersion = async (type: "user" | "host"): Promise<bigint> => {
-	const response = await exports.default.fetch(`http://example.com/api/v3/${type}/krl`)
+	const response = await exports.default.fetch(`http://example.com/api/v4/${type}/krl`)
 	expect(response.status).toBe(200)
 	const { krl } = await response.json<{ krl: string }>()
 	const bytes = Uint8Array.from(atob(krl), c => c.charCodeAt(0))
@@ -36,9 +36,9 @@ describe("get /docs", () => {
 const admin = adminSecretsStore(env.PRIVATE_KEY);
 await admin.create(privateKeyString)
 
-describe("get /api/v3/ca", () => {
+describe("get /api/v4/ca", () => {
 	it("responds with a 200 and correct content", async () => {
-		const request = new IncomingRequest("http://example.com/api/v3/ca")
+		const request = new IncomingRequest("http://example.com/api/v4/ca")
 
 		// Create an empty context to pass to `worker.fetch()`
 		const ctx = createExecutionContext()
@@ -56,13 +56,13 @@ describe("get /api/v3/ca", () => {
 	})
 })
 
-describe("post /api/v3/user/certificate", () => {
+describe("post /api/v4/user/certificates", () => {
 	it("incomplete request", async () => {
 		const headers = new Headers()
 		headers.set("Authorization", "Bearer foo")
 		headers.set("Content-Type", "application/json")
 
-		const request = new IncomingRequest("http://example.com/api/v3/user/certificate", { method: "POST", headers: headers, body: "{}" })
+		const request = new IncomingRequest("http://example.com/api/v4/user/certificates", { method: "POST", headers: headers, body: "{}" })
 
 		// Create an empty context to pass to `worker.fetch()`
 		const ctx = createExecutionContext()
@@ -76,9 +76,9 @@ describe("post /api/v3/user/certificate", () => {
 	})
 })
 
-describe("GET /api/v3/user/krl", () => {
+describe("GET /api/v4/user/krl", () => {
 	it("normal request", async () => {
-		const request = new IncomingRequest("http://example.com/api/v3/user/krl")
+		const request = new IncomingRequest("http://example.com/api/v4/user/krl")
 
 		// Create an empty context to pass to `worker.fetch()`
 		const ctx = createExecutionContext()
@@ -100,13 +100,13 @@ describe("GET /api/v3/user/krl", () => {
 	})
 })
 
-describe("post /api/v3/host/certificate", () => {
+describe("post /api/v4/host/certificates", () => {
 	it("incomplete request", async () => {
 		const headers = new Headers()
 		headers.set("Authorization", "Bearer foo")
 		headers.set("Content-Type", "application/json")
 
-		const request = new IncomingRequest("http://example.com/api/v3/host/certificate", { method: "POST", headers: headers, body: "{}" })
+		const request = new IncomingRequest("http://example.com/api/v4/host/certificates", { method: "POST", headers: headers, body: "{}" })
 
 		// Create an empty context to pass to `worker.fetch()`
 		const ctx = createExecutionContext()
@@ -120,13 +120,13 @@ describe("post /api/v3/host/certificate", () => {
 	})
 })
 
-describe("post /api/v3/host/renew", () => {
+describe("post /api/v4/host/certificates/{serial}/renew", () => {
 	it("incomplete request", async () => {
 		const headers = new Headers()
 		headers.set("Authorization", "Bearer foo")
 		headers.set("Content-Type", "application/json")
 
-		const request = new IncomingRequest("http://example.com/api/v3/host/renew", { method: "POST", headers: headers, body: "{}" })
+		const request = new IncomingRequest("http://example.com/api/v4/host/certificates/1234/renew", { method: "POST", headers: headers, body: "{}" })
 
 		// Create an empty context to pass to `worker.fetch()`
 		const ctx = createExecutionContext()
@@ -140,9 +140,9 @@ describe("post /api/v3/host/renew", () => {
 	})
 })
 
-describe("GET /api/v3/host/krl", () => {
+describe("GET /api/v4/host/krl", () => {
 	it("normal request", async () => {
-		const request = new IncomingRequest("http://example.com/api/v3/host/krl")
+		const request = new IncomingRequest("http://example.com/api/v4/host/krl")
 
 		// Create an empty context to pass to `worker.fetch()`
 		const ctx = createExecutionContext()

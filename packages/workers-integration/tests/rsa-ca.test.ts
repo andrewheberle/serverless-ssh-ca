@@ -14,9 +14,9 @@ await admin.create(privateKeyString)
 
 describe("RSA CA key", () => {
 	it.each([
-		"/api/v3/ca",
-		"/api/v3/user/krl",
-		"/api/v3/host/krl",
+		"/api/v4/ca",
+		"/api/v4/user/krl",
+		"/api/v4/host/krl",
 	])("GET %s responds with a 500", async (path) => {
 		const response = await exports.default.fetch(`http://example.com${path}`)
 

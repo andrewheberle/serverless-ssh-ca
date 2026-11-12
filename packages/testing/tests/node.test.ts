@@ -26,18 +26,18 @@ describe("startTestServer under node", () => {
 
 		expect(readFileSync(files.portFile, "utf-8")).toBe(String(server.port))
 
-		const response = await fetch(`http://127.0.0.1:${server.port}/api/v3/ca`)
+		const response = await fetch(`http://127.0.0.1:${server.port}/api/v4/ca`)
 		expect(response.status).toBe(200)
 		expect(await response.text()).toContain("ssh-ed25519")
 
-		expect(logLines()).toContainEqual({ level: "info", message: "harness request", method: "GET", url: "/api/v3/ca", status: 200 })
+		expect(logLines()).toContainEqual({ level: "info", message: "harness request", method: "GET", url: "/api/v4/ca", status: 200 })
 	})
 
 	it("should log the body of rejected requests", async () => {
 		files = writeConfig()
 		server = await startTestServer("node", files.configFile)
 
-		const response = await fetch(`http://127.0.0.1:${server.port}/api/v3/user/certificate`, {
+		const response = await fetch(`http://127.0.0.1:${server.port}/api/v4/user/certificates`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: "{}",
@@ -47,7 +47,7 @@ describe("startTestServer under node", () => {
 		expect(logLines()).toContainEqual(expect.objectContaining({
 			message: "harness request",
 			method: "POST",
-			url: "/api/v3/user/certificate",
+			url: "/api/v4/user/certificates",
 			status: response.status,
 			body: await response.text(),
 		}))

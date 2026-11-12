@@ -16,8 +16,8 @@ const IncomingRequest = Request<unknown, IncomingRequestCfProperties>
 const admin = adminSecretsStore(env.PRIVATE_KEY)
 await admin.create(privateKeyString)
 
-describe("post /api/v3/user/certificate", () => {
-    const proof = inject("testProof")
+describe("post /api/v4/user/certificates", () => {
+    const proof = inject("testRequestProof")
 
     let accessToken: string
     let identityToken: string
@@ -37,16 +37,16 @@ describe("post /api/v3/user/certificate", () => {
         const headers = new Headers()
         headers.set("Authorization", accessToken)
         headers.set("Content-Type", "application/json")
+        headers.set("Proof-Of-Possession", proof)
 
         const body = JSON.stringify({
             public_key: Buffer.from(key.publicKey).toString("base64"),
-            proof: proof,
             identity: identityToken,
             extensions: [],
             lifetime: 3600,
         })
 
-        const request = new IncomingRequest("http://example.com/api/v3/user/certificate", {
+        const request = new IncomingRequest("http://example.com/api/v4/user/certificates", {
             method: "POST",
             headers,
             body,
@@ -75,16 +75,16 @@ describe("post /api/v3/user/certificate", () => {
         const headers = new Headers()
         headers.set("Authorization", accessToken)
         headers.set("Content-Type", "application/json")
+        headers.set("Proof-Of-Possession", proof)
 
         const body = JSON.stringify({
             public_key: Buffer.from(key.publicKey).toString("base64"),
-            proof: proof,
             identity: differentIdentityToken,
             extensions: [],
             lifetime: 3600,
         })
 
-        const request = new IncomingRequest("http://example.com/api/v3/user/certificate", {
+        const request = new IncomingRequest("http://example.com/api/v4/user/certificates", {
             method: "POST",
             headers,
             body,

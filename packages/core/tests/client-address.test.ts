@@ -10,7 +10,7 @@ import { CertificateType } from "../src/db/types.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { SshCertificate } from "../src/ssh/certificate.js"
 import { makeEnv } from "./env.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
@@ -90,12 +90,6 @@ describe("recording client addresses", () => {
 		"Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/user/certificates"),
 	}, address)
 
-	const issueUserV3 = async (key: TestKey, address?: string): Promise<Response> => await post("/api/v3/user/certificate", {
-		public_key: base64(key.publicKey),
-		proof: generateProof(key),
-		identity: await getIdentityToken(claims),
-	}, { "Authorization": await getAccessToken(claims) }, address)
-
 	const issueHostV4 = async (key: TestKey, address?: string): Promise<Response> => await post("/api/v4/host/certificates", {
 		public_key: base64(key.publicKey),
 		identity: await getIdentityToken(claims),
@@ -105,20 +99,10 @@ describe("recording client addresses", () => {
 		"Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/host/certificates"),
 	}, address)
 
-	const issueHostV3 = async (key: TestKey, address?: string): Promise<Response> => await post("/api/v3/host/certificate", {
-		public_key: base64(key.publicKey),
-		proof: generateProof(key),
-		identity: await getIdentityToken(claims),
-		principals: ["address.example.com"],
-	}, { "Authorization": await getAccessToken(claims) }, address)
-
 	const renewV4 = async (issued: { text: string, certificate: SshCertificate }, key: TestKey, address?: string): Promise<Response> => {
 		const path = `/api/v4/host/certificates/${issued.certificate.serial}/renew`
 		return await post(path, { certificate: base64(issued.text) }, { "Proof-Of-Possession": generateRequestProof(key, "POST", path) }, address)
 	}
-
-	const renewV3 = async (issued: { text: string }, key: TestKey, address?: string): Promise<Response> =>
-		await post("/api/v3/host/renew", { certificate: base64(issued.text), public_key: base64(key.publicKey), proof: generateProof(key) }, {}, address)
 
 	const revokeV4 = async (serial: bigint, key: TestKey, address?: string): Promise<Response> => {
 		const path = `/api/v4/user/certificates/${serial}`
@@ -127,9 +111,6 @@ describe("recording client addresses", () => {
 			headers: { "Proof-Of-Possession": generateRequestProof(key, "DELETE", path), ...(address === undefined ? {} : { [AddressHeader]: address }) },
 		}))
 	}
-
-	const revokeV3 = async (serial: bigint, key: TestKey, address?: string): Promise<Response> =>
-		await post("/api/v3/user/revoke", { serial: `${serial}`, public_key: base64(key.publicKey), proof: generateProof(key) }, {}, address)
 
 	const create = (options: SshCaOptions, bindings: Partial<SshCaBindings> = {}): SshCa => createSshCa(makeEnv({
 		DB: fromNodeSqlite(sqlite),
@@ -155,36 +136,28 @@ describe("recording client addresses", () => {
 
 	it.each([
 		["a user certificate (v4)", issueUserV4, ecdsaKey.user],
-		["a user certificate (v3)", issueUserV3, ecdsaKey.user],
 		["a host certificate (v4)", issueHostV4, ecdsaKey.host],
-		["a host certificate (v3)", issueHostV3, ecdsaKey.host],
 	])("should record the request address when issuing %s", async (_name, issue, key) => {
 		const { certificate } = await certificateOf(await issue(key(), "192.0.2.10"))
 
 		expect(addresses(certificate.serial)).toEqual({ request_address: "192.0.2.10", revocation_address: null })
 	})
 
-	it.each([
-		["v4", renewV4],
-		["v3", renewV3],
-	])("should record the address of a renewal as the request address of the renewal and the revocation address of what it renewed (%s)", async (_name, renew) => {
+	it("should record the address of a renewal as the request address of the renewal and the revocation address of what it renewed", async () => {
 		const key = ecdsaKey.host()
 		const issued = await certificateOf(await issueHostV4(key, "192.0.2.10"))
 
-		const renewed = await certificateOf(await renew(issued, key, "2001:db8::1"))
+		const renewed = await certificateOf(await renewV4(issued, key, "2001:db8::1"))
 
 		expect(addresses(issued.certificate.serial)).toEqual({ request_address: "192.0.2.10", revocation_address: "2001:db8::1" })
 		expect(addresses(renewed.certificate.serial)).toEqual({ request_address: "2001:db8::1", revocation_address: null })
 	})
 
-	it.each([
-		["v4", revokeV4],
-		["v3", revokeV3],
-	])("should record the revocation address of a revocation by the key holder (%s)", async (_name, revoke) => {
+	it("should record the revocation address of a revocation by the key holder", async () => {
 		const key = ecdsaKey.user()
 		const { certificate } = await certificateOf(await issueUserV4(key, "192.0.2.10"))
 
-		expect((await revoke(certificate.serial, key, "198.51.100.7")).status).toBe(200)
+		expect((await revokeV4(certificate.serial, key, "198.51.100.7")).status).toBe(200)
 
 		expect(addresses(certificate.serial)).toEqual({ request_address: "192.0.2.10", revocation_address: "198.51.100.7" })
 	})

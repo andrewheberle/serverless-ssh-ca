@@ -6,7 +6,7 @@ import { SshCertificate } from "../src/ssh/certificate.js"
 import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { generateKey, signCertificate } from "./helpers/ssh-keygen.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
@@ -56,24 +56,6 @@ type IssueEndpoint = {
 }
 
 const issueEndpoints: IssueEndpoint[] = [
-	{
-		name: "POST /api/v3/user/certificate",
-		user: true,
-		request: async (ca, body = {}) => await ca.fetch(new Request("http://example.com/api/v3/user/certificate", {
-			method: "POST",
-			headers: { "Content-Type": "application/json", "Authorization": await getAccessToken({ sub, email }) },
-			body: JSON.stringify({ public_key: base64(userKey.publicKey), proof: generateProof(userKey), identity: await getIdentityToken({ sub, email }), ...body }),
-		})),
-	},
-	{
-		name: "POST /api/v3/host/certificate",
-		user: false,
-		request: async (ca, body = {}) => await ca.fetch(new Request("http://example.com/api/v3/host/certificate", {
-			method: "POST",
-			headers: { "Content-Type": "application/json", "Authorization": await getAccessToken({ sub, email }) },
-			body: JSON.stringify({ public_key: base64(hostKey.publicKey), proof: generateProof(hostKey), identity: await getIdentityToken({ sub, email }), principals: ["test_host"], ...body }),
-		})),
-	},
 	{
 		name: "POST /api/v4/user/certificates",
 		user: true,
@@ -135,28 +117,12 @@ describe.each(issueEndpoints)("responses to certificates the CA will not issue (
 
 type RenewEndpoint = {
 	name: string
-	v3: boolean
 	request: (ca: SshCa, certificate: string, key: TestKey, options?: { proofKey?: TestKey, lifetime?: number }) => Promise<Response>
 }
 
 const renewEndpoints: RenewEndpoint[] = [
 	{
-		name: "POST /api/v3/host/renew",
-		v3: true,
-		request: async (ca, certificate, key, options = {}) => await ca.fetch(new Request("http://example.com/api/v3/host/renew", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				certificate: base64(certificate),
-				public_key: base64(key.publicKey),
-				proof: generateProof(options.proofKey ?? key),
-				...(options.lifetime === undefined ? {} : { lifetime: options.lifetime }),
-			}),
-		})),
-	},
-	{
 		name: "POST /api/v4/host/certificates/{serial}/renew",
-		v3: false,
 		request: async (ca, certificate, key, options = {}) => {
 			const path = `/api/v4/host/certificates/${SshCertificate.parse(certificate).serial}/renew`
 			return await ca.fetch(new Request(`http://example.com${path}`, {
@@ -183,7 +149,7 @@ const hostCertificate = (options: { key?: TestKey, ca?: TestKey, kind?: "user" |
 		...(options.serial === undefined ? {} : { serial: options.serial }),
 	})
 
-describe.each(renewEndpoints)("responses to certificates the CA will not renew ($name)", ({ request, v3 }) => {
+describe.each(renewEndpoints)("responses to certificates the CA will not renew ($name)", ({ request }) => {
 	const notRenewable = (message: string) => validationError(message, ["body"])
 
 	it("should renew a certificate for no longer than the certificate it renews", async () => {
@@ -240,9 +206,7 @@ describe.each(renewEndpoints)("responses to certificates the CA will not renew (
 	it("should return 400 for a proof made with another key", async () => {
 		const response = await request(newCa(), hostCertificate(), hostKey, { proofKey: ecdsaKey.user() })
 		expect(response.status).toBe(400)
-		expect(await response.json()).toEqual(v3
-			? validationError("proof of possession fingerprints did not match public_key and/or certificate", ["body"])
-			: validationError("proof of possession fingerprint did not match public key", ["headers", "Proof-Of-Possession"]))
+		expect(await response.json()).toEqual(validationError("proof of possession fingerprint did not match public key", ["headers", "Proof-Of-Possession"]))
 	})
 
 	it("should return 500 for a CA key of a type that is not supported", async () => {

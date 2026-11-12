@@ -5,7 +5,7 @@ import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken, type TokenClaims } from "./helpers/token.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 
@@ -22,11 +22,6 @@ const createCa = (overrides: Partial<SshCaBindings> = {}): SshCa => createSshCa(
 type Request = (ca: SshCa, body: Record<string, unknown>) => Promise<Response>
 
 const requests: [string, Request][] = [
-	["POST /api/v3/user/certificate", async (ca, body) => await ca.fetch(new Request("http://example.com/api/v3/user/certificate", {
-		method: "POST",
-		headers: { "Content-Type": "application/json", "Authorization": await getAccessToken(claims) },
-		body: JSON.stringify({ public_key: publicKey, proof: generateProof(userKey), identity: await getIdentityToken(claims), ...body }),
-	}))],
 	["POST /api/v4/user/certificates", async (ca, body) => await ca.fetch(new Request("http://example.com/api/v4/user/certificates", {
 		method: "POST",
 		headers: {

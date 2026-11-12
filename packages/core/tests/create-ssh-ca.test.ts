@@ -27,7 +27,7 @@ describe("createSshCa", () => {
 			const ca = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(key.privateKey) }))
 
 			// only the request is passed, so the handler must supply the bindings itself
-			const response = await ca.fetch(new Request("http://example.com/api/v3/ca"))
+			const response = await ca.fetch(new Request("http://example.com/api/v4/ca"))
 
 			expect(response.status).toBe(200)
 			expect(keyBlob(await response.text())).toBe(keyBlob(key.publicKey))
@@ -39,8 +39,8 @@ describe("createSshCa", () => {
 			const a = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(first.privateKey), ISSUER_DN: "CN=First CA" }))
 			const b = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(second.privateKey), ISSUER_DN: "CN=Second CA" }))
 
-			const fromA = await (await a.fetch(new Request("http://example.com/api/v3/ca"))).text()
-			const fromB = await (await b.fetch(new Request("http://example.com/api/v3/ca"))).text()
+			const fromA = await (await a.fetch(new Request("http://example.com/api/v4/ca"))).text()
+			const fromB = await (await b.fetch(new Request("http://example.com/api/v4/ca"))).text()
 
 			expect(fromA).toBe(`${keyBlob(first.publicKey)} CN=First CA\n`)
 			expect(fromB).toBe(`${keyBlob(second.publicKey)} CN=Second CA\n`)
@@ -52,6 +52,26 @@ describe("createSshCa", () => {
 			const response = await ca.fetch(new Request("http://example.com/not-found"))
 
 			expect(response.status).toBe(404)
+		})
+
+		it.each([
+			["GET", "/api/v3"],
+			["GET", "/api/v3/ca"],
+			["GET", "/api/v3/user/krl"],
+			["POST", "/api/v3/user/certificate"],
+			["POST", "/api/v3/host/renew"],
+			["DELETE", "/api/v3/user/certificates/1"],
+		])("should respond to %s %s with a 410 as API v3 was removed", async (method, path) => {
+			const ca = createSshCa(makeEnv())
+
+			const response = await ca.fetch(new Request(`http://example.com${path}`, { method, body: method === "POST" ? "{}" : undefined }))
+
+			expect(response.status).toBe(410)
+			expect(await response.json()).toEqual({
+				success: false,
+				errors: [{ code: 410, message: "API v3 was removed in serverless-ssh-ca 1.0.0; upgrade ssh-ca-client to 0.24.0 or later" }],
+				result: {},
+			})
 		})
 	})
 

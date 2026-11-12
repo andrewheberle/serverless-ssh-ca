@@ -6,7 +6,7 @@ import { makeEnv } from "./env.js"
 import { failingCertificateWrites, hostCertificate } from "./helpers/certificate.js"
 import { MockSecretStore } from "./helpers/secret.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 
 // every attempt to record a certificate fails, but nothing is revoked, so
@@ -18,12 +18,12 @@ const ca = createSshCa(makeEnv({
 	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: email,
 }))
 
-const post = async (path: string, body: unknown, authorization?: string): Promise<Response> => {
-	const headers = new Headers({ "Content-Type": "application/json" })
-	if (authorization !== undefined) {
-		headers.set("Authorization", authorization)
-	}
-	return await ca.fetch(new Request(`http://example.com${path}`, { method: "POST", headers, body: JSON.stringify(body) }))
+const post = async (path: string, body: unknown, headers: Record<string, string>): Promise<Response> => {
+	return await ca.fetch(new Request(`http://example.com${path}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...headers },
+		body: JSON.stringify(body),
+	}))
 }
 
 const expectRecordingFailure = async (response: Response): Promise<void> => {
@@ -39,23 +39,27 @@ describe("certificate issuance when the database write fails", () => {
 
 	it("user certificate request responds with a 500", async () => {
 		const key = ecdsaKey.user()
-		const response = await post("/api/v3/user/certificate", {
+		const response = await post("/api/v4/user/certificates", {
 			public_key: Buffer.from(key.publicKey).toString("base64"),
-			proof: generateProof(key),
 			identity: await getIdentityToken(claims),
-		}, await getAccessToken(claims))
+		}, {
+			"Authorization": await getAccessToken(claims),
+			"Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/user/certificates"),
+		})
 
 		await expectRecordingFailure(response)
 	})
 
 	it("host certificate request responds with a 500", async () => {
 		const key = ecdsaKey.host()
-		const response = await post("/api/v3/host/certificate", {
+		const response = await post("/api/v4/host/certificates", {
 			public_key: Buffer.from(key.publicKey).toString("base64"),
-			proof: generateProof(key),
 			identity: await getIdentityToken(claims),
 			principals: ["test_host"],
-		}, await getAccessToken(claims))
+		}, {
+			"Authorization": await getAccessToken(claims),
+			"Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/host/certificates"),
+		})
 
 		await expectRecordingFailure(response)
 	})
@@ -63,11 +67,10 @@ describe("certificate issuance when the database write fails", () => {
 	it("host certificate renewal responds with a 500", async () => {
 		const key = ecdsaKey.host()
 		const certificate = hostCertificate(ecdsaKey.ca(), key)
-		const response = await post("/api/v3/host/renew", {
+		const path = `/api/v4/host/certificates/${certificate.serial}/renew`
+		const response = await post(path, {
 			certificate: Buffer.from(certificate.toString()).toString("base64"),
-			public_key: Buffer.from(key.publicKey).toString("base64"),
-			proof: generateProof(key),
-		})
+		}, { "Proof-Of-Possession": generateRequestProof(key, "POST", path) })
 
 		await expectRecordingFailure(response)
 	})

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { ProofOfPossession } from "../src/proof.js"
+import { ProofOfPossession, RequestNamespace } from "../src/proof.js"
+import { verify } from "../src/sshsig/index.js"
 import { PublicKey } from "../src/ssh/keys.js"
 
 type testSig = {
@@ -116,9 +117,10 @@ describe("ProofOfPossession", async () => {
             } else {
                 const proof = new ProofOfPossession(`${tt.data}.${tt.sig}`, { from: tt.from })
 
-                // verify timestamp and signature
+                // verify timestamp and the signature parsed from the proof,
+                // which the fixtures make over the timestamp and fingerprint
                 expect(proof.timestamp).toBe(timestamp)
-                expect(await proof.verify(tt.namespace)).toBe(tt.want)
+                expect(await verify(proof.signature, tt.data, { namespace: tt.namespace ?? RequestNamespace })).toBe(tt.want)
 
                 // check matches for keys
                 if (tt.matches !== undefined) {

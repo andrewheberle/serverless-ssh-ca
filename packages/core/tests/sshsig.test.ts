@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest"
 import { generateKey } from "./helpers/ssh-keygen.js"
 import { verify } from "../src/sshsig/index.js"
 import { parse, ecdsaComponentSize, toFixedWidth } from "../src/sshsig/sig_parser.js"
-import { Namespace, ProofOfPossession } from "../src/proof.js"
-import { generateProof } from "./helpers/proof.js"
+import { ProofOfPossession } from "../src/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 
 type fixture = {
 	name: string
@@ -15,6 +15,10 @@ type fixture = {
 // signatures produced by ssh-keygen -Y sign where r or s encodes to fewer
 // bytes than the curve size, so must be left-padded before verification.
 // every nistp521 signature needs converting as its components are 66 bytes
+// the namespace the fixtures below were signed in, which API v3 used for its
+// proofs of possession
+const FixtureNamespace = "proof-of-possession@com.github.serverless-ssh-ca.andrewheberle"
+
 const fixtures: fixture[] = [
 	{
 		name: "nistp256 short r",
@@ -152,11 +156,11 @@ describe("ECDSA signatures with short components", () => {
 		})
 
 		it(`${f.name} should verify`, async () => {
-			expect(await verify(f.signature, f.data, { namespace: Namespace })).toBe(true)
+			expect(await verify(f.signature, f.data, { namespace: FixtureNamespace })).toBe(true)
 		})
 
 		it(`${f.name} should not verify against different data`, async () => {
-			expect(await verify(f.signature, `${f.data}x`, { namespace: Namespace })).toBe(false)
+			expect(await verify(f.signature, `${f.data}x`, { namespace: FixtureNamespace })).toBe(false)
 		})
 	}
 })
@@ -169,8 +173,8 @@ describe("ECDSA proof of possession", () => {
 			const key = generateKey("ecdsa", bits)
 			const failures: string[] = []
 			for (let i = 0; i < 300; i++) {
-				const proof = generateProof(key)
-				if (!(await new ProofOfPossession(proof).verify())) {
+				const proof = generateRequestProof(key, "DELETE", "/api/v4/user/certificates/1")
+				if (!(await new ProofOfPossession(proof).verifyRequest("DELETE", "/api/v4/user/certificates/1"))) {
 					failures.push(proof)
 				}
 			}

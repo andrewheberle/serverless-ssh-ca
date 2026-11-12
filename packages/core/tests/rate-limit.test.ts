@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite"
 import ca, { cloudflareClientIp, createSshCa, InvalidConfigurationError, type CaRateLimiter, type SshCa, type SshCaOptions } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { makeEnv } from "./env.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 
@@ -59,21 +59,21 @@ describe("rate limiting", () => {
 		expect(await response.json()).toMatchObject({ success: false, errors: [{ code: 7008, message: "Too Many Requests" }] })
 	})
 
-	it("should limit v3 requests", async () => {
+	it("should answer API v3 requests with a 410 without asking the rate limiter", async () => {
 		const limiter = fakeLimiter(false)
 		const response = await createCa(limiter).fetch(new Request("http://example.com/api/v3/user/revoke", {
 			method: "POST",
 			headers: { "Content-Type": "application/json", "CF-Connecting-IP": "192.0.2.1" },
-			body: JSON.stringify({ serial: "12345", public_key: Buffer.from(userKey.publicKey).toString("base64"), proof: generateProof(userKey) }),
+			body: "{}",
 		}))
-		expect(response.status).toBe(429)
-		expect(limiter.keys).toEqual(["192.0.2.1"])
+		expect(response.status).toBe(410)
+		expect(limiter.keys).toEqual([])
 	})
 
 	it.each([
 		"/api/v4/ca",
 		"/api/v4/user/krl",
-		"/api/v3/host/krl",
+		"/api/v4/host/krl",
 	])("should not limit GET %s", async (path) => {
 		const limiter = fakeLimiter(false)
 		const response = await createCa(limiter).fetch(new Request(`http://example.com${path}`, { headers: { "CF-Connecting-IP": "192.0.2.1" } }))

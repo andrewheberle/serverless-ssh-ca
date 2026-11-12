@@ -17,16 +17,16 @@ const admin = adminSecretsStore(env.PRIVATE_KEY)
 await admin.create(privateKey)
 
 describe("Ed25519 CA key in PKCS#8 format", () => {
-	it("GET /api/v3/ca responds with the public key", async () => {
-		const response = await exports.default.fetch("http://example.com/api/v3/ca")
+	it("GET /api/v4/ca responds with the public key", async () => {
+		const response = await exports.default.fetch("http://example.com/api/v4/ca")
 
 		expect(response.status).toBe(200)
 		expect((await response.text()).trim()).toBe(`${publicKey} ${env.ISSUER_DN}`)
 	})
 
 	it.each([
-		"/api/v3/user/krl",
-		"/api/v3/host/krl",
+		"/api/v4/user/krl",
+		"/api/v4/host/krl",
 	])("GET %s responds with a signed KRL", async (path) => {
 		const response = await exports.default.fetch(`http://example.com${path}`)
 

@@ -12,7 +12,7 @@ await admin.create(privateKeyString)
 
 describe("database migrations", () => {
 	it("are applied once when concurrent requests use a fresh database", async () => {
-		const responses = await Promise.all(Array.from({ length: 10 }, () => exports.default.fetch("http://example.com/api/v3/user/krl")))
+		const responses = await Promise.all(Array.from({ length: 10 }, () => exports.default.fetch("http://example.com/api/v4/user/krl")))
 
 		expect(responses.map(r => r.status)).toEqual(Array.from({ length: 10 }, () => 200))
 
@@ -21,7 +21,7 @@ describe("database migrations", () => {
 	})
 
 	it("link renewals recorded before 0005_renewal_of on D1", async () => {
-		expect((await exports.default.fetch("http://example.com/api/v3/user/krl")).status).toBe(200)
+		expect((await exports.default.fetch("http://example.com/api/v4/user/krl")).status).toBe(200)
 
 		const insert = env.DB.prepare(`INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before, revoked_at, certificate_type, public_key, requested_by, revoked_by, revocation_reason)
 			VALUES (?, 'host', 'CN=host.example.com', '', ?, '2026-12-31T00:00:00.000Z', ?, 1, 'ssh-ed25519 AAAA', 'user@example.com', ?, ?)`)

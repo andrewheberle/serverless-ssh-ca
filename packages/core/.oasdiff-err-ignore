@@ -1,3 +1,9 @@
-# ssh-ca-client v0.23.0: krl and revoke split into /user and /host paths, same requests on the wire
-GET /api/v3/{certificateType}/krl api path removed without deprecation
-POST /api/v3/{certificateType}/revoke api path removed without deprecation
+# ssh-ca-client v0.27.3: API v3 removed in serverless-ssh-ca 1.0.0 (approved in #553, see #555 and ADR 0006); the client has used only v4 since v0.24.0
+GET /api/v3/ca api path removed without deprecation
+POST /api/v3/user/certificate api path removed without deprecation
+GET /api/v3/user/krl api path removed without deprecation
+POST /api/v3/user/revoke api path removed without deprecation
+POST /api/v3/host/certificate api path removed without deprecation
+POST /api/v3/host/renew api path removed without deprecation
+GET /api/v3/host/krl api path removed without deprecation
+POST /api/v3/host/revoke api path removed without deprecation

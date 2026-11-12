@@ -9,7 +9,7 @@ import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
 import { MockSecretStore } from "./helpers/secret.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { listCertificate } from "./helpers/ssh-keygen.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
@@ -124,10 +124,14 @@ describe("cached KRLs", () => {
 	// issues a user certificate, returning its serial
 	const issue = async (ca: SshCa): Promise<bigint> => {
 		const key = ecdsaKey.user()
-		const response = await ca.fetch(new Request("http://example.com/api/v3/user/certificate", {
+		const response = await ca.fetch(new Request("http://example.com/api/v4/user/certificates", {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "Authorization": await getAccessToken(claims) },
-			body: JSON.stringify({ public_key: Buffer.from(key.publicKey).toString("base64"), proof: generateProof(key), identity: await getIdentityToken(claims) }),
+			headers: {
+				"Content-Type": "application/json",
+				"Authorization": await getAccessToken(claims),
+				"Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/user/certificates"),
+			},
+			body: JSON.stringify({ public_key: Buffer.from(key.publicKey).toString("base64"), identity: await getIdentityToken(claims) }),
 		}))
 		expect(response.status).toBe(200)
 		const { certificate } = await response.json() as { certificate: string }
@@ -136,10 +140,10 @@ describe("cached KRLs", () => {
 
 	const revoke = async (ca: SshCa, serial: bigint): Promise<void> => {
 		const key = ecdsaKey.user()
-		const response = await ca.fetch(new Request("http://example.com/api/v3/user/revoke", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ serial: `${serial}`, public_key: Buffer.from(key.publicKey).toString("base64"), proof: generateProof(key) }),
+		const path = `/api/v4/user/certificates/${serial}`
+		const response = await ca.fetch(new Request(`http://example.com${path}`, {
+			method: "DELETE",
+			headers: { "Proof-Of-Possession": generateRequestProof(key, "DELETE", path) },
 		}))
 		expect(response.status).toBe(200)
 	}

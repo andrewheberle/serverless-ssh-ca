@@ -2,7 +2,6 @@ import { fromHono } from "chanfana"
 import { AdminBasePath, createAdminApp } from "./admin/index.js"
 import { createLandingApp } from "./landing/index.js"
 import { Hono, type Context } from "hono"
-import { createApi as apiv3 } from "./api/v3/index.js"
 import { BasePath as v4BasePath, createApi as apiv4 } from "./api/v4/index.js"
 import { HTTPException } from "hono/http-exception"
 import { logger } from "./logger.js"
@@ -55,6 +54,12 @@ export interface SshCaOptions {
  */
 export const cloudflareClientIp: RateLimitKey = (req) => req.headers.get("CF-Connecting-IP") ?? undefined
 
+/**
+ * The message API v3 paths are answered with, as API v3 was removed because
+ * its proofs of possession were not bound to the request they were sent with.
+ */
+export const ApiV3RemovedMessage = "API v3 was removed in serverless-ssh-ca 1.0.0; upgrade ssh-ca-client to 0.24.0 or later"
+
 // requests that only read from the CA, which are not rate limited
 const ReadMethods = new Set(["GET", "HEAD", "OPTIONS"])
 
@@ -66,6 +71,13 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
     let reportedMissingKey = false
     // whether a client address that is not an IP address has been reported
     let reportedInvalidAddress = false
+
+    // API v3 was removed, so its paths are answered before anything else is
+    // done for them, such as rate limiting. This is a plain Hono route, so is
+    // not part of the OpenAPI schema.
+    const apiV3Removed = (c: Context): Response => c.json({ success: false, errors: [{ code: 410, message: ApiV3RemovedMessage }], result: {} }, 410)
+    hono.all("/api/v3", apiV3Removed)
+    hono.all("/api/v3/*", apiV3Removed)
 
     // the client address of requests that issue, renew and revoke
     // certificates, which is recorded with them
@@ -169,7 +181,6 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
         bearerFormat: 'JWT',
     })
 
-    app.route("/api/v3", apiv3(env))
     app.route(v4BasePath, apiv4(env))
 
     return app

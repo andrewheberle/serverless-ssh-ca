@@ -5,7 +5,7 @@ import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import type { SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 
@@ -35,24 +35,6 @@ type Endpoint = {
 }
 
 const endpoints: Endpoint[] = [
-	{
-		name: "POST /api/v3/user/certificate",
-		host: false,
-		request: async (ca, { authorization, identity }) => await ca.fetch(new Request("http://example.com/api/v3/user/certificate", {
-			method: "POST",
-			headers: { "Content-Type": "application/json", "Authorization": authorization },
-			body: JSON.stringify({ public_key: publicKey(userKey), proof: generateProof(userKey), identity }),
-		})),
-	},
-	{
-		name: "POST /api/v3/host/certificate",
-		host: true,
-		request: async (ca, { authorization, identity }) => await ca.fetch(new Request("http://example.com/api/v3/host/certificate", {
-			method: "POST",
-			headers: { "Content-Type": "application/json", "Authorization": authorization },
-			body: JSON.stringify({ public_key: publicKey(hostKey), proof: generateProof(hostKey), identity, principals: ["test_host"] }),
-		})),
-	},
 	{
 		name: "POST /api/v4/user/certificates",
 		host: false,

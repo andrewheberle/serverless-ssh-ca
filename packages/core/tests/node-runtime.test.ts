@@ -9,7 +9,7 @@ import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { KRLBuilder } from "../src/krl.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { fingerprint, listCertificate } from "./helpers/ssh-keygen.js"
 import type { TestKey } from "./keys/types.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
@@ -23,7 +23,7 @@ const KrlResponse = z.object({ krl: z.string(), signature: z.string() })
 
 // fetch a KRL and return it with the version from its header
 const getKrl = async (ca: SshCa, type: "user" | "host" = "user"): Promise<{ krl: Buffer, version: bigint, generatedAt: Date }> => {
-	const response = await ca.fetch(new Request(`http://example.com/api/v3/${type}/krl`))
+	const response = await ca.fetch(new Request(`http://example.com/api/v4/${type}/krl`))
 	expect(response.status).toBe(200)
 	const krl = Buffer.from(KrlResponse.parse(await response.json()).krl, "base64")
 	// the header is the magic, format version, KRL version and generation date
@@ -36,23 +36,47 @@ const caFor = (sqlite: DatabaseSync): SshCa => createSshCa(makeEnv({
 	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: email,
 }))
 
-const post = async (ca: SshCa, path: string, body: unknown, authorization?: string): Promise<Response> => {
-	const headers = new Headers({ "Content-Type": "application/json" })
-	if (authorization !== undefined) {
-		headers.set("Authorization", authorization)
-	}
-	return await ca.fetch(new Request(`http://example.com${path}`, { method: "POST", headers, body: JSON.stringify(body) }))
+const post = async (ca: SshCa, path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> => {
+	return await ca.fetch(new Request(`http://example.com${path}`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", ...headers },
+		body: JSON.stringify(body),
+	}))
 }
 
 const publicKey = (key: TestKey): string => Buffer.from(key.publicKey).toString("base64")
 
+// request a certificate of a type for a key, with principals for a host certificate
+const issue = async (ca: SshCa, type: "user" | "host", key: TestKey, principals?: string[]): Promise<Response> => {
+	const path = `/api/v4/${type}/certificates`
+	return await post(ca, path, {
+		public_key: publicKey(key),
+		identity: await getIdentityToken(claims),
+		...(principals === undefined ? {} : { principals }),
+	}, {
+		"Authorization": await getAccessToken(claims),
+		"Proof-Of-Possession": generateRequestProof(key, "POST", path),
+	})
+}
+
+// renew a BASE64 encoded host certificate with a proof of possession of its key
+const renew = async (ca: SshCa, certificate: string, key: TestKey): Promise<Response> => {
+	const path = `/api/v4/host/certificates/${listCertificate(Buffer.from(certificate, "base64").toString()).serial}/renew`
+	return await post(ca, path, { certificate }, { "Proof-Of-Possession": generateRequestProof(key, "POST", path) })
+}
+
+// revoke a certificate of a type by its serial, with a proof of possession of a key
+const revoke = async (ca: SshCa, type: string, serial: bigint, key: TestKey): Promise<Response> => {
+	const path = `/api/v4/${type}/certificates/${serial}`
+	return await ca.fetch(new Request(`http://example.com${path}`, {
+		method: "DELETE",
+		headers: { "Proof-Of-Possession": generateRequestProof(key, "DELETE", path) },
+	}))
+}
+
 // request a certificate and return its serial
 const requestUserCertificate = async (ca: SshCa, key: TestKey): Promise<bigint> => {
-	const response = await post(ca, "/api/v3/user/certificate", {
-		public_key: publicKey(key),
-		proof: generateProof(key),
-		identity: await getIdentityToken(claims),
-	}, await getAccessToken(claims))
+	const response = await issue(ca, "user", key)
 	expect(response.status).toBe(200)
 
 	const { certificate } = CertificateResponse.parse(await response.json())
@@ -94,12 +118,7 @@ describe("running on Node.js with node:sqlite", () => {
 
 	it("should record issued host certificates", async () => {
 		const key = ecdsaKey.host()
-		const response = await post(ca, "/api/v3/host/certificate", {
-			public_key: publicKey(key),
-			proof: generateProof(key),
-			identity: await getIdentityToken(claims),
-			principals: ["test_host"],
-		}, await getAccessToken(claims))
+		const response = await issue(ca, "host", key, ["test_host"])
 		expect(response.status).toBe(200)
 
 		expect(sqlite.prepare("SELECT key_id, certificate_type FROM certificates WHERE certificate_type = 1").all()).toEqual([
@@ -109,12 +128,7 @@ describe("running on Node.js with node:sqlite", () => {
 
 	it("should not issue a host certificate for a wildcard principal", async () => {
 		const key = ecdsaKey.host()
-		const response = await post(ca, "/api/v3/host/certificate", {
-			public_key: publicKey(key),
-			proof: generateProof(key),
-			identity: await getIdentityToken(claims),
-			principals: ["test_host", "*"],
-		}, await getAccessToken(claims))
+		const response = await issue(ca, "host", key, ["test_host", "*"])
 		expect(response.status).toBe(400)
 		expect(sqlite.prepare("SELECT serial FROM certificates WHERE principals LIKE '%*%'").all()).toEqual([])
 	})
@@ -122,14 +136,13 @@ describe("running on Node.js with node:sqlite", () => {
 	it("should revoke a certificate and include it in the KRL", async () => {
 		const key = ecdsaKey.user()
 		const serial = await requestUserCertificate(ca, key)
-		const revoke = { serial: `${serial}`, public_key: publicKey(key), proof: generateProof(key) }
 
-		const response = await post(ca, "/api/v3/user/revoke", revoke)
+		const response = await revoke(ca, "user", serial, key)
 		expect(response.status).toBe(200)
 		expect(await response.json()).toEqual({ revoked_at: expect.any(String) })
 
 		// a second revocation conflicts with the first
-		expect((await post(ca, "/api/v3/user/revoke", { ...revoke, proof: generateProof(key) })).status).toBe(409)
+		expect((await revoke(ca, "user", serial, key)).status).toBe(409)
 
 		const { krl, generatedAt } = await getKrl(ca)
 		// the first user KRL generated by this CA, so the first version after 1
@@ -137,43 +150,21 @@ describe("running on Node.js with node:sqlite", () => {
 		expect(krl).toEqual(Buffer.from(expected))
 	})
 
-	it("should revoke a certificate when the public key has a different comment", async () => {
-		const key = ecdsaKey.user()
-		const serial = await requestUserCertificate(ca, key)
-		const [type, data] = key.publicKey.split(" ")
-
-		const response = await post(ca, "/api/v3/user/revoke", {
-			serial: `${serial}`,
-			public_key: Buffer.from(`${type} ${data} another-comment`).toString("base64"),
-			proof: generateProof(key),
-		})
-		expect(response.status).toBe(200)
-	})
-
 	it("should not revoke a certificate issued for another key", async () => {
 		const serial = await requestUserCertificate(ca, ecdsaKey.user())
 		const other = ecdsaKey.host()
 
-		const response = await post(ca, "/api/v3/user/revoke", {
-			serial: `${serial}`,
-			public_key: publicKey(other),
-			proof: generateProof(other),
-		})
+		const response = await revoke(ca, "user", serial, other)
 		expect(response.status).toBe(404)
 	})
 
 	it("should renew a host certificate", async () => {
 		const key = ecdsaKey.host()
-		const issued = await post(ca, "/api/v3/host/certificate", {
-			public_key: publicKey(key),
-			proof: generateProof(key),
-			identity: await getIdentityToken(claims),
-			principals: ["renewed_host"],
-		}, await getAccessToken(claims))
+		const issued = await issue(ca, "host", key, ["renewed_host"])
 		expect(issued.status).toBe(200)
 		const { certificate } = CertificateResponse.parse(await issued.json())
 
-		const response = await post(ca, "/api/v3/host/renew", { certificate, public_key: publicKey(key), proof: generateProof(key) })
+		const response = await renew(ca, certificate, key)
 		expect(response.status).toBe(200)
 		const renewed = listCertificate(Buffer.from(CertificateResponse.parse(await response.json()).certificate, "base64").toString())
 		expect(renewed.kind).toBe("host")
@@ -184,43 +175,33 @@ describe("running on Node.js with node:sqlite", () => {
 		const previous = listCertificate(Buffer.from(certificate, "base64").toString())
 		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${previous.serial}`)).toEqual({ revoked_at: expect.any(String) })
 		expect(sqlite.prepare("SELECT revoked_at FROM certificates WHERE serial = ?").get(`${renewed.serial}`)).toEqual({ revoked_at: null })
-		const repeated = await post(ca, "/api/v3/host/renew", { certificate, public_key: publicKey(key), proof: generateProof(key) })
+		const repeated = await renew(ca, certificate, key)
 		expect(repeated.status).toBe(400)
 	})
 
 	it("should not renew a user certificate", async () => {
 		const key = ecdsaKey.user()
-		const issued = await post(ca, "/api/v3/user/certificate", {
-			public_key: publicKey(key),
-			proof: generateProof(key),
-			identity: await getIdentityToken(claims),
-		}, await getAccessToken(claims))
+		const issued = await issue(ca, "user", key)
 		expect(issued.status).toBe(200)
 		const { certificate } = CertificateResponse.parse(await issued.json())
 
 		// renewal does not need OIDC authentication, so must not extend a user certificate
-		const response = await post(ca, "/api/v3/host/renew", { certificate, public_key: publicKey(key), proof: generateProof(key) })
+		const response = await renew(ca, certificate, key)
 		expect(response.status).toBe(400)
 		expect(JSON.stringify(await response.json())).toContain("the provided certificate is not a host certificate")
 	})
 
 	it("should revoke a host certificate and include it in the host KRL", async () => {
 		const key = ecdsaKey.host()
-		const issued = await post(ca, "/api/v3/host/certificate", {
-			public_key: publicKey(key),
-			proof: generateProof(key),
-			identity: await getIdentityToken(claims),
-			principals: ["revoked_host"],
-		}, await getAccessToken(claims))
+		const issued = await issue(ca, "host", key, ["revoked_host"])
 		expect(issued.status).toBe(200)
 		const { certificate } = CertificateResponse.parse(await issued.json())
 		const serial = listCertificate(Buffer.from(certificate, "base64").toString()).serial
-		const revoke = () => ({ serial: `${serial}`, public_key: publicKey(key), proof: generateProof(key) })
 
 		// a host certificate cannot be revoked through the user endpoint
-		expect((await post(ca, "/api/v3/user/revoke", revoke())).status).toBe(404)
+		expect((await revoke(ca, "user", serial, key)).status).toBe(404)
 
-		const response = await post(ca, "/api/v3/host/revoke", revoke())
+		const response = await revoke(ca, "host", serial, key)
 		expect(response.status).toBe(200)
 		expect(await response.json()).toEqual({ revoked_at: expect.any(String) })
 
@@ -235,8 +216,8 @@ describe("running on Node.js with node:sqlite", () => {
 	})
 
 	it("should not serve endpoints for an unknown certificate type", async () => {
-		expect((await ca.fetch(new Request("http://example.com/api/v3/other/krl"))).status).toBe(404)
-		expect((await post(ca, "/api/v3/other/revoke", {})).status).toBe(404)
+		expect((await ca.fetch(new Request("http://example.com/api/v4/other/krl"))).status).toBe(404)
+		expect((await revoke(ca, "other", 1n, ecdsaKey.user())).status).toBe(404)
 	})
 
 	it("should increment the KRL version only when a certificate is revoked", async () => {
@@ -248,7 +229,7 @@ describe("running on Node.js with node:sqlite", () => {
 		// issuing a certificate does not change the KRL
 		expect((await getKrl(ca)).version).toBe(version)
 
-		const response = await post(ca, "/api/v3/user/revoke", { serial: `${serial}`, public_key: publicKey(key), proof: generateProof(key) })
+		const response = await revoke(ca, "user", serial, key)
 		expect(response.status).toBe(200)
 
 		expect((await getKrl(ca)).version).toBe(version + 1n)

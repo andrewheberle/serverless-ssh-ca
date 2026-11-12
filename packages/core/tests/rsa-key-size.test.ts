@@ -6,7 +6,7 @@ import { PublicKey, rsaKeyBits } from "../src/ssh/keys.js"
 import { subjectKeyIssue } from "../src/utils.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
-import { generateProof, generateRequestProof } from "./helpers/proof.js"
+import { generateRequestProof } from "./helpers/proof.js"
 import { generateKey } from "./helpers/ssh-keygen.js"
 import type { TestKey } from "./keys/types.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
@@ -66,12 +66,6 @@ describe("certificate requests with small RSA keys", () => {
 	}
 
 	const requests: [string, (key: TestKey) => Promise<Response>][] = [
-		["POST /api/v3/user/certificate", async (key) => await post("/api/v3/user/certificate", {
-			public_key: encode(key), proof: generateProof(key), identity: await getIdentityToken(claims),
-		})],
-		["POST /api/v3/host/certificate", async (key) => await post("/api/v3/host/certificate", {
-			public_key: encode(key), proof: generateProof(key), identity: await getIdentityToken(claims), principals: ["test_host"],
-		})],
 		["POST /api/v4/user/certificates", async (key) => await post("/api/v4/user/certificates", {
 			public_key: encode(key), identity: await getIdentityToken(claims),
 		}, { "Proof-Of-Possession": generateRequestProof(key, "POST", "/api/v4/user/certificates") })],
