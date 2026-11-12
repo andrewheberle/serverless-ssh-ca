@@ -285,7 +285,7 @@ const verifyIdentityToken = async (config: RequesterConfig, logger: Logger, toke
 const mayRequestHostCertificates = (config: RequesterConfig, requester: Requester): boolean => {
 	const { hostAllowedEmails, hostAllowedRoles } = caConfig(config)
 
-	return hostAllowedEmails.includes(requester.email)
+	return hostAllowedEmails.includes(requester.email.toLowerCase())
 		|| requester.principals.some((p) => hostAllowedRoles.includes(p))
 }
 

@@ -75,10 +75,10 @@ Notes:
 
 - The configuration environment variables have the same names and formats
   as the `vars` in the Workers [`wrangler.jsonc`](https://github.com/andrewheberle/serverless-ssh-ca/blob/main/packages/workers-integration/wrangler.jsonc).
-  `bindingsFromEnv` validates them at start up and throws an
-  `InvalidConfigurationError` that lists every missing or invalid variable.
-  `createSshCa` validates the bindings it is given in the same way (see
-  [Validation](#validation)).
+  `bindingsFromEnv` validates them at start up with the same rules as
+  `createSshCa` and the Workers default export (see [Validation](#validation)),
+  and throws an `InvalidConfigurationError` that lists every missing or
+  invalid variable. It returns only the variables the CA reads, unchanged.
 - The database schema is created and migrated automatically on first use, as
   on Workers. Use a file path for `DatabaseSync` (not `:memory:`) so issued
   and revoked certificates survive restarts.
@@ -337,27 +337,38 @@ with it:
 
 | Setting | Accepted values |
 |---|---|
-| `CERTIFICATE_REQUEST_TIME_SKEW_MAX` | A duration of zero or more, such as `"90 seconds"` |
-| `SSH_CERTIFICATE_LIFETIME`, `SSH_HOST_CERTIFICATE_LIFETIME` | A positive duration, such as `"24 hours"` or `"30 days"` |
+| `CERTIFICATE_REQUEST_TIME_SKEW_MAX` | A positive duration of at most 5 minutes, such as `"90 seconds"`. A proof of possession is accepted this long either side of the CA's clock |
+| `SSH_CERTIFICATE_LIFETIME` | A duration of at least 5 minutes, in whole seconds, such as `"24 hours"`. The longest lifetime of a user certificate |
+| `SSH_HOST_CERTIFICATE_LIFETIME` | A duration of at least 24 hours, in whole seconds, such as `"30 days"`. The longest lifetime of a host certificate |
 | `DB_CERTIFICATE_RETENTION` | `"infinite"`, or a positive period such as `"1 year"` or `"90 days"` |
-| `JWT_ISSUER`, `ISSUER_DN`, `JWT_ALGORITHMS`, `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | Must be set |
-| `JWT_JWKS_URL` | An `http` or `https` URL |
-| `OIDC_USERINFO_URL` | An `http` or `https` URL, or unset (an empty string is treated as unset) |
-| `SSH_CERTIFICATE_PRINCIPALS` | A comma separated list of principals, each of which is not empty and contains no whitespace, control characters or `*`, `?`, `!`, or unset. Entries are not trimmed, so `"a, b"` is refused |
+| `JWT_ISSUER`, `ISSUER_DN`, `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | Must be set |
+| `JWT_AUD` | A list with at least one audience. Must be set |
+| `JWT_ALGORITHMS` | A list with at least one of `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `ES512`, `EdDSA` or `Ed25519`. Symmetric algorithms and `none` are refused, as the keys come from a public JWKS |
+| `JWT_JWKS_URL` | An `https` URL, or an `http` URL for `localhost`, `127.0.0.0/8` or `[::1]` (such as a test identity provider) |
+| `OIDC_USERINFO_URL` | As `JWT_JWKS_URL`, or unset (an empty string is treated as unset) |
+| `JWT_ACCESS_TOKEN_AUD`, `SSH_HOST_CERTIFICATE_ALLOWED_EMAILS`, `SSH_HOST_CERTIFICATE_ALLOWED_ROLES` | A list, or unset (an empty string is an empty list) |
+| `SSH_CERTIFICATE_EXTENSIONS` | A list of extension names, each without whitespace, or unset. These are the extensions user certificates get by default and the only ones a requester may ask for; when unset, user certificates have no extensions (so no `permit-pty`) |
+| `SSH_CERTIFICATE_PRINCIPALS` | A list of principals, each of which contains no whitespace, control characters or `*`, `?`, `!`, or unset |
 | `SSH_CERTIFICATE_INCLUDE_SELF`, `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | `"true"` or `"false"` (or a boolean), or unset |
 | `LOG_LEVEL` | `none`, `error`, `warning`, `info` or `debug`, or unset |
 | `LANDING_PAGE` | `"true"` or `"false"` (or a boolean), or unset. See [Landing Page](#landing-page) |
 | `ADMIN_*` | See [Admin UI](#admin-ui). Each may be unset, but must be valid when set |
+
+A list is a comma separated string, or an array of strings where bindings
+can be arrays. Each entry is trimmed, so `"a, b"` is the same as `"a,b"`, and
+an empty entry, such as in `"a,,b"` or `"a,"`, is refused.
+
+`SSH_HOST_CERTIFICATE_ALLOWED_EMAILS` is compared with the requester's email
+address case-insensitively. `SSH_HOST_CERTIFICATE_ALLOWED_ROLES` is compared
+exactly with the values of the `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` claim of
+the identity token, after any spaces in those values are replaced with
+underscores, so a group `ops team` is allowed by the role `ops_team`.
 
 A duration is a number and one of the units `second`, `minute`, `hour`,
 `day`, `week`, `month` or `year` (singular or plural), separated by a space. A
 unit is required, so a bare number or an abbreviation such as `"90 secs"` is
 refused. A retention period uses the same format without `week`, as it is
 passed to SQLite as a date modifier.
-
-`JWT_AUD` is not refused when it is empty, but every certificate request then
-fails with a `500` error, as tokens are only accepted for a configured
-audience. `bindingsFromEnv` on Node.js also requires `JWT_AUD` to be set.
 
 How an invalid configuration is reported depends on the runtime:
 

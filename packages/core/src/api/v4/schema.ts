@@ -16,8 +16,7 @@ import {
 	ForbiddenException,
 	UnprocessableEntityException,
 } from "chanfana"
-import { seconds } from "itty-time"
-import { caConfig } from "../../config.js"
+import { caConfig, MinHostCertificateLifetime, MinUserCertificateLifetime } from "../../config.js"
 import { CertificateType } from "../../db/types.js"
 import {
 	CaPublicKeyEndpointSchema,
@@ -102,7 +101,7 @@ export const issueUserCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.default(caConfig(env).extensions)
 			.meta({ description: "Extensions to include in the issued SSH certificate" }),
 		lifetime: z.int()
-			.min(seconds("5 minutes"))
+			.min(MinUserCertificateLifetime)
 			.max(caConfig(env).certificateLifetime)
 			.default(caConfig(env).certificateLifetime)
 			.meta({ description: "Lifetime of issued SSH certificate" }),
@@ -141,7 +140,7 @@ export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 		principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1)
 			.meta({ description: "List of principals to include on the issued certificate" }),
 		lifetime: z.int()
-			.min(seconds("24 hours"))
+			.min(MinHostCertificateLifetime)
 			.max(caConfig(env).hostCertificateLifetime)
 			.default(caConfig(env).hostCertificateLifetime)
 			.meta({ description: "Lifetime of issued Host SSH certificate" }),
@@ -179,7 +178,7 @@ export const renewHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.transform(transformCertificate)
 			.meta({ description: "SSH certificate to renew, which must have the serial number in the path" }),
 		lifetime: z.int()
-			.min(seconds("24 hours"))
+			.min(MinHostCertificateLifetime)
 			.max(caConfig(env).hostCertificateLifetime)
 			.default(caConfig(env).hostCertificateLifetime)
 			.meta({ description: "Lifetime of renewed Host SSH certificate" }),

@@ -1,56 +1,15 @@
-import z from "zod"
-import { AdminJwtAlgorithmListString, BooleanString, configurationError, DurationString, HeaderNameString, HostnameString, HttpsUrl, HttpUrl, InvalidConfigurationError, ListString, LogLevelName, OptionalSetting, PrincipalListString, RequiredString, RetentionString } from "../config.js"
+import { ConfigNames, InvalidConfigurationError, parseConfig } from "../config.js"
 import type { CaCache, CaDatabase, CaRateLimiter, CaSecret, SshCaBindings } from "../types.js"
 
 export { InvalidConfigurationError }
-
-/**
- * The environment variables read by {@link bindingsFromEnv}, which match the
- * Workers vars documented for the CA.
- */
-export const EnvSchema = z.object({
-	DB_CERTIFICATE_RETENTION: RetentionString,
-	SSH_CERTIFICATE_EXTENSIONS: z.string(),
-	SSH_CERTIFICATE_LIFETIME: DurationString({ allowZero: false }),
-	SSH_CERTIFICATE_INCLUDE_SELF: BooleanString.optional(),
-	SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: BooleanString.optional(),
-	SSH_CERTIFICATE_PRINCIPALS: PrincipalListString,
-	SSH_HOST_CERTIFICATE_LIFETIME: DurationString({ allowZero: false }),
-	SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: z.string().optional(),
-	SSH_HOST_CERTIFICATE_ALLOWED_ROLES: z.string().optional(),
-	ISSUER_DN: RequiredString,
-	JWT_JWKS_URL: HttpUrl,
-	JWT_AUD: RequiredString,
-	JWT_ACCESS_TOKEN_AUD: z.string().optional(),
-	OIDC_USERINFO_URL: HttpUrl.optional(),
-	JWT_ISSUER: RequiredString,
-	JWT_ALGORITHMS: RequiredString,
-	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: RequiredString,
-	CERTIFICATE_REQUEST_TIME_SKEW_MAX: DurationString({ allowZero: true }),
-	LOG_LEVEL: LogLevelName.optional(),
-	LANDING_PAGE: BooleanString.optional(),
-	ADMIN_JWT_HEADER: OptionalSetting(HeaderNameString),
-	ADMIN_JWKS_URL: OptionalSetting(HttpsUrl),
-	ADMIN_JWT_ISSUER: OptionalSetting(RequiredString),
-	ADMIN_JWT_AUD: OptionalSetting(ListString),
-	ADMIN_JWT_ALGORITHMS: OptionalSetting(AdminJwtAlgorithmListString),
-	ADMIN_ALLOWED_EMAILS: OptionalSetting(ListString),
-	ADMIN_ALLOWED_ROLES: OptionalSetting(ListString),
-	ADMIN_JWT_ROLES_CLAIM: OptionalSetting(RequiredString),
-	ADMIN_HOSTNAME: OptionalSetting(HostnameString),
-})
-
-/**
- * The CA's configuration as read from environment variables, see {@link EnvSchema}.
- */
-export type CaEnv = z.infer<typeof EnvSchema>
 
 /**
  * Build the CA's bindings from environment variables, for runtimes where
  * configuration is not supplied as Workers bindings.
  *
  * The variables have the same names and formats as the Workers vars, and are
- * validated before use so that misconfiguration is reported at start up.
+ * validated by the same rules as `createSshCa` uses before they are returned,
+ * so that misconfiguration is reported at start up.
  *
  * @example
  * ```ts
@@ -69,10 +28,21 @@ export const bindingsFromEnv = (
 	bindings: { DB: CaDatabase, PRIVATE_KEY: CaSecret, RATE_LIMITER?: CaRateLimiter, CACHE?: CaCache },
 	source: Record<string, string | undefined> = process.env,
 ): SshCaBindings => {
-	const result = EnvSchema.safeParse(source)
-	if (!result.success) {
-		throw configurationError(result.error)
+	const vars: Record<string, string> = {}
+	for (const name of ConfigNames) {
+		const value = source[name]
+		if (value !== undefined) {
+			vars[name] = value
+		}
 	}
 
-	return { ...result.data, DB: bindings.DB, PRIVATE_KEY: bindings.PRIVATE_KEY, RATE_LIMITER: bindings.RATE_LIMITER, CACHE: bindings.CACHE }
+	// the vars are only known to have the shape of SshCaBindings once they
+	// have been validated below, which throws if they do not
+	const env = { ...vars, DB: bindings.DB, PRIVATE_KEY: bindings.PRIVATE_KEY, RATE_LIMITER: bindings.RATE_LIMITER, CACHE: bindings.CACHE } as SshCaBindings
+	const result = parseConfig(env)
+	if (!result.success) {
+		throw result.error
+	}
+
+	return env
 }

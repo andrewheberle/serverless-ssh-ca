@@ -61,8 +61,8 @@ describe("createSshCa", () => {
 		expect(InvalidConfigurationError).toBe(NodeInvalidConfigurationError)
 	})
 
-	it("should accept a skew of zero", () => {
-		expect(() => createSshCa(makeEnv({ CERTIFICATE_REQUEST_TIME_SKEW_MAX: "0 seconds" }))).not.toThrow()
+	it.each(["1 second", "90 seconds", "5 minutes"])("should accept a skew of %s", (skew) => {
+		expect(() => createSshCa(makeEnv({ CERTIFICATE_REQUEST_TIME_SKEW_MAX: skew }))).not.toThrow()
 	})
 
 	it.each([

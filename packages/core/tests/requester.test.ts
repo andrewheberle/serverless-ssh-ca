@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { authenticate, type AuthenticationResult, type RequesterConfig } from "../src/requester.js"
+import { caConfig } from "../src/config.js"
 import { CertificateType } from "../src/db/types.js"
 import { logger } from "../src/logger.js"
 import { makeEnv } from "./env.js"
@@ -198,18 +199,21 @@ describe("authenticate", () => {
 		})
 	})
 
-	it("should report the CA as misconfigured when no audience is configured", async () => {
-		expect(await run({}, { config: config({ JWT_AUD: "" }) })).toEqual({
-			kind: "misconfigured",
-			message: "no audience is configured for verifying tokens, set JWT_AUD",
-		})
-	})
-
 	describe("host certificates", () => {
 		const host = (overrides: Partial<RequesterConfig>) => ({ config: config(overrides), certificateType: CertificateType.Host })
 
 		it("should be permitted for an allowed email address", async () => {
 			expect(await run({}, host({ SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: `admin@example.com,${email}` }))).toMatchObject({ kind: "authenticated" })
+		})
+
+		it("should compare allowed email addresses case-insensitively", async () => {
+			expect(await run({}, host({ SSH_HOST_CERTIFICATE_ALLOWED_EMAILS: ` admin@example.com, ${email.toUpperCase()}` }))).toMatchObject({ kind: "authenticated" })
+		})
+
+		it("should refuse a list of allowed roles with an empty entry", () => {
+			// a trailing comma used to add an empty role, which an empty entry in the
+			// principals claim would then match
+			expect(() => caConfig(makeEnv({ SSH_HOST_CERTIFICATE_ALLOWED_ROLES: "admins," }))).toThrow("SSH_HOST_CERTIFICATE_ALLOWED_ROLES")
 		})
 
 		it("should be permitted for an allowed role", async () => {

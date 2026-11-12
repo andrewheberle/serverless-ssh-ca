@@ -157,7 +157,8 @@ export interface SshCaBindings {
      * are generated for every request when this is not set.
      */
     CACHE?: CaCache
-    SSH_CERTIFICATE_EXTENSIONS: string
+    /** The extensions included in user certificates by default, and the only ones a requester may ask for; none when not set */
+    SSH_CERTIFICATE_EXTENSIONS?: string | string[]
     SSH_CERTIFICATE_INCLUDE_SELF_EMAIL?: string | boolean
     SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean
     SSH_CERTIFICATE_LIFETIME: string
