@@ -85,6 +85,7 @@ export interface CaDatabase {
  * A Workers `SecretsStoreSecret` binding satisfies this structurally.
  */
 export interface CaSecret {
+    /** Returns the CA private key, in OpenSSH or unencrypted PKCS#8 format */
     get(): Promise<string>
 }
 
@@ -148,7 +149,8 @@ export interface SshCaBindings {
     ISSUER_DN: string
     PRIVATE_KEY: CaSecret
     /**
-     * Limits requests to issue, renew and revoke certificates, see
+     * Limits requests to issue, renew and revoke certificates, and admin UI
+     * requests that change state, see
      * {@link CaRateLimiter}. Requests are not limited when this is not set.
      */
     RATE_LIMITER?: CaRateLimiter
@@ -195,7 +197,7 @@ export interface SshCaBindings {
     ADMIN_ALLOWED_EMAILS?: string | string[]
     /** The roles that make someone an admin, compared exactly with the values of {@link SshCaBindings.ADMIN_JWT_ROLES_CLAIM} */
     ADMIN_ALLOWED_ROLES?: string | string[]
-    /** The claim of the proxy's JWT that holds the requester's roles, as a string or an array of strings */
+    /** The claim of the proxy's JWT that holds the admin's roles, as a string or an array of strings */
     ADMIN_JWT_ROLES_CLAIM?: string
     /** The only host name the admin UI answers on, when set; requests to `/admin` on any other host name get 404 */
     ADMIN_HOSTNAME?: string

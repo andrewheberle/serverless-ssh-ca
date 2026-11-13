@@ -43,7 +43,7 @@ is published. You are credited in the advisory unless you ask not to be.
 This policy covers:
 
 - the CA, `@andrewheberle/serverless-ssh-ca` (`packages/core`), including
-  its HTTP API, admin UI and D1 schema
+  its HTTP API, admin UI and database schema
 - the test server, `@andrewheberle/serverless-ssh-ca-testing`
   (`packages/testing`). It is a tool for end-to-end tests of clients and must
   not be used as a production CA, so a weakness that only matters if it is

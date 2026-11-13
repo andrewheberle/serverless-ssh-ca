@@ -9,7 +9,7 @@ import type { CaSecret } from "../types.js"
  * const PRIVATE_KEY = secretFromString(process.env.SSH_CA_PRIVATE_KEY ?? "")
  * ```
  *
- * @param value The CA private key in OpenSSH format
+ * @param value The CA private key in OpenSSH or unencrypted PKCS#8 format
  * @returns A secret for the `PRIVATE_KEY` binding, see {@link CaSecret}
  */
 export const secretFromString = (value: string): CaSecret => ({
@@ -22,7 +22,7 @@ export const secretFromString = (value: string): CaSecret => ({
  * The file is read each time the key is needed, so replacing the file takes
  * effect without a restart.
  *
- * @param path The path of a file containing the CA private key in OpenSSH format
+ * @param path The path of a file containing the CA private key in OpenSSH or unencrypted PKCS#8 format
  * @returns A secret for the `PRIVATE_KEY` binding, see {@link CaSecret}
  */
 export const secretFromFile = (path: string): CaSecret => ({

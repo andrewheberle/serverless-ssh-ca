@@ -45,7 +45,7 @@ A person allowed to see every certificate the CA has issued and to revoke any of
 _Avoid_: Administrator, operator, superuser
 
 **Revocation**:
-Marking an issued certificate as no longer trusted, so it appears in the KRL for its type until it expires. A certificate can be revoked by the holder of its key or by an admin. A revocation is never undone; access is restored by issuing a new certificate.
+Marking an issued certificate as no longer trusted, so it appears in the KRL for its type until 24 hours after it expires. A certificate can be revoked by the holder of its key or by an admin. A revocation is never undone; access is restored by issuing a new certificate.
 _Avoid_: Cancellation, deletion
 
 **Revoker**:
