@@ -91,6 +91,13 @@ describe.each(endpoints)("responses to tokens that are not accepted ($name)", ({
 		expect(await response.json()).toEqual(validationError({ message: "authorization header must be a Bearer token", path: accessTokenPath }))
 	})
 
+	it("should return 400 when the identity token is sent as the access token", async () => {
+		const { identity } = await validTokens()
+		const response = await request(ca, { authorization: `Bearer ${identity}`, identity })
+		expect(response.status).toBe(400)
+		expect(await response.json()).toEqual(validationError({ message: "the access token must not be the identity token", path: accessTokenPath }))
+	})
+
 	it("should return 400 for an expired access token", async () => {
 		const authorization = await getAccessToken({ sub, email, exp: Math.floor(Date.now() / 1000) - 3600 })
 		const response = await request(ca, { ...await validTokens(), authorization })

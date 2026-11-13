@@ -62,6 +62,11 @@ describe("authenticate", () => {
 			expect(await run({ access: authorization })).toEqual(invalid({ token: "access", message: "authorization header must be a Bearer token" }))
 		})
 
+		it.each(["Bearer", "bearer"])("should not be accepted when it is the identity token, with the scheme written as %s", async (scheme) => {
+			const identity = await identityToken({ sub, email })
+			expect(await run({ access: `${scheme} ${identity}`, identity })).toEqual(invalid({ token: "access", message: "the access token must not be the identity token" }))
+		})
+
 		it.each(["bearer", "BEARER", "BeArEr"])("should be accepted with the scheme written as %s", async (scheme) => {
 			const authorization = (await accessToken({ sub, email })).replace(/^Bearer /, `${scheme} `)
 			expect(await run({ access: authorization })).toMatchObject({ kind: "authenticated" })

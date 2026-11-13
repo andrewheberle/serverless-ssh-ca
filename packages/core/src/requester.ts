@@ -306,7 +306,8 @@ const mayRequestHostCertificates = (config: RequesterConfig, requester: Requeste
  * token is always verified as a JWT issued for `JWT_AUD`. Both tokens are
  * verified, so a request with two tokens that are not accepted is told about
  * both, and they must be for the same subject, so a token issued to another
- * user cannot be substituted for either.
+ * user cannot be substituted for either. The identity token cannot also be
+ * sent as the access token, so a requester always needs both tokens.
  *
  * @param config The bindings used to verify the tokens, see {@link RequesterConfig}
  * @param tokens The tokens sent with the request, see {@link RequesterTokens}
@@ -315,6 +316,14 @@ const mayRequestHostCertificates = (config: RequesterConfig, requester: Requeste
  * @returns The {@link Requester}, or why one could not be established, see {@link AuthenticationResult}
  */
 export const authenticate = async (config: RequesterConfig, tokens: RequesterTokens, certificateType: CertificateType, logger: Logger): Promise<AuthenticationResult> => {
+	// when the access token is checked against the same audience as the
+	// identity token, an identity token would pass as both, so the same token
+	// sent twice is refused before either is verified
+	if (bearerToken(tokens.authorization) === tokens.identityToken) {
+		logger.with("in", "authenticate").warn("the identity token was sent as the access token")
+		return { kind: "invalid", issues: [{ token: "access", message: "the access token must not be the identity token" }] }
+	}
+
 	const [access, identity] = await Promise.all([
 		verifyAccessToken(config, logger, tokens.authorization),
 		verifyIdentityToken(config, logger, tokens.identityToken),
