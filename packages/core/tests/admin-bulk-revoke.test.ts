@@ -432,6 +432,16 @@ describe("revocation forms in the admin UI (#592, #593)", () => {
 		expect(body).toContain(`href="/admin/user/certificates?status=valid&amp;key_id=alice&amp;serial=${serial}"`)
 	})
 
+	it("should name a serial filter sent back that is not valid as the serial", async () => {
+		const { ca, seed } = await setup()
+		const [serial] = seed({})
+
+		const body = await (await bulkRevoke(ca, [...selected([serial ?? ""], ""), ["key_id", "alice"], ["filter_serial", "abc"]])).text()
+
+		expect(body).toContain("<li>Serial ")
+		expect(body).not.toContain("filter_serial")
+	})
+
 	it("should describe the certificates without filters when the filters sent back are not valid", async () => {
 		const { ca, seed } = await setup()
 		const [serial] = seed({})

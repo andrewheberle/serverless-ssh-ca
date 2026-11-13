@@ -2,7 +2,7 @@
 
 A proof of possession signs the request it is sent with: the HTTP method and the path, including any serial, are signed together with the timestamp and the key's fingerprint, in the `request-proof-of-possession@…` namespace. API v3 signed only the timestamp and fingerprint, in one namespace shared by every endpoint, so a proof captured from one v3 request could be replayed against any other v3 endpoint while the time window was open. For example, a proof sent to request a certificate could be reused to revoke a certificate for that key. So API v3 is removed in 1.0.0 with no deprecation release in between, and requests to its paths get `410 Gone`. The client has used only v4 since ssh-ca-client 0.24.0.
 
-A v4 proof can still be replayed to the same request, with the same method and path, within `CERTIFICATE_REQUEST_TIME_SKEW_MAX` (90 seconds by default). This is accepted for 1.0, because such a replay gains nothing:
+A v4 proof can still be replayed to the same request, with the same method and path, within `CERTIFICATE_REQUEST_TIME_SKEW_MAX` (90 seconds in the example configuration, and at most 5 minutes). This is accepted for 1.0, because such a replay gains nothing:
 
 - **Issuing a certificate again**: also needs the requester's access token and identity token, and the new certificate is for a key the attacker does not hold.
 - **Revoking again**: does nothing, because the certificate is already revoked.

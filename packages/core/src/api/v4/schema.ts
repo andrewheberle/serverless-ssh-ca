@@ -153,7 +153,7 @@ export const createIssueHostCertificateEndpointSchema = (env: SshCaBindings) => 
 	tags: [certificateTypeTag(CertificateType.Host)],
 	operationId: "issue_host_certificate",
 	summary: "Request a host certificate",
-	description: `Issues a signed SSH host certificate for the provided public key and principals. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key for \`public_key\` in the \`${ProofHeader}\` header made for this request. The user must be permitted to request host certificates by email address or role.`,
+	description: `Issues a signed SSH host certificate for the provided public key and principals. The request must be authenticated with an access token and include an identity token from the OIDC IdP for the same subject, along with a proof of possession of the private key for \`public_key\` in the \`${ProofHeader}\` header made for this request. The requester must be permitted to request host certificates by email address or role.`,
 	security: [{ oidcAuth: [] }],
 	request: {
 		headers: createAuthenticatedHeaderSchema(env),

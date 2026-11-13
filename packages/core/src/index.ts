@@ -20,8 +20,9 @@ type SshCaHandler = {
  */
 export interface SshCa {
     /**
-     * Handle a request to the CA's API, suitable for any server that speaks
-     * the Fetch API `Request` and `Response` types.
+     * Handle a request to the CA (its API, and the landing page and admin UI
+     * when they are turned on), suitable for any server that speaks the
+     * Fetch API `Request` and `Response` types.
      */
     fetch(req: Request): Promise<Response>
     /**
@@ -92,6 +93,16 @@ const invalidConfigurationResponse = (): Response => Response.json(
     { status: 500 },
 )
 
+/**
+ * The CA as a Cloudflare Workers handler, which receives its bindings (see
+ * {@link SshCaBindings}) from the runtime. `fetch` serves the API, and the
+ * landing page and admin UI when they are turned on, and answers every request
+ * with a 500 while the configuration is invalid. `scheduled` removes expired
+ * certificates (see {@link SshCa.cleanup}) and should be run by a cron trigger,
+ * for example once a day. Requests are rate limited, and client addresses
+ * recorded, by {@link cloudflareClientIp}. On other runtimes use
+ * {@link createSshCa}.
+ */
 export default {
     fetch(req: Request, env: SshCaBindings, ctx: ExecutionContext) {
         if (!isValid(env)) {

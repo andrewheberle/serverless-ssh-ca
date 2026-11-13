@@ -5,7 +5,7 @@ to Cloudflare as a working solution using the "Deploy to Cloudflare" button belo
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca-template)
 
-To use the package in your own Worker manually (assuming you have the requried
+To use the package in your own Worker manually (assuming you have the required
 bindings in place), the following code in `src/index.ts` (your Worker's main
 file) will work:
 
@@ -92,10 +92,10 @@ Notes:
 - Put the CA behind a reverse proxy that terminates TLS, as clients send
   identity tokens to it.
 
-See the following respositories for additional information:
+See the following repositories for additional information:
 
 
-| Repostitory | Details |
+| Repository | Details |
 |---|---|
 | [https://github.com/andrewheberle/ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client) | Contains client code for issuing user and host certificates |
 | [https://github.com/andrewheberle/serverless-ssh-ca-template](https://github.com/andrewheberle/serverless-ssh-ca-template) | Contains a template repository for deployment to Cloudflare Workers |
@@ -103,28 +103,32 @@ See the following respositories for additional information:
 ## Architecture
 
 The solution comprises of the CA running as a Worker, a Go based client
-(found [here](https://github.com/andrewheberle/ssh-ca-client])) and a third
+(found [here](https://github.com/andrewheberle/ssh-ca-client)) and a third
 party OIDC IdP.
 
-The IdP may be any OIDC compatible service that returns a JWT with at least
-an `email` claim in the OIDC access token, however at this time only
-Cloudflare Access has been tested.
+The IdP may be any OIDC compatible service that issues identity tokens as
+JWTs, and access tokens that are either JWTs with an `email` claim or
+accepted by its userinfo endpoint (see
+[Opaque Access Tokens](#opaque-access-tokens)). At this time only Cloudflare
+Access has been tested.
 
 ### User Certificates
 
 The flow to obtain a User SSH certificate using the CLI version is as follows:
 
 1. The user initiates `ssh-ca-client-cli login`
-2. If required a new SSH key is generated and the a browser is opened to
+2. If required a new SSH key is generated and a browser is opened to
    visit `http://localhost:3000/auth/login`
 3. The client redirects the user to the configured IdP
 4. The IdP returns the user to the callback URL (default
    `http://localhost:3000/auth/callback`)
-5. The client uses the JWT from the IdP as `Authorization: Bearer <TOKEN>`
-   in a `POST` request containing the users SSH public key to the CA's
-   `/api/v4/user/certificates` endpoint
-6. The CA verifies the incoming JWT and assuming it is valid and verified, will
-   respond with a signed certificate based on the provided public key
+5. The client sends the access token from the IdP as
+   `Authorization: Bearer <TOKEN>` in a `POST` request to the CA's
+   `/api/v4/user/certificates` endpoint, with the user's SSH public key, the
+   identity token, and a proof of possession of the key in the
+   `Proof-Of-Possession` header
+6. The CA verifies both tokens and the proof of possession and, if they are
+   valid, responds with a signed certificate for the provided public key
 7. The client saves the certificate and adds the SSH private key and
    certificate to the local SSH Agent.
 
@@ -164,7 +168,7 @@ If a refresh token is available, the process looks like this when running
 
 ```mermaid
 sequenceDiagram
-    Client->>IdP: Request authentication token
+    Client->>IdP: Request access and identity tokens
     activate IdP
     IdP-->>Client: Token returned
     deactivate IdP
@@ -179,14 +183,14 @@ sequenceDiagram
     deactivate Client
 ```
 
-If the process to request a new authentication token fails using the refresh
-token, the standard authentication process is followed which requires user
+If refreshing the tokens with the refresh token fails, the standard authentication process is followed which requires user
 interaction.
 
 The principals of a user certificate come from the identity token's
 `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` (with spaces replaced by underscores),
 `SSH_CERTIFICATE_PRINCIPALS` and the `SSH_CERTIFICATE_INCLUDE_SELF*` settings.
-A request is refused with a `422` error if any of them is empty or contains a
+A request is refused with a `422` error if there are none, or if any of them
+is empty or contains a
 comma, whitespace, a control character or an OpenSSH pattern character (`*`,
 `?` or `!`). A server that restricts certificates with the `principals="..."`
 option in `authorized_keys` reads that option as a comma separated list, so,
@@ -197,7 +201,7 @@ otherwise be accepted for an account it was not meant for.
 
 #### Initial Request
 
-The process to request an intitial Host certificate is similar to obtaining
+The process to request an initial Host certificate is similar to obtaining
 a User certificate once `ssh-ca-client-cli host` is run, however instead of
 adding the obtained certificate to a SSH Agent, it is written to
 `<KEYPATH>-cert.pub` instead:
@@ -325,6 +329,10 @@ the request part from the request it receives. The path does not change if
 the CA is served behind a proxy under another path, and serials in the path
 are written in decimal without leading zeros.
 
+The timestamp is written in decimal without a sign or leading zeros, and the
+signature is standard base64 with padding. A proof in any other form is
+refused.
+
 The public key for a revocation or renewal is taken from the proof and the
 certificate respectively, so it is not sent separately.
 
@@ -390,7 +398,7 @@ retention period is.
 
 The CA keeps the certificates it has issued, and the version of each KRL, in
 a SQLite database: D1 on Cloudflare Workers, or `node:sqlite` (or another
-`CaDatabase`) on Node.js. The database is created on first use, and after an
+`CaDatabase`) on Node.js. The CA's tables are created in the database on first use, and after an
 upgrade any new migrations are applied automatically the first time the
 database is used. Upgrading from any earlier release migrates the database,
 as migrations are never removed.
@@ -440,6 +448,10 @@ The `Redirect URL` must match the configured value in the client.
 Transfer the IdP settings as follows:
 
 ![IdP Settings](docs/images/oidc-example_02.png)
+
+Copy the **Client ID** to `JWT_AUD` on the CA and to `client_id` in the
+client, the **Issuer** to `JWT_ISSUER` on the CA and to `issuer` in the
+client, and the **Key endpoint** to `JWT_JWKS_URL` on the CA.
 
 The `openid` and `email` scopes are required, with enabling of refresh tokens
 (the `offline_access` scope) being optional, but recommended.
@@ -938,13 +950,28 @@ The `/etc/ssh/principals.d` directory should contain a file corresponding to
 a local user that contains a list of principals that should be allowed
 login.
 
-Using the principals list in `SSH_CERTIFICATE_PRINCIPALS` above, the
+For example, with `SSH_CERTIFICATE_PRINCIPALS` set to `ssh-admin` (as in the
+example [`wrangler.jsonc`](https://github.com/andrewheberle/serverless-ssh-ca/blob/main/packages/workers-integration/wrangler.jsonc)), the
 following file named `/etc/ssh/principals.d/admin` would allow login
 as the SSH user `admin` for the bearer of an issued (and valid) certificate:
 
 ```
 ssh-admin
 ```
+
+To refuse revoked user certificates, `sshd` also needs the user KRL.
+[ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client) downloads it
+from `/api/v4/user/krl`, checks its signature with the CA public key and
+writes it where OpenSSH can read it:
+
+```sh
+sudo ssh-ca-client-cli krl --out /etc/ssh/revocation_list
+```
+
+Then add `RevokedKeys /etc/ssh/revocation_list` to `sshd_config`. Write the
+KRL before setting `RevokedKeys`, as `sshd` refuses all public key
+authentication when it cannot read the file, and refresh it regularly, as
+certificates can be revoked at any time.
 
 #### Client Configuration
 
@@ -957,7 +984,7 @@ configuration must be added to `/etc/ssh/ssh_known_hosts` (system wide) or
 ```
 
 The format of the above file is documented in the `ssh(1)` man page however
-the important items of note is the `*.example.com` above tells `ssh` that the
+the important item of note is that the `*.example.com` above tells `ssh` that the
 CA public key (ie `ecdsa-sha2-nistp256 ....`) is trusted for all hosts, that
 match `*.example.com`.
 
@@ -971,3 +998,7 @@ curl https://ssh-ca.example.com/api/v4/ca
 Once the above configuration is completed and host certificates are in place
 clients will not require "trust on first use" (TOFU) as the certificate will be
 verified as being signed by the configured SSH CA.
+
+SSH clients refuse revoked host certificates with the host KRL: run
+`ssh-ca-client-cli krl --host --out ~/.ssh/revocation_list` and add
+`RevokedHostKeys ~/.ssh/revocation_list` to `~/.ssh/config`.

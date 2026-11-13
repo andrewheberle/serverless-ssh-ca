@@ -21,9 +21,9 @@ This repository contains a serverless Certificate Authority (CA) that can be use
 
 ## Build, test, lint
 Run these before considering any change complete:
-- Lint: `npm lint .`
+- Lint: `npm run lint`
 - Test: `npm test`
-- Build: `npm build`
+- Build: `npm run build`
 
 Prefer the scripts in `package.json` over invoking tools directly.
 
