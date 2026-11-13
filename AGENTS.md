@@ -60,7 +60,18 @@ Prefer the scripts in `package.json` over invoking tools directly.
 - npm trusted publishing is tied to the `release.yml` filename, so don't rename it.
 - Don't edit `CHANGELOG.md`, `.release-please-manifest.json` or package versions by hand; release-please maintains them.
 - PRs are squash merged with the PR title as the commit message, so PR titles must be conventional commits (`feat:`, `fix(scope):`, `feat!:` for breaking changes); the PR title check enforces this. Only `feat`, `fix`, `perf`, `revert` and breaking changes trigger a release.
-- The PR description is used as the body of the squash commit, so write it as a commit message body: explain what changed and why in plain prose, without headings or checklists. Put any `BREAKING CHANGE:` footer in the last paragraph so release-please reads it.
+- PRs are squash merged with the PR title as the commit message and no body: the PR description does not reach the commit. Write the description as plain prose explaining what changed and why, without headings or checklists.
+- A `!` in the PR title (`feat!:`, `fix(scope)!:`) marks a change as breaking. A PR that also needs a footer, such as a `BREAKING CHANGE:` note for the changelog or `Release-As:`, ends its description with a block that release-please reads from the merged PR. The block holds the full conventional commit message, and the footer must be its last paragraph, with nothing after it:
+
+  ```
+  BEGIN_COMMIT_OVERRIDE
+  feat(api)!: remove API v3
+
+  What changed and why.
+
+  BREAKING CHANGE: what users must do.
+  END_COMMIT_OVERRIDE
+  ```
 - Don't include links to Claude Code sessions (`https://claude.ai/code/session_...`) in PR descriptions.
 - Never delete, move, or force-push an existing tag; fix forward with a new patch version.
 - Do not create or push a tag unless specifically directed to as this triggers the release workflow.
@@ -71,6 +82,7 @@ Prefer the scripts in `package.json` over invoking tools directly.
   - `packages/workers-integration/worker-configuration.d.ts`: regenerate with `npm run cf-typegen` if Cloudflare Workers types are outdated after updates to `packages/workers-integration/wrangler.jsonc` or updates to the `wrangler` package.
   - `packages/core/openapi.json` is committed and published in the npm package; the client generates its bindings from it. CI fails if it doesn't match `npm run schema`, so commit the regenerated file with any change that affects it.
 - Keep changes scoped to the task. No drive-by refactors or renames.
+- The database schema is internal, but every earlier release must be able to upgrade, so never change or remove a released migration's name or result. See the rules on `Migration` in `packages/core/src/db/migrate.ts`.
 - Do not change any of the OpenAPI surface as this could break clients.
   - The client end-to-end tests (`.github/workflows/client-e2e.yml`) run oasdiff to compare `packages/core/openapi.json` against the schema committed in the client's `main` and in its latest release, and fail on any breaking change.
   - `packages/core/.oasdiff-err-ignore` lists the breaking schema changes that this check accepts. When a breaking schema change has been approved (for example one that is compatible on the wire, or that the client is being updated for), add its oasdiff errors to the file in the same PR, so the acknowledgement is visible in review. Write one entry per line as `METHOD /path <error message>` (eg `GET /api/v3/{certificateType}/krl api path removed without deprecation`).

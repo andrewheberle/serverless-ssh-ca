@@ -5,8 +5,18 @@ import type { CaDatabase } from "../types.js"
  * A database schema migration.
  *
  * Migrations are applied in order and recorded by `name` in the `migrations`
- * table, so a name must never change once released. Each statement must be a
- * single SQL statement.
+ * table. Each statement must be a single SQL statement.
+ *
+ * The schema is internal to the CA, so it can change in any release, but every
+ * earlier release must still be able to upgrade:
+ *
+ * - A released migration is never removed or renamed, and its result never
+ *   changes. Its SQL may be rewritten, for example to run faster, as long as
+ *   it gives the same result on every database it can run on.
+ * - Every change to the schema is a new migration, added to the end.
+ * - Changes need not be additive. Running an older release against a database
+ *   that a newer release has migrated is not supported, so a migration may
+ *   rename, drop or tighten what an older release relies on.
  */
 export type Migration = {
 	/** Unique name recorded once the migration has been applied */
