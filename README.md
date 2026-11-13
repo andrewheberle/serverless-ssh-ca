@@ -9,6 +9,8 @@ to provide signed certificates for SSH users and hosts running on Cloudflare Wor
 
 Please see [README.md](packages/core/README.md) for further information.
 
+Upgrading from a 0.x release? See [Upgrading to 1.0](docs/upgrading-to-1.0.md).
+
 ## Supported Platforms
 
 | Runtime | Version | Used by |
