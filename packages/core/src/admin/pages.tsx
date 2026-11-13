@@ -3,7 +3,7 @@ import { KeyHolderRevoker, MaxBulkRevocation, type BulkRevocationResult, type Ce
 import { PublicKey } from "../ssh/keys.js"
 import { hashedAsset, type HashedAsset } from "../web/assets.js"
 import { BaseStylesheet } from "../web/styles.js"
-import { bulkRevocationFilters, bulkRevokeLink, bulkRevokePath, certificatesLink, certificatesPath, MaxRevocationReason, type BulkRevocationFilters, type CertificateKind, type CertificateListQuery } from "./query.js"
+import { bulkRevocationFilters, bulkRevokeLink, bulkRevokePath, certificatesLink, certificatesPath, MaxRevocationReason, type BulkRevocationFilters, type CertificateKind, type CertificateListQuery, type RevokeFormField } from "./query.js"
 import { TimeScriptPath } from "./time.js"
 
 /**
@@ -96,7 +96,7 @@ main {
 
 .tabs a, .tabs button {
 	border-radius: 0.375rem;
-	color: var(--text-subtle);
+	color: var(--text-muted);
 	font-size: 0.875rem;
 	padding: 0.25rem 0.75rem;
 }
@@ -155,7 +155,7 @@ input, select, .button {
 
 input, select {
 	background: var(--control);
-	box-shadow: 0 0 0 1px var(--line);
+	box-shadow: 0 0 0 1px var(--control-line);
 	color: var(--text);
 	width: 100%;
 }
@@ -351,7 +351,7 @@ textarea {
 	background: var(--control);
 	border: 0;
 	border-radius: 0.5rem;
-	box-shadow: 0 0 0 1px var(--line);
+	box-shadow: 0 0 0 1px var(--control-line);
 	color: var(--text);
 	font: inherit;
 	font-size: 0.875rem;
@@ -378,15 +378,33 @@ input[type="checkbox"] {
 	width: 1rem;
 }
 
+input[type="checkbox"][aria-invalid="true"] {
+	outline: 1.5px solid var(--danger);
+	outline-offset: 2px;
+}
+
+/* input:focus removes the outline for the box-shadow above, which a
+   checkbox does not have, so it gets the outline back. This comes after the
+   invalid outline, so keyboard focus is shown on an invalid box too */
+input[type="checkbox"]:focus-visible {
+	outline: 2px solid var(--brand);
+	outline-offset: 2px;
+}
+
 .button.danger {
-	background: var(--danger);
+	background: var(--danger-strong);
 	box-shadow: none;
 	color: #fff;
 	justify-self: start;
 }
 
 .button.danger:hover {
-	background: color-mix(in oklch, var(--danger), black 10%);
+	background: color-mix(in oklch, var(--danger-strong), black 10%);
+}
+
+/* serials are kept on one line in tables, which scroll sideways instead */
+td.mono {
+	white-space: nowrap;
 }
 
 .list-actions {
@@ -500,14 +518,14 @@ export const Layout: FC<PropsWithChildren<{ title: string, email: string }>> = (
  * A page explaining why a request could not be answered, such as a 400 or
  * 404, with a list of the problems when there are several.
  */
-export const ErrorPage: FC<{ email: string, title: string, message: string, problems?: string[] }> = ({ email, title, message, problems = [] }) => (
+export const ErrorPage: FC<{ email: string, title: string, message: string, problems?: string[], kind?: CertificateKind }> = ({ email, title, message, problems = [], kind = "user" }) => (
 	<Layout title={title} email={email}>
 		<div class="alert" role="alert">
 			<h2>{title}</h2>
 			<p>{message}</p>
 			{problems.length > 0 && <ul>{problems.map((p) => <li>{p}</li>)}</ul>}
 		</div>
-		<p><a href={certificatesPath("user")}>Back to certificates</a></p>
+		<p><a href={certificatesPath(kind)}>Back to {kind} certificates</a></p>
 	</Layout>
 )
 
@@ -642,7 +660,7 @@ const ListActions: FC<{ kind: CertificateKind, query: CertificateListQuery, list
 
 	return (
 		<div class="list-actions">
-			{revoke ? <a class="button danger" href={bulkRevokeLink(kind, filters)}>Revoke these certificates…</a> : <span></span>}
+			{revoke ? <a class="button danger" href={bulkRevokeLink(kind, filters)}>Revoke matching certificates…</a> : <span></span>}
 			{nextPage !== undefined && <a class="button" href={nextPage} rel="next">Next page</a>}
 		</div>
 	)
@@ -659,6 +677,28 @@ const describeFilters = (filters: BulkRevocationFilters): string => [
 	filters.serial === undefined ? undefined : `serial ${filters.serial}`,
 ].filter((f) => f !== undefined).join(", ")
 
+/**
+ * A revoke form as it was sent, shown again because it was not valid: the
+ * reason that was entered, the problems as they are shown to the admin, and
+ * the fields they are about.
+ */
+export type RevokeFormState = { reason: string, errors: string[], invalid: RevokeFormField[] }
+
+// the id of the list of problems with a revoke form, which each invalid field
+// is described by
+const FormErrorsId = "revoke-errors"
+
+// the problems with a revoke form, if there are any
+const FormErrors: FC<{ errors: string[] }> = ({ errors }) => errors.length === 0
+	? <></>
+	: <ul class="form-errors" id={FormErrorsId} role="alert">{errors.map((e) => <li>{e}</li>)}</ul>
+
+// marks a field of a revoke form as invalid, and described by the list of
+// problems, when one of the problems is about it
+const fieldState = (invalid: RevokeFormField[], field: RevokeFormField): Record<string, string> => invalid.includes(field)
+	? { "aria-invalid": "true", "aria-describedby": FormErrorsId }
+	: {}
+
 /** The props of {@link BulkRevokePage} */
 export type BulkRevokeProps = {
 	email: string
@@ -670,7 +710,7 @@ export type BulkRevokeProps = {
 	/** Whether more certificates match the filters than are offered */
 	more: boolean
 	/** The form as it was sent, when it is shown again because it was not valid */
-	form?: { reason: string, errors: string[] } | undefined
+	form?: RevokeFormState | undefined
 }
 
 /**
@@ -683,55 +723,68 @@ export type BulkRevokeProps = {
  */
 export const BulkRevokePage: FC<BulkRevokeProps> = ({ email, kind, filters, certificates, more, form }) => {
 	const errors = form?.errors ?? []
+	const invalid = form?.invalid ?? []
+	const described = describeFilters(filters)
+	const back = <p><a href={filteredListLink(kind, filters)}>Back to {kindName(kind).toLowerCase()} certificates</a></p>
+
+	// with nothing to revoke there is no form, only why and the way back
+	if (certificates.length === 0) {
+		return (
+			<Layout title={`Revoke ${kind} certificates`} email={email}>
+				{back}
+				<h2>Revoke {kindName(kind).toLowerCase()} certificates</h2>
+				{errors.length > 0
+					? <ul class="form-errors" role="alert">{errors.map((e) => <li>{e}</li>)}</ul>
+					: <p class="empty">No valid certificates match these filters.</p>}
+			</Layout>
+		)
+	}
 
 	return (
 		<Layout title={`Revoke ${kind} certificates`} email={email}>
-			<p><a href={filteredListLink(kind, filters)}>Back to {kindName(kind).toLowerCase()} certificates</a></p>
+			{back}
 			<h2>Revoke {kindName(kind).toLowerCase()} certificates</h2>
-			<p>Valid {kind} certificates with {describeFilters(filters)}. Check the key IDs and principals, and untick any certificate that should not be revoked.</p>
+			<p>{described === "" ? `Valid ${kind} certificates.` : `Valid ${kind} certificates with ${described}.`} Check the key IDs and principals, and untick any certificate that should not be revoked.</p>
 			{more && <p class="notice" role="status">More than {MaxBulkRevocation} certificates match. The newest {MaxBulkRevocation} are shown; revoke these, then return to this page to revoke the rest.</p>}
 			<form class="revoke" method="post" action={bulkRevokePath(kind)}>
 				{filters.principal !== undefined && <input type="hidden" name="principal" value={filters.principal} />}
 				{filters.key_id !== undefined && <input type="hidden" name="key_id" value={filters.key_id} />}
+				{filters.serial !== undefined && <input type="hidden" name="filter_serial" value={`${filters.serial}`} />}
 				<div class="card flush">
-					{certificates.length === 0
-						? <p class="empty">No valid certificates match these filters.</p>
-						: (
-							<table>
-								<thead>
-									<tr>
-										<th scope="col">Revoke</th>
-										<th scope="col">Serial</th>
-										<th scope="col">Key ID</th>
-										<th scope="col">Principals</th>
-										<th scope="col">Valid until</th>
-										<th scope="col">Status</th>
-									</tr>
-								</thead>
-								<tbody>
-									{certificates.map((c) => (
-										<tr>
-											<td><input type="checkbox" name="serial" value={c.serial} checked aria-label={`Revoke certificate ${c.serial}`} /></td>
-											<td class="mono"><a href={`${certificatesPath(kind)}/${c.serial}`}>{c.serial}</a></td>
-											<td>{c.key_id}</td>
-											<td><Principals principals={c.principals} /></td>
-											<td><Timestamp date={c.valid_before} precision="minute" /></td>
-											<td><StatusBadge status={c.status} /></td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						)}
+					<table>
+						<thead>
+							<tr>
+								<th scope="col">Revoke</th>
+								<th scope="col">Serial</th>
+								<th scope="col">Key ID</th>
+								<th scope="col">Principals</th>
+								<th scope="col">Valid until</th>
+								<th scope="col">Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							{certificates.map((c) => (
+								<tr>
+									<td><input type="checkbox" name="serial" value={c.serial} checked aria-label={`Revoke certificate ${c.serial}`} /></td>
+									<td class="mono"><a href={`${certificatesPath(kind)}/${c.serial}`}>{c.serial}</a></td>
+									<td>{c.key_id}</td>
+									<td><Principals principals={c.principals} /></td>
+									<td><Timestamp date={c.valid_before} precision="minute" /></td>
+									<td><StatusBadge status={c.status} /></td>
+								</tr>
+							))}
+						</tbody>
+					</table>
 				</div>
 				<section class="card revoke">
 					<p>Revoking is permanent and cannot be undone. Each ticked certificate is added to the {kind} KRL until it expires, and access is restored by issuing a new certificate.</p>
-					{errors.length > 0 && <ul class="form-errors" role="alert">{errors.map((e) => <li>{e}</li>)}</ul>}
+					<FormErrors errors={errors} />
 					<label>
 						Reason, recorded for every certificate
-						<textarea name="reason" required maxlength={MaxRevocationReason} aria-invalid={errors.length > 0 ? "true" : undefined}>{form?.reason ?? ""}</textarea>
+						<textarea name="reason" required maxlength={MaxRevocationReason} {...fieldState(invalid, "reason")}>{form?.reason ?? ""}</textarea>
 					</label>
 					<label class="checkbox">
-						<input type="checkbox" name="confirm" value="yes" required />
+						<input type="checkbox" name="confirm" value="yes" required {...fieldState(invalid, "confirm")} />
 						I understand that these revocations cannot be undone
 					</label>
 					<button type="submit" class="button danger">Revoke ticked certificates</button>
@@ -808,7 +861,7 @@ export type CertificateDetailProps = {
 	/** The certificates it is linked to by renewal, see {@link RenewalLinks} */
 	renewal: RenewalLinks
 	/** The revoke form as it was sent, when it is shown again because it was not valid */
-	revokeForm?: { reason: string, errors: string[] } | undefined
+	revokeForm?: RevokeFormState | undefined
 }
 
 /**
@@ -818,19 +871,20 @@ export type CertificateDetailProps = {
  */
 const RevokeSection: FC<{ kind: CertificateKind, serial: string, form: CertificateDetailProps["revokeForm"] }> = ({ kind, serial, form }) => {
 	const errors = form?.errors ?? []
+	const invalid = form?.invalid ?? []
 
 	return (
 		<section class="card">
 			<h3 class="section-title">Revoke this certificate</h3>
 			<form class="revoke" method="post" action={`${certificatesPath(kind)}/${serial}/revoke`}>
 				<p>Revoking is permanent and cannot be undone. The certificate is added to the {kind} KRL until it expires, and access is restored by issuing a new certificate.</p>
-				{errors.length > 0 && <ul class="form-errors" role="alert">{errors.map((e) => <li>{e}</li>)}</ul>}
+				<FormErrors errors={errors} />
 				<label>
 					Reason
-					<textarea name="reason" required maxlength={MaxRevocationReason} aria-invalid={errors.length > 0 ? "true" : undefined}>{form?.reason ?? ""}</textarea>
+					<textarea name="reason" required maxlength={MaxRevocationReason} {...fieldState(invalid, "reason")}>{form?.reason ?? ""}</textarea>
 				</label>
 				<label class="checkbox">
-					<input type="checkbox" name="confirm" value="yes" required />
+					<input type="checkbox" name="confirm" value="yes" required {...fieldState(invalid, "confirm")} />
 					I understand that this revocation cannot be undone
 				</label>
 				<button type="submit" class="button danger">Revoke certificate</button>

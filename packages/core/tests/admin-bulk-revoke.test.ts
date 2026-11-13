@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import { cloudflareClientIp, createSshCa, type CaRateLimiter, type SshCa, type SshCaBindings } from "../src/index.js"
-import { AdminSecurityHeaders } from "../src/admin/index.js"
+import { AdminSecurityHeaders, CrossSiteRefusal } from "../src/admin/index.js"
 import { CertificatePageSize, getKrlRevision, revokeCertificates } from "../src/db/index.js"
 import { migrateOnce } from "../src/db/migrate.js"
 import { migrations } from "../src/db/migrations/index.js"
@@ -125,7 +125,7 @@ const selected = (serials: string[], reason = "Offboarding", confirm = "yes"): [
 const tickedSerials = (body: string): string[] => [...body.matchAll(/<input type="checkbox" name="serial" value="(\d+)" checked=""/g)].map((m) => m[1] ?? "")
 
 // the link from a list page to its bulk revocation, if it has one
-const bulkLink = (body: string): string | undefined => /<a class="button danger" href="([^"]+)">Revoke these certificates/.exec(body)?.[1]?.replaceAll("&amp;", "&")
+const bulkLink = (body: string): string | undefined => /<a class="button danger" href="([^"]+)">Revoke matching certificates/.exec(body)?.[1]?.replaceAll("&amp;", "&")
 
 describe("bulk revocation operation", () => {
 	it("should revoke every valid certificate it is given, with one KRL revision", async () => {
@@ -306,7 +306,13 @@ describe("bulk revocation in the admin UI", () => {
 		expect(response.status).toBe(422)
 		const body = await response.text()
 		expect(body).toContain(`<li>${error}</li>`)
-		expect(body).toContain("<form class=\"revoke\"")
+		// with no certificates ticked there is nothing to revoke, so only the
+		// problem and the way back are shown
+		if (_name === "no certificates selected") {
+			expect(body).not.toContain("<form class=\"revoke\"")
+		} else {
+			expect(body).toContain("<form class=\"revoke\"")
+		}
 		for (const serial of serials) {
 			expect(recorded(serial)?.revoked_at).toBeNull()
 		}
@@ -375,5 +381,111 @@ describe("bulk revocation in the admin UI", () => {
 		const response = await get(ca, `/admin/user/certificates/${serial}`)
 		expect(response.status).toBe(200)
 		expect(await response.text()).toContain(`<form class="revoke" method="post" action="/admin/user/certificates/${serial}/revoke">`)
+	})
+})
+
+describe("revocation forms in the admin UI (#592, #593)", () => {
+	it("should count a line break in the reason as one character, as the browser does, and record it as one", async () => {
+		const { ca, seed, recorded } = await setup()
+		const [serial] = seed({})
+		// 500 characters as the browser counts them, but 501 as sent
+		const reason = `${"a".repeat(250)}\r\n${"b".repeat(249)}`
+
+		const response = await bulkRevoke(ca, selected([serial ?? ""], reason))
+
+		expect(response.status).toBe(200)
+		expect(recorded(serial ?? "")?.revocation_reason).toBe(`${"a".repeat(250)}\n${"b".repeat(249)}`)
+	})
+
+	it("should label the link to revoke the listed certificates as revoking every matching certificate", async () => {
+		const { ca, seed } = await setup()
+		seed({})
+
+		const body = await (await get(ca, "/admin/user/certificates?status=valid&key_id=alice")).text()
+
+		expect(body).toContain(">Revoke matching certificates…</a>")
+		expect(body).not.toContain("Revoke these certificates")
+	})
+
+	it("should show only that nothing matches, and the way back, when no certificates match", async () => {
+		const { ca, seed } = await setup()
+		seed({})
+
+		const response = await get(ca, "/admin/user/certificates/revoke?status=valid&key_id=nobody")
+		const body = await response.text()
+
+		expect(response.status).toBe(200)
+		expect(body).toContain("No valid certificates match these filters.")
+		expect(body).toContain("href=\"/admin/user/certificates?status=valid&amp;key_id=nobody\"")
+		expect(body).not.toContain("<form class=\"revoke\"")
+	})
+
+	it("should send the serial filter back with the form, and keep it when the form is shown again", async () => {
+		const { ca, seed } = await setup()
+		const [serial] = seed({})
+
+		const page = await (await get(ca, `/admin/user/certificates/revoke?status=valid&key_id=alice&serial=${serial}`)).text()
+		expect(page).toContain(`<input type="hidden" name="filter_serial" value="${serial}"/>`)
+
+		const body = await (await bulkRevoke(ca, [...selected([serial ?? ""], ""), ["key_id", "alice"], ["filter_serial", serial ?? ""]])).text()
+		expect(body).toContain(`<input type="hidden" name="filter_serial" value="${serial}"/>`)
+		expect(body).toContain(`href="/admin/user/certificates?status=valid&amp;key_id=alice&amp;serial=${serial}"`)
+	})
+
+	it("should describe the certificates without filters when the filters sent back are not valid", async () => {
+		const { ca, seed } = await setup()
+		const [serial] = seed({})
+
+		const body = await (await bulkRevoke(ca, [...selected([serial ?? ""], ""), ["principal", "a,b"]])).text()
+
+		expect(body).toContain("Valid user certificates. Check the key IDs")
+		expect(body).not.toContain("with .")
+	})
+
+	it.each([
+		["the reason", (s: string) => selected([s], ""), "reason"],
+		["the confirmation", (s: string) => selected([s], "Offboarding", "no"), "confirm"],
+	])("should mark only %s as invalid, and described by the problems", async (_name, form, field) => {
+		const { ca, seed } = await setup()
+		const [serial] = seed({})
+
+		const body = await (await bulkRevoke(ca, form(serial ?? ""))).text()
+
+		expect(body).toContain("<ul class=\"form-errors\" id=\"revoke-errors\" role=\"alert\">")
+		const reason = /<textarea name="reason"[^>]*>/.exec(body)?.[0] ?? ""
+		const confirm = /<input type="checkbox" name="confirm"[^>]*>/.exec(body)?.[0] ?? ""
+		const [invalid, valid] = field === "reason" ? [reason, confirm] : [confirm, reason]
+		expect(invalid).toContain("aria-invalid=\"true\"")
+		expect(invalid).toContain("aria-describedby=\"revoke-errors\"")
+		expect(valid).not.toContain("aria-invalid")
+	})
+
+	it("should link back to the kind of certificate an error page is about", async () => {
+		const { ca } = await setup()
+
+		const body = await (await get(ca, "/admin/host/certificates/999999")).text()
+
+		expect(body).toContain("<a href=\"/admin/host/certificates\">Back to host certificates</a>")
+	})
+
+	it.each([
+		["another origin", { Origin: "https://evil.example.com" }],
+		["no Sec-Fetch-Site", { "Sec-Fetch-Site": "" }],
+		["the internal origin behind a proxy", { Origin: "http://127.0.0.1:8787" }],
+	])("should refuse a request from %s with a 403 that says how to fix it, and log why", async (_name, headers) => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
+		const { ca, seed, recorded } = await setup({ LOG_LEVEL: "warning" })
+		const [serial] = seed({})
+
+		const response = await bulkRevoke(ca, selected([serial ?? ""]), { headers })
+
+		expect(response.status).toBe(403)
+		expect(await response.text()).toBe(CrossSiteRefusal)
+		expect(recorded(serial ?? "")?.revoked_at).toBeNull()
+		expect(log).toHaveBeenCalledWith(expect.objectContaining({
+			level: "warning",
+			message: "refused an admin request that did not come from the admin UI",
+			expectedOrigin: Origin,
+		}))
 	})
 })

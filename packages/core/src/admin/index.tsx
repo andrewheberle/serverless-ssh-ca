@@ -13,7 +13,7 @@ import { assetResponse, type HashedAsset } from "../web/assets.js"
 import { SecurityHeaders, securityHeaders } from "../web/headers.js"
 import { authenticateAdmin, type EnabledAdminConfig } from "./auth.js"
 import { BulkRevokePage, BulkRevokeResultPage, CertificateDetailPage, CertificateListPage, ErrorPage, StylesheetAsset } from "./pages.js"
-import { BulkRevokeForm, bulkRevocationFilters, CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeBulkRevokeError, describeQueryError, formValues, RevokeForm, SerialString, type CertificateKind } from "./query.js"
+import { BulkRevokeForm, bulkRevocationFilters, bulkRevokeFormFilters, CertificateKinds, CertificateListQuery, certificatesLink, certificatesPath, certificateType, describeBulkRevokeError, describeQueryError, formValues, invalidRevokeFields, RevokeForm, SerialString, type CertificateKind } from "./query.js"
 import { TimeScriptAsset } from "./time.js"
 
 /** The path the admin UI is served under */
@@ -60,6 +60,13 @@ const reportedPartial = new WeakSet<SshCaBindings>()
 const expectedOrigin = (config: EnabledAdminConfig, c: Context): string => config.hostname !== undefined
 	? `https://${config.hostname}`
 	: new URL(c.req.url).origin
+
+/**
+ * The body of the response to a request that changes state but did not come
+ * from the admin UI, which says how to fix the usual cause without repeating
+ * anything from the request.
+ */
+export const CrossSiteRefusal = "Forbidden: the request was refused because it did not come from this admin UI. If the admin UI is served behind a proxy, set ADMIN_HOSTNAME to the host name it is reached on."
 
 // the kind of certificate named in a path, if it names one
 const certificateKind = (kind: string): CertificateKind | undefined => CertificateKinds.find((k) => k === kind)
@@ -157,27 +164,35 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 	})
 
 	// refuse cross-site requests that change state. The proxy keeps the
-	// admin's session in a cookie, so does not do this itself. Hono's csrf
-	// middleware checks the Origin of form submissions, and the check after
-	// it also requires Sec-Fetch-Site to be same-origin and the Origin to
-	// match whatever the content type
-	app.use(csrf({
-		origin: (origin, c) => origin === expectedOrigin(config, c),
-		// Hono accepts a request when either check passes, so the origin is
-		// required here and Sec-Fetch-Site after this
-		secFetchSite: () => false,
-	}))
+	// admin's session in a cookie, so does not do this itself. Every request
+	// that changes state must have Sec-Fetch-Site same-origin and the
+	// expected Origin, whatever its content type. A refusal is logged with
+	// what was received and expected, as behind a proxy that terminates TLS
+	// the expected origin is wrong unless ADMIN_HOSTNAME is set, and the body
+	// says so without repeating any of it
 	app.use(async (c, next) => {
 		if (SafeMethods.has(c.req.method)) {
 			return await next()
 		}
 
-		if (c.req.header("Sec-Fetch-Site") !== "same-origin" || c.req.header("Origin") !== expectedOrigin(config, c)) {
-			return c.text("Forbidden", 403)
+		const expected = expectedOrigin(config, c)
+		const origin = c.req.header("Origin")
+		const site = c.req.header("Sec-Fetch-Site")
+		if (site !== "same-origin" || origin !== expected) {
+			l.warn("refused an admin request that did not come from the admin UI", "method", c.req.method, "path", c.req.path, "origin", origin ?? null, "secFetchSite", site ?? null, "expectedOrigin", expected)
+			return c.text(CrossSiteRefusal, 403)
 		}
 
 		return await next()
 	})
+	// Hono's csrf middleware checks the Origin of form submissions again, so
+	// a mistake in the check above is not enough on its own to allow one
+	app.use(csrf({
+		origin: (origin, c) => origin === expectedOrigin(config, c),
+		// Hono accepts a request when either check passes, so the origin is
+		// required here, as Sec-Fetch-Site is above
+		secFetchSite: () => false,
+	}))
 
 	// authenticate and authorise the admin from the proxy's JWT
 	app.use(async (c, next) => {
@@ -241,7 +256,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		const email = adminEmail(c)
 		const query = CertificateListQuery.safeParse(c.req.query())
 		if (!query.success) {
-			return page(c, <ErrorPage email={email} title="Invalid filters" message="The list could not be shown because of these filters:" problems={describeQueryError(query.error)} />, 400)
+			return page(c, <ErrorPage email={email} kind={kind} title="Invalid filters" message="The list could not be shown because of these filters:" problems={describeQueryError(query.error)} />, 400)
 		}
 
 		const { certificates, next } = await listCertificates(env, {
@@ -275,12 +290,12 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		const email = adminEmail(c)
 		const query = CertificateListQuery.safeParse(c.req.query())
 		if (!query.success) {
-			return page(c, <ErrorPage email={email} title="Invalid filters" message="The certificates to revoke could not be found because of these filters:" problems={describeQueryError(query.error)} />, 400)
+			return page(c, <ErrorPage email={email} kind={kind} title="Invalid filters" message="The certificates to revoke could not be found because of these filters:" problems={describeQueryError(query.error)} />, 400)
 		}
 
 		const filters = bulkRevocationFilters(query.data)
 		if (filters === undefined) {
-			return page(c, <ErrorPage email={email} title="Filter the certificates first" message="Certificates can only be revoked together from a list of valid certificates filtered by principal or key ID." />, 400)
+			return page(c, <ErrorPage email={email} kind={kind} title="Filter the certificates first" message="Certificates can only be revoked together from a list of valid certificates filtered by principal or key ID." />, 400)
 		}
 
 		const { certificates, next } = await listCertificates(env, {
@@ -322,17 +337,16 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 				return serial.success ? [serial.data] : []
 			})
 			const certificates = await getCertificates(env, [...new Set(serials)].slice(0, MaxBulkRevocation), certificateType(kind))
-			const filters = BulkRevokeForm.pick({ principal: true, key_id: true }).safeParse(body)
 			const reason = typeof body.reason === "string" ? body.reason : ""
 			const now = new Date()
 
 			return page(c, <BulkRevokePage
 				email={email}
 				kind={kind}
-				filters={filters.success ? filters.data : {}}
+				filters={bulkRevokeFormFilters(body)}
 				certificates={certificates.map((certificate) => ({ ...certificate, status: certificateStatus(certificate, now) }))}
 				more={false}
-				form={{ reason, errors: describeBulkRevokeError(form.error) }}
+				form={{ reason, errors: describeBulkRevokeError(form.error), invalid: invalidRevokeFields(form.error) }}
 			/>, 422)
 		}
 
@@ -345,7 +359,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 			reason: form.data.reason,
 		})
 
-		return page(c, <BulkRevokeResultPage email={email} kind={kind} filters={{ principal: form.data.principal, key_id: form.data.key_id }} results={results} />)
+		return page(c, <BulkRevokeResultPage email={email} kind={kind} filters={{ principal: form.data.principal, key_id: form.data.key_id, serial: form.data.filter_serial }} results={results} />)
 	})
 
 	app.get("/:kind/certificates/:serial", async (c) => {
@@ -358,7 +372,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		const serial = SerialString.safeParse(c.req.param("serial"))
 		const certificate = serial.success ? await getCertificate(env, serial.data, certificateType(kind)) : undefined
 		if (certificate === undefined) {
-			return page(c, <ErrorPage email={email} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
+			return page(c, <ErrorPage email={email} kind={kind} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
 		}
 
 		return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={certificateStatus(certificate)} renewal={await getRenewalLinks(env, certificate)} />)
@@ -377,11 +391,11 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		const serial = SerialString.safeParse(c.req.param("serial"))
 		const certificate = serial.success ? await getCertificate(env, serial.data, certificateType(kind)) : undefined
 		if (!serial.success || certificate === undefined) {
-			return page(c, <ErrorPage email={email} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
+			return page(c, <ErrorPage email={email} kind={kind} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
 		}
 
-		const alreadyRevoked = () => page(c, <ErrorPage email={email} title="Certificate already revoked" message="This certificate has already been revoked, so nothing was changed." />, 409)
-		const expired = () => page(c, <ErrorPage email={email} title="Certificate has expired" message="An expired certificate cannot be revoked, as it is no longer trusted. Nothing was changed." />, 422)
+		const alreadyRevoked = () => page(c, <ErrorPage email={email} kind={kind} title="Certificate already revoked" message="This certificate has already been revoked, so nothing was changed." />, 409)
+		const expired = () => page(c, <ErrorPage email={email} kind={kind} title="Certificate has expired" message="An expired certificate cannot be revoked, as it is no longer trusted. Nothing was changed." />, 422)
 
 		// the form is only offered for valid certificates, so explain why
 		// one that is not cannot be revoked before checking what was sent
@@ -397,7 +411,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 		const form = RevokeForm.safeParse(body)
 		if (!form.success) {
 			const reason = typeof body.reason === "string" ? body.reason : ""
-			return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={status} renewal={await getRenewalLinks(env, certificate)} revokeForm={{ reason, errors: form.error.issues.map((i) => i.message) }} />, 422)
+			return page(c, <CertificateDetailPage email={email} kind={kind} certificate={certificate} status={status} renewal={await getRenewalLinks(env, certificate)} revokeForm={{ reason, errors: form.error.issues.map((i) => i.message), invalid: invalidRevokeFields(form.error) }} />, 422)
 		}
 
 		// the operation decides again, as the certificate may have been
@@ -416,7 +430,7 @@ const withAdminRoutes = (app: Hono<AdminEnv>, env: SshCaBindings, config: Enable
 			case "expired":
 				return expired()
 			case "notFound":
-				return page(c, <ErrorPage email={email} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
+				return page(c, <ErrorPage email={email} kind={kind} title="Certificate not found" message={`There is no ${kind} certificate with that serial.`} />, 404)
 			default: {
 				const unknown: never = result
 				throw new Error(`unknown revocation result ${JSON.stringify(unknown)}`)
