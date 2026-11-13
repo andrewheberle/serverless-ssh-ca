@@ -31,8 +31,13 @@ describe("database migrations", () => {
 			insert.bind("9003", "2026-01-03T00:00:01.000Z", null, null, null),
 		])
 
-		// the column and index already exist, so only the backfill is run again
-		await env.DB.batch(renewalOf.statements.filter((sql) => !/^(ALTER|CREATE)\b/.test(sql)).map((sql) => env.DB.prepare(sql)))
+		// the column and its index already exist, so only the backfill is run
+		// again: the temporary index, the match (with AS MATERIALIZED and
+		// UPDATE ... FROM, which D1 must support), dropping the index, and
+		// clearing the requesters of renewals
+		const backfill = renewalOf.statements.filter((sql) => !/^ALTER\b/.test(sql) && !sql.includes("idx_certificates_renewal_of"))
+		expect(backfill.some((sql) => sql.includes("MATERIALIZED"))).toBe(true)
+		await env.DB.batch(backfill.map((sql) => env.DB.prepare(sql)))
 
 		const { results } = await env.DB.prepare("SELECT serial, requested_by, renewal_of FROM certificates WHERE serial IN ('9001', '9002', '9003') ORDER BY serial").all()
 		expect(results).toEqual([
@@ -40,5 +45,9 @@ describe("database migrations", () => {
 			{ serial: "9002", requested_by: null, renewal_of: "9001" },
 			{ serial: "9003", requested_by: null, renewal_of: "9002" },
 		])
+
+		// the index made for the match is dropped again
+		const indexes = await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = 'tmp_0005_renewal_candidates'").all()
+		expect(indexes.results).toEqual([])
 	})
 })
