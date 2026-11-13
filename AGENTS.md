@@ -72,6 +72,7 @@ Prefer the scripts in `package.json` over invoking tools directly.
   BREAKING CHANGE: what users must do.
   END_COMMIT_OVERRIDE
   ```
+- Write `BEGIN_COMMIT_OVERRIDE` only as the first line of that block, never in prose: release-please treats whatever follows the marker as the commit message, even without `END_COMMIT_OVERRIDE`. A description that mentions it in a sentence replaces its own commit message with the rest of that sentence, and a commit that cannot be parsed is left out of the changelog (#620). Refer to it as a commit override block instead.
 - Don't include links to Claude Code sessions (`https://claude.ai/code/session_...`) in PR descriptions.
 - Never delete, move, or force-push an existing tag; fix forward with a new patch version.
 - Do not create or push a tag unless specifically directed to as this triggers the release workflow.
