@@ -433,6 +433,13 @@ issues access tokens with a different audience to identity tokens, set
 `JWT_ACCESS_TOKEN_AUD` to the audience of the access token. Either value may
 be a comma separated list. `JWT_AUD` must be set (see [Validation](#validation)).
 
+When `JWT_ACCESS_TOKEN_AUD` is not set, both tokens are checked against the
+same audience, issuer and keys, so the access token adds little beyond the
+identity token. The CA refuses a request whose access token is the identity
+token itself, so a single leaked identity token is not enough, but where the
+IdP can issue access tokens with their own audience, setting
+`JWT_ACCESS_TOKEN_AUD` keeps the two tokens apart.
+
 Cloudflare Access issues access tokens for the client's redirect URL (for
 example `http://localhost:3000/auth/callback`), so set `JWT_ACCESS_TOKEN_AUD`
 to it. This is safe because the issuer of an Access application includes its
