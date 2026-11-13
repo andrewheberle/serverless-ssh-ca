@@ -28,6 +28,8 @@ export const BaseStylesheet = `/*
 	--recessed: light-dark(oklch(96% 0 0), oklch(15% 0 0));
 	--control: light-dark(#fff, oklch(21% 0.006 285.885));
 	--line: light-dark(oklch(14.5% 0 0 / 0.1), oklch(32% 0 0));
+	/* the boundary of a form control, which must reach 3:1 against it and its surroundings */
+	--control-line: light-dark(oklch(62% 0 0), oklch(55% 0 0));
 	--hairline: light-dark(oklch(93.5% 0 0), oklch(26.9% 0 0));
 	--fill: light-dark(oklch(92.2% 0 0), oklch(26.9% 0 0));
 	--focus: light-dark(oklch(15% 0 0 / 0.5), oklch(93.5% 0 0 / 0.5));
@@ -35,10 +37,14 @@ export const BaseStylesheet = `/*
 	--text: light-dark(oklch(21% 0.006 285.885), oklch(97% 0 0));
 	--text-strong: light-dark(oklch(14.5% 0 0), oklch(98.5% 0 0));
 	--text-subtle: light-dark(oklch(55.6% 0 0), oklch(70.8% 0 0));
+	/* subtle text that must reach 4.5:1 on --recessed, such as tabs */
+	--text-muted: light-dark(oklch(50% 0 0), oklch(70.8% 0 0));
 	--link: light-dark(oklch(42.4% 0.199 265.638), oklch(70.7% 0.165 254.624));
 	--success: light-dark(oklch(43.2% 0.095 166.913), oklch(90.5% 0.093 164.15));
 	--success-tint: light-dark(oklch(96.2% 0.043 156.7 / 0.57), oklch(39.3% 0.096 152.3 / 0.2));
 	--danger: light-dark(oklch(50.5% 0.213 27.518), oklch(70.4% 0.191 22.216));
+	/* a danger background that white text reaches 4.5:1 on */
+	--danger-strong: light-dark(oklch(50.5% 0.213 27.518), oklch(55% 0.2 25));
 	--danger-tint: light-dark(oklch(93.6% 0.032 17.7 / 0.42), oklch(42.9% 0.176 28.7 / 0.17));
 	--neutral: light-dark(oklch(26.9% 0 0), oklch(92.2% 0 0));
 	--mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

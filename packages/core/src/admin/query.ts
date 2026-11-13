@@ -133,10 +133,15 @@ export const MaxRevocationReason = 500
  * is.
  */
 export const RevokeForm = z.object({
+	// a form sends each line break as CRLF, but the browser counts it as one
+	// character against the textarea's maxlength, so the reason is counted,
+	// and recorded, with LF line breaks
 	reason: z.string({ message: "Give a reason for revoking the certificate." })
-		.trim()
-		.min(1, { message: "Give a reason for revoking the certificate." })
-		.max(MaxRevocationReason, { message: `The reason must be at most ${MaxRevocationReason} characters.` }),
+		.transform((v) => v.replaceAll("\r\n", "\n"))
+		.pipe(z.string()
+			.trim()
+			.min(1, { message: "Give a reason for revoking the certificate." })
+			.max(MaxRevocationReason, { message: `The reason must be at most ${MaxRevocationReason} characters.` })),
 	confirm: z.literal("yes", { message: "Tick the box to confirm that the revocation cannot be undone." }),
 })
 
@@ -209,9 +214,10 @@ export const formValues = (value: unknown): unknown[] => value === undefined ? [
  * The form an admin revokes several certificates of one kind with, see
  * {@link RevokeForm}: a `serial` field for each certificate that is ticked,
  * at most {@link MaxBulkRevocation}, one reason for them all and the
- * confirmation. The `principal` and `key_id` filters the certificates were
- * found with are sent back so the admin can be returned to the list. Each
- * message is shown to the admin as it is.
+ * confirmation. The `principal`, `key_id` and serial filters the
+ * certificates were found with are sent back so the admin can be returned to
+ * the list; the serial filter is sent as `filter_serial`, as `serial` names
+ * the ticked certificates. Each message is shown to the admin as it is.
  */
 export const BulkRevokeForm = z.object({
 	serial: z.preprocess(formValues, z.array(z.string({ message: NotASerial }).pipe(SerialString))
@@ -221,7 +227,35 @@ export const BulkRevokeForm = z.object({
 	confirm: RevokeForm.shape.confirm,
 	principal: CertificateListQuery.shape.principal,
 	key_id: CertificateListQuery.shape.key_id,
+	filter_serial: CertificateListQuery.shape.serial,
 })
+
+/**
+ * The filters a bulk revoke form was sent with, see {@link BulkRevokeForm},
+ * or none when they are not valid.
+ *
+ * @param body The form as it was sent
+ * @returns The filters
+ */
+export const bulkRevokeFormFilters = (body: unknown): BulkRevocationFilters => {
+	const filters = BulkRevokeForm.pick({ principal: true, key_id: true, filter_serial: true }).safeParse(body)
+	return filters.success ? { principal: filters.data.principal, key_id: filters.data.key_id, serial: filters.data.filter_serial } : {}
+}
+
+/** The fields of a revoke form, see {@link RevokeForm} and {@link BulkRevokeForm} */
+export type RevokeFormField = "reason" | "confirm" | "serial"
+
+/**
+ * Returns the fields of a revoke form that are not valid, so each can be
+ * marked as invalid where it is shown.
+ *
+ * @param error The error from parsing {@link RevokeForm} or {@link BulkRevokeForm}
+ * @returns The fields with at least one problem
+ */
+export const invalidRevokeFields = (error: z.ZodError): RevokeFormField[] => {
+	const fields = new Set(error.issues.map((issue) => issue.path[0]))
+	return (["reason", "confirm", "serial"] as const).filter((field) => fields.has(field))
+}
 
 /** A validated bulk revoke form, see {@link BulkRevokeForm} */
 export type BulkRevokeForm = z.infer<typeof BulkRevokeForm>
@@ -239,6 +273,9 @@ export const describeBulkRevokeError = (error: z.ZodError): string[] => [...new 
 	}
 	if (field === "principal" || field === "key_id") {
 		return `${QueryLabels[field]} ${issue.message}.`
+	}
+	if (field === "filter_serial") {
+		return `${QueryLabels.serial} ${issue.message}.`
 	}
 
 	return issue.message

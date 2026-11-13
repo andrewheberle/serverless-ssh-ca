@@ -810,7 +810,9 @@ for why.
   admin UI's origin (`https://<ADMIN_HOSTNAME>` when it is set) and their
   `Sec-Fetch-Site` header must be `same-origin`, or they get `403`. The proxy
   keeps the admin's session in a cookie, so does not protect against
-  cross-site requests itself.
+  cross-site requests itself. A refused request is logged at warning level
+  with the `Origin` and `Sec-Fetch-Site` it had and the origin that was
+  expected.
 - When a `RATE_LIMITER` is configured, requests that change state are rate
   limited with the key `admin:<email>`, using the verified email, so they never
   share a key with the client API. The `rateLimitKey` option is not used for
@@ -830,6 +832,14 @@ for why.
 Make sure the proxy protects every hostname the CA answers on, or set
 `ADMIN_HOSTNAME` to the one it protects. On Workers this includes the
 `workers.dev` hostname unless `workers_dev` is `false`.
+
+When `ADMIN_HOSTNAME` is not set, the admin UI's origin is the origin of the
+URL the CA receives. On Node.js behind a reverse proxy that terminates TLS,
+that is usually `http://` and an internal host name, while the browser sends
+`Origin: https://<public host>`, so every revocation gets `403`. Set
+`ADMIN_HOSTNAME` to the public host name in that case. The origin it gives is
+`https://<ADMIN_HOSTNAME>` on the default port, so the admin UI must be
+reached on port 443.
 
 #### Stylesheet and script
 
