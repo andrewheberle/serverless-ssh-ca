@@ -3,7 +3,7 @@
 This is the package that implements the SSH CA functionality which can be deployed
 to Cloudflare as a working solution using the "Deploy to Cloudflare" button below:
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca-template)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca%2Ftree%2Fmain%2Ftemplate)
 
 To use the package in your own Worker manually (assuming you have the required
 bindings in place), the following code in `src/index.ts` (your Worker's main
@@ -98,7 +98,7 @@ See the following repositories for additional information:
 | Repository | Details |
 |---|---|
 | [https://github.com/andrewheberle/ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client) | Contains client code for issuing user and host certificates |
-| [https://github.com/andrewheberle/serverless-ssh-ca-template](https://github.com/andrewheberle/serverless-ssh-ca-template) | Contains a template repository for deployment to Cloudflare Workers |
+| [template/](https://github.com/andrewheberle/serverless-ssh-ca/tree/main/template) | The Worker the "Deploy to Cloudflare" button deploys, which pins the CA to the latest release |
 
 ## Architecture
 

@@ -1,7 +1,7 @@
 # Cloudflare Workers
 
 After deployment on Workers using the
-[template](https://github.com/andrewheberle/serverless-ssh-ca-template)
+[template](https://github.com/andrewheberle/serverless-ssh-ca/tree/main/template)
 repository configuration is handled by making changes in your `wrangler.jsonc`
 file.
 
