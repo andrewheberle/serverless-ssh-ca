@@ -1,0 +1,73 @@
+{
+	"name": "serverless-ssh-ca-template",
+	"private": true,
+	"description": "Deploys @andrewheberle/serverless-ssh-ca to Cloudflare Workers with the Deploy to Cloudflare button",
+	"cloudflare": {
+		"bindings": {
+			"ISSUER_DN": {
+				"description": "The comment on the CA public key served at /api/v4/ca, such as \"CN=SSH CA\". It is not used in certificates."
+			},
+			"JWT_JWKS_URL": {
+				"description": "The URL of your OIDC identity provider's JWKS, which the CA verifies tokens with. It must be an https URL."
+			},
+			"JWT_ISSUER": {
+				"description": "The issuer (iss) of the access tokens and identity tokens your identity provider issues, such as https://idp.example.com."
+			},
+			"JWT_AUD": {
+				"description": "The audience the identity token, and the access token unless JWT_ACCESS_TOKEN_AUD is set, must be issued for: usually your OIDC application's client ID. A comma separated list may be given. Required."
+			},
+			"JWT_ALGORITHMS": {
+				"description": "The algorithms tokens may be signed with, as a comma separated list of RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512, EdDSA or Ed25519."
+			},
+			"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": {
+				"description": "The identity token claim, such as \"groups\", whose values are added as principals to user certificates and are the roles compared with SSH_HOST_CERTIFICATE_ALLOWED_ROLES."
+			},
+			"SSH_CERTIFICATE_LIFETIME": {
+				"description": "The longest lifetime of a user certificate, such as \"24 hours\". At least 5 minutes, in whole seconds; a client may ask for less."
+			},
+			"SSH_CERTIFICATE_PRINCIPALS": {
+				"description": "A comma separated list of principals added to every user certificate, or empty for none. A user certificate needs at least one principal from this, the principals claim or SSH_CERTIFICATE_INCLUDE_SELF."
+			},
+			"SSH_CERTIFICATE_INCLUDE_SELF": {
+				"description": "\"true\" to add the part of the requester's email address before the @ as a principal of their user certificates, or \"false\"."
+			},
+			"SSH_CERTIFICATE_EXTENSIONS": {
+				"description": "The extensions user certificates get by default, and the only ones a client may ask for, as a comma separated list, such as \"permit-pty,permit-agent-forwarding\". Without permit-pty, users get no interactive shell."
+			},
+			"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": {
+				"description": "A comma separated list of the email addresses of people who may request host certificates, compared without regard to case, or empty for nobody."
+			},
+			"SSH_HOST_CERTIFICATE_ALLOWED_ROLES": {
+				"description": "A comma separated list of the roles, from the JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM claim, whose members may request host certificates, or empty for none. Spaces are matched as underscores."
+			},
+			"SSH_HOST_CERTIFICATE_LIFETIME": {
+				"description": "The longest lifetime of a host certificate, such as \"30 days\". At least 24 hours, in whole seconds; a host may ask for less."
+			},
+			"CERTIFICATE_REQUEST_TIME_SKEW_MAX": {
+				"description": "How far a proof of possession's timestamp may be from the CA's clock, such as \"90 seconds\". Above zero and at most 5 minutes."
+			},
+			"DB_CERTIFICATE_RETENTION": {
+				"description": "How long certificates are kept in the database after they expire, such as \"1 year\", or \"infinite\" to keep them for ever."
+			},
+			"LOG_LEVEL": {
+				"description": "How much the Worker logs: none, error, warning, info or debug."
+			},
+			"PRIVATE_KEY": {
+				"description": "The Secrets Store secret holding the CA private key: an unencrypted Ed25519 or ECDSA key in OpenSSH or PKCS#8 format (RSA is not supported). The deploy form cannot keep the key's line breaks, so enter any value here and upload the key with wrangler afterwards, as the README in your new repository describes."
+			},
+			"DB": {
+				"description": "The D1 database the CA records issued and revoked certificates in. Its tables are created on first use."
+			}
+		}
+	},
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev"
+	},
+	"dependencies": {
+		"@andrewheberle/serverless-ssh-ca": "0.31.0"
+	},
+	"devDependencies": {
+		"wrangler": "^4.73.0"
+	}
+}

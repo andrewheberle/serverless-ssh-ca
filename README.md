@@ -1,6 +1,6 @@
 # Serverless SSH CA on Cloudflare Workers
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca-template)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fandrewheberle%2Fserverless-ssh-ca%2Ftree%2Fmain%2Ftemplate)
 
 [![codecov](https://codecov.io/gh/andrewheberle/serverless-ssh-ca/graph/badge.svg?token=458TXQTUUC)](https://codecov.io/gh/andrewheberle/serverless-ssh-ca)
 

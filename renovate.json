@@ -41,6 +41,16 @@
 				"@vitest/**"
 			],
 			"groupName": "vitest"
+		},
+		{
+			"description": "release-please pins the template to the version of the CA being released, so Renovate leaves it alone (#624)",
+			"matchFileNames": [
+				"template/package.json"
+			],
+			"matchPackageNames": [
+				"@andrewheberle/serverless-ssh-ca"
+			],
+			"enabled": false
 		}
 	]
 }

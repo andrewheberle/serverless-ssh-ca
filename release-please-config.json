@@ -27,6 +27,11 @@
           "type": "json",
           "path": "package-lock.json",
           "jsonpath": "$.packages['packages/testing'].version"
+        },
+        {
+          "type": "json",
+          "path": "template/package.json",
+          "jsonpath": "$.dependencies['@andrewheberle/serverless-ssh-ca']"
         }
       ]
     }
