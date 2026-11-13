@@ -35,15 +35,17 @@
 		"JWT_ALGORITHMS": "RS256",
 		"JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM": "groups",
 		"SSH_CERTIFICATE_LIFETIME": "24 hours",
-		"SSH_CERTIFICATE_PRINCIPALS": "",
 		"SSH_CERTIFICATE_INCLUDE_SELF": "true",
 		"SSH_CERTIFICATE_EXTENSIONS": "permit-agent-forwarding,permit-port-forwarding,permit-pty",
-		"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": "",
-		"SSH_HOST_CERTIFICATE_ALLOWED_ROLES": "",
 		"SSH_HOST_CERTIFICATE_LIFETIME": "30 days",
 		"CERTIFICATE_REQUEST_TIME_SKEW_MAX": "90 seconds",
 		"DB_CERTIFICATE_RETENTION": "1 year",
 		"LOG_LEVEL": "info"
+		/* optional settings, left out of the deploy form as it does not accept
+		   empty values; see the README
+		"SSH_CERTIFICATE_PRINCIPALS": "ssh-user",
+		"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": "admin@example.com",
+		"SSH_HOST_CERTIFICATE_ALLOWED_ROLES": "host-admins", */
 		/* the landing page at /, see the README
 		"LANDING_PAGE": "true", */
 		/* the admin UI under /admin, behind Cloudflare Access, see the README

@@ -25,20 +25,11 @@
 			"SSH_CERTIFICATE_LIFETIME": {
 				"description": "The longest lifetime of a user certificate, such as \"24 hours\". At least 5 minutes, in whole seconds; a client may ask for less."
 			},
-			"SSH_CERTIFICATE_PRINCIPALS": {
-				"description": "A comma separated list of principals added to every user certificate, or empty for none. A user certificate needs at least one principal from this, the principals claim or SSH_CERTIFICATE_INCLUDE_SELF."
-			},
 			"SSH_CERTIFICATE_INCLUDE_SELF": {
-				"description": "\"true\" to add the part of the requester's email address before the @ as a principal of their user certificates, or \"false\"."
+				"description": "\"true\" to add the part of the requester's email address before the @ as a principal of their user certificates, or \"false\". A user certificate needs at least one principal, from this or the JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM claim; more can be added after deploying, see the README."
 			},
 			"SSH_CERTIFICATE_EXTENSIONS": {
 				"description": "The extensions user certificates get by default, and the only ones a client may ask for, as a comma separated list, such as \"permit-pty,permit-agent-forwarding\". Without permit-pty, users get no interactive shell."
-			},
-			"SSH_HOST_CERTIFICATE_ALLOWED_EMAILS": {
-				"description": "A comma separated list of the email addresses of people who may request host certificates, compared without regard to case, or empty for nobody."
-			},
-			"SSH_HOST_CERTIFICATE_ALLOWED_ROLES": {
-				"description": "A comma separated list of the roles, from the JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM claim, whose members may request host certificates, or empty for none. Spaces are matched as underscores."
 			},
 			"SSH_HOST_CERTIFICATE_LIFETIME": {
 				"description": "The longest lifetime of a host certificate, such as \"30 days\". At least 24 hours, in whole seconds; a host may ask for less."

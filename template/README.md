@@ -44,6 +44,19 @@ curl https://<your worker's host name>/api/v4/ca
 This prints the CA public key, which is what hosts and clients are configured
 to trust. A `500` means a setting is not valid: the Worker's logs say which.
 
+## Allowing host certificates and extra principals
+
+The deploy form does not accept empty values, so three optional settings are
+left out of it, and nobody may request host certificates until they are set.
+Add any of them to `vars` in `wrangler.jsonc`, where they are shown commented
+out, and commit:
+
+| Setting | What it does |
+|---|---|
+| `SSH_HOST_CERTIFICATE_ALLOWED_EMAILS` | A comma separated list of the email addresses of people who may request host certificates, compared without regard to case |
+| `SSH_HOST_CERTIFICATE_ALLOWED_ROLES` | A comma separated list of the roles, from the `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` claim, whose members may request host certificates. Spaces are matched as underscores |
+| `SSH_CERTIFICATE_PRINCIPALS` | A comma separated list of principals added to every user certificate |
+
 ## Changing the configuration
 
 Edit `wrangler.jsonc` and commit, and Workers Builds deploys the change. To
