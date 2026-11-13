@@ -1,5 +1,5 @@
 import { createServer } from "node:http"
-import { generateKeyPairSync, createSign, createPublicKey } from "node:crypto"
+import { generateKeyPairSync, createSign, createPublicKey, randomBytes } from "node:crypto"
 
 // Generate RS256 keypair at startup
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -21,6 +21,9 @@ const makeJwt = (claims: Record<string, unknown>): string => {
         iss: `http://localhost:${port}`,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + 3600,
+        // every token is distinct, as tokens from a real IdP are, so an access
+        // token and an identity token are never the same string
+        jti: randomBytes(16).toString("base64url"),
 		...(aud ? { aud } : {}),
         ...claims,
     })).toString("base64url")

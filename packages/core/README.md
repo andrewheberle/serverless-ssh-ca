@@ -361,8 +361,8 @@ an empty entry, such as in `"a,,b"` or `"a,"`, is refused.
 `SSH_HOST_CERTIFICATE_ALLOWED_EMAILS` is compared with the requester's email
 address case-insensitively. `SSH_HOST_CERTIFICATE_ALLOWED_ROLES` is compared
 exactly with the values of the `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` claim of
-the identity token, after any spaces in those values are replaced with
-underscores, so a group `ops team` is allowed by the role `ops_team`.
+the identity token. Spaces are replaced with underscores in both, so a group
+`ops team` is allowed by the role `ops team` or `ops_team`.
 
 A duration is a number and one of the units `second`, `minute`, `hour`,
 `day`, `week`, `month` or `year` (singular or plural), separated by a space. A
@@ -431,8 +431,7 @@ the access token and the identity token must be issued for this audience, so
 tokens the IdP issues for other applications are not accepted. If the IdP
 issues access tokens with a different audience to identity tokens, set
 `JWT_ACCESS_TOKEN_AUD` to the audience of the access token. Either value may
-be a comma separated list. If `JWT_AUD` is not set, requests that need a
-token fail with a `500` error.
+be a comma separated list. `JWT_AUD` must be set (see [Validation](#validation)).
 
 Cloudflare Access issues access tokens for the client's redirect URL (for
 example `http://localhost:3000/auth/callback`), so set `JWT_ACCESS_TOKEN_AUD`

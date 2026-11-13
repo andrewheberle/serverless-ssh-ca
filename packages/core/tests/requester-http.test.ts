@@ -113,7 +113,7 @@ describe.each(endpoints)("responses to tokens that are not accepted ($name)", ({
 	})
 
 	it("should return 400 listing both tokens when neither can be verified", async () => {
-		const response = await request(ca, { authorization: "Bearer foo", identity: "foo" })
+		const response = await request(ca, { authorization: "Bearer foo", identity: "bar" })
 		expect(response.status).toBe(400)
 		expect(await response.json()).toEqual(validationError(
 			{ message: "the access token was invalid", path: accessTokenPath },
