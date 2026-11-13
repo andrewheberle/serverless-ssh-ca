@@ -80,7 +80,7 @@ Notes:
   and throws an `InvalidConfigurationError` that lists every missing or
   invalid variable. It returns only the variables the CA reads, unchanged.
 - The database schema is created and migrated automatically on first use, as
-  on Workers. Use a file path for `DatabaseSync` (not `:memory:`) so issued
+  on Workers (see [Database](#database)). Use a file path for `DatabaseSync` (not `:memory:`) so issued
   and revoked certificates survive restarts.
 - Only SQLite databases are supported. Other SQLite-compatible databases can
   be used by implementing the `CaDatabase` interface.
@@ -385,6 +385,25 @@ The scheduled cleanup removes certificates that expired longer ago than
 `DB_CERTIFICATE_RETENTION`. A revoked certificate stays in the KRL until 24
 hours after it expires, so it is not removed before then, however short the
 retention period is.
+
+### Database
+
+The CA keeps the certificates it has issued, and the version of each KRL, in
+a SQLite database: D1 on Cloudflare Workers, or `node:sqlite` (or another
+`CaDatabase`) on Node.js. The database is created on first use, and after an
+upgrade any new migrations are applied automatically the first time the
+database is used. Upgrading from any earlier release migrates the database,
+as migrations are never removed.
+
+The schema is internal to the CA and can change in any release, including a
+minor or patch release, so it is not part of what semver covers. Reading the
+tables, writing to them or adding your own tables, indexes or views is not
+supported, and may break on any upgrade. Use the admin UI and the API instead.
+
+Running an older release against a database that a newer release has migrated
+is not supported. To roll back after an upgrade, restore a backup of the
+database taken before it, such as a D1 Time Travel restore point or a copy of
+the SQLite file, along with the older release.
 
 ### CA Private Key
 

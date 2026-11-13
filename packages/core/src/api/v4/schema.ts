@@ -124,7 +124,8 @@ export const createIssueUserCertificateEndpointSchema = (env: SshCaBindings) => 
 			description: "SSH User Certificate issued successfully",
 			...certificateResponse,
 		},
-		...UnauthorizedException.schema(),
+		// any requester may request a user certificate, so there is no 401
+		// for one that is not permitted (see ADR 0001)
 		...ForbiddenException.schema(),
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
@@ -201,8 +202,8 @@ export const createRenewHostCertificateEndpointSchema = (env: SshCaBindings) => 
 			description: "SSH Host Certificate renewed successfully",
 			...certificateResponse,
 		},
-		...UnauthorizedException.schema(),
-		...ForbiddenException.schema(),
+		// a renewal is authorized by a proof of possession, not by tokens, so
+		// it has no 401 or 403 (see ADR 0001)
 		...InputValidationException.schema(),
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),

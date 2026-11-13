@@ -18,6 +18,22 @@ describe("OpenAPI schema", () => {
 		expect(paths[path]?.[method]?.tags).toEqual([tag])
 	})
 
+	// the status codes of the v4 API are part of what 1.0 promises, including
+	// those for refused requests that ADR 0001 keeps, so a change to them is
+	// deliberate
+	it.each([
+		["/api/v4/ca", "get", ["200", "500"]],
+		["/api/v4/user/certificates", "post", ["200", "400", "403", "422", "429", "500"]],
+		["/api/v4/user/certificates/{serial}", "delete", ["200", "400", "404", "409", "429", "500"]],
+		["/api/v4/user/krl", "get", ["200", "500"]],
+		["/api/v4/host/certificates", "post", ["200", "400", "401", "403", "422", "429", "500"]],
+		["/api/v4/host/certificates/{serial}/renew", "post", ["200", "400", "422", "429", "500"]],
+		["/api/v4/host/certificates/{serial}", "delete", ["200", "400", "404", "409", "429", "500"]],
+		["/api/v4/host/krl", "get", ["200", "500"]],
+	] as const)("should document exactly the status codes %s %s responds with", (path, method, codes) => {
+		expect(Object.keys(paths[path]?.[method]?.responses ?? {}).sort()).toEqual([...codes])
+	})
+
 	it("should use a unique operationId for every operation", () => {
 		const operationIds = Object.values(paths).flatMap((operations) => Object.values(operations ?? {}).map((operation) => (operation as { operationId?: string }).operationId))
 
