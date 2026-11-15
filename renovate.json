@@ -33,6 +33,16 @@
 			"dependencyDashboardApproval": true
 		},
 		{
+			"description": "typescript-eslint only accepts TypeScript below 6.1. While a workspace needs a newer one, npm cannot regenerate the lockfile and lock file maintenance fails (#613). Raise this once typescript-eslint supports a newer TypeScript.",
+			"matchManagers": [
+				"npm"
+			],
+			"matchPackageNames": [
+				"typescript"
+			],
+			"allowedVersions": "<6.1.0"
+		},
+		{
 			"matchManagers": [
 				"npm"
 			],
