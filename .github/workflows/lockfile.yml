@@ -1,0 +1,52 @@
+name: Lockfile
+
+# Renovate's lock file maintenance deletes package-lock.json and resolves the
+# whole tree again. Nothing else does: npm ci and every individual update only
+# reuse the existing lockfile, so a dependency change that npm can no longer
+# resolve from scratch goes unnoticed until lock file maintenance quietly
+# fails (#613). This repeats that regeneration.
+#
+# On PRs that change dependencies it only checks the tree still resolves.
+# A fresh resolve picks up the newest upstream releases, so it can fail for
+# reasons unrelated to the PR; treat it as an early warning. The weekly run,
+# ahead of lock file maintenance's Monday before 4am UTC schedule, also checks
+# that the refreshed lockfile would pass CI.
+on:
+  pull_request:
+    paths:
+      - '**/package.json'
+      - 'package-lock.json'
+      - '.github/workflows/lockfile.yml'
+  schedule:
+    - cron: '17 18 * * 0'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  regenerate:
+    name: regenerate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Regenerate package-lock.json from scratch
+        run: |
+          rm package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Show what a refresh would change
+        run: git diff --stat -- package-lock.json
+      - if: github.event_name != 'pull_request'
+        run: npm ci
+      - if: github.event_name != 'pull_request'
+        run: npm run lint
+      - if: github.event_name != 'pull_request'
+        run: npm run test
+      - if: github.event_name != 'pull_request'
+        run: npm run build
+      - if: github.event_name != 'pull_request'
+        run: npm run test:workers
