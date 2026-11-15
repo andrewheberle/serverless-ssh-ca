@@ -46,7 +46,7 @@ const recorded = (sqlite: DatabaseSync): unknown => sqlite.prepare("SELECT name 
 
 const unprocessable = (message: string) => ({
 	success: false,
-	result: {},
+	result: null,
 	errors: [{ code: 7007, message }],
 })
 

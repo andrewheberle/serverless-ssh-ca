@@ -1,11 +1,11 @@
-import { fromHono } from "chanfana"
+import { ApiException, fromHono, TooManyRequestsException } from "chanfana"
 import { AdminBasePath, createAdminApp } from "./admin/index.js"
 import { createLandingApp } from "./landing/index.js"
 import { Hono, type Context } from "hono"
 import { BasePath as v4BasePath, createApi as apiv4 } from "./api/v4/index.js"
 import { HTTPException } from "hono/http-exception"
 import { logger } from "./logger.js"
-import { TooManyRequestsException } from "chanfana"
+import { errorResponse, internalServerErrorResponse } from "./errors.js"
 import type { SshCaBindings } from "./types.js"
 import { clientAddressOf, type ClientAddress, type ClientAddressSource } from "./client-address.js"
 
@@ -60,6 +60,14 @@ export const cloudflareClientIp: RateLimitKey = (req) => req.headers.get("CF-Con
  */
 export const ApiV3RemovedMessage = "API v3 was removed in serverless-ssh-ca 1.0.0; upgrade ssh-ca-client to 0.24.0 or later"
 
+// thrown for API v3 paths, which are answered with a 410 and the message above
+class ApiV3RemovedException extends ApiException {
+    override isVisible = true
+    override default_message = ApiV3RemovedMessage
+    override status = 410
+    override code = 410
+}
+
 // requests that only read from the CA, which are not rate limited
 const ReadMethods = new Set(["GET", "HEAD", "OPTIONS"])
 
@@ -75,7 +83,9 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
     // API v3 was removed, so its paths are answered before anything else is
     // done for them, such as rate limiting. This is a plain Hono route, so is
     // not part of the OpenAPI schema.
-    const apiV3Removed = (c: Context): Response => c.json({ success: false, errors: [{ code: 410, message: ApiV3RemovedMessage }], result: {} }, 410)
+    const apiV3Removed = (): never => {
+        throw new ApiV3RemovedException()
+    }
     hono.all("/api/v3", apiV3Removed)
     hono.all("/api/v3/*", apiV3Removed)
 
@@ -142,21 +152,25 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
 
         if (!success) {
             l.warn("request was rate limited", "key", key, "method", c.req.method, "path", c.req.path)
-            const err = new TooManyRequestsException()
-            return c.json({ success: false, errors: err.buildResponse(), result: {} }, 429)
+            throw new TooManyRequestsException()
         }
 
         return await next()
     })
 
-    // add error handling
-    hono.onError((err, c) => {
+    // errors are thrown as chanfana's exceptions and formatted as the API's
+    // routes format them, so every error response has the same shape
+    hono.onError((err) => {
         if (err instanceof HTTPException) {
             return err.getResponse()
         }
 
+        if (err instanceof ApiException) {
+            return errorResponse(err)
+        }
+
         logger(env).error("unexpected error from router", "error", err)
-        return c.json({ success: false, errors: [{ code: 7000, message: "Internal Server Error" }] }, 500)
+        return internalServerErrorResponse()
     })
 
     // the admin UI is a plain Hono app, so is not part of the OpenAPI schema

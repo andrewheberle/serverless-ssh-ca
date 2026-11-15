@@ -1,6 +1,7 @@
 import type { ExecutionContext } from "hono"
 import { caConfig, InvalidConfigurationError, parseConfig } from "./config.js"
 import { dbCleanup } from "./db/index.js"
+import { internalServerErrorResponse } from "./errors.js"
 import { logger } from "./logger.js"
 import { cloudflareClientIp, createApp, type SshCaOptions } from "./router.js"
 import type { SshCaBindings } from "./types.js"
@@ -88,10 +89,7 @@ const apps = new WeakMap<SshCaBindings, ReturnType<typeof createApp>>()
 
 // the response to every request while the configuration is invalid, which
 // does not describe the configuration as it is only logged
-const invalidConfigurationResponse = (): Response => Response.json(
-    { success: false, errors: [{ code: 7000, message: "Internal Server Error" }] },
-    { status: 500 },
-)
+const invalidConfigurationResponse = (): Response => internalServerErrorResponse()
 
 /**
  * The CA as a Cloudflare Workers handler, which receives its bindings (see

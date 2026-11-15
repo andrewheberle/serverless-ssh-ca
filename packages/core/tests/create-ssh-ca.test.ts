@@ -70,7 +70,7 @@ describe("createSshCa", () => {
 			expect(await response.json()).toEqual({
 				success: false,
 				errors: [{ code: 410, message: "API v3 was removed in serverless-ssh-ca 1.0.0; upgrade ssh-ca-client to 0.24.0 or later" }],
-				result: {},
+				result: null,
 			})
 		})
 	})

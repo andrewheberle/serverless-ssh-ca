@@ -71,7 +71,7 @@ const validTokens = async (): Promise<Tokens> => ({
 const validationError = (...errors: { message: string, path: string[] }[]) => ({
 	success: false,
 	errors: errors.map((error) => ({ code: 7001, ...error })),
-	result: {},
+	result: null,
 })
 
 const accessTokenPath = ["headers", "Authorization"]
@@ -133,7 +133,7 @@ describe.each(endpoints)("responses to tokens that are not accepted ($name)", ({
 		expect(response.status).toBe(403)
 		expect(await response.json()).toEqual({
 			success: false,
-			result: {},
+			result: null,
 			errors: [{ code: 7004, message: `${host ? "possible" : "Possible"} token substitution as subjects for authentication and identity tokens did not match` }],
 		})
 	})
@@ -143,7 +143,7 @@ describe.each(endpoints)("responses to tokens that are not accepted ($name)", ({
 		expect(response.status).toBe(500)
 		expect(await response.json()).toEqual({
 			success: false,
-			result: {},
+			result: null,
 			errors: [{ code: 7009, message: "Internal Error" }],
 		})
 	})
@@ -153,7 +153,7 @@ describe.each(endpoints)("responses to tokens that are not accepted ($name)", ({
 		expect(response.status).toBe(401)
 		expect(await response.json()).toEqual({
 			success: false,
-			result: {},
+			result: null,
 			errors: [{ code: 7003, message: "User not allowed to issue host certificates" }],
 		})
 	})
