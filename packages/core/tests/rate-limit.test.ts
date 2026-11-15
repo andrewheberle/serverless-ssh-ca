@@ -56,7 +56,7 @@ describe("rate limiting", () => {
 	it("should respond with a 429 to requests the rate limiter refuses", async () => {
 		const response = await revoke(createCa(fakeLimiter(false)))
 		expect(response.status).toBe(429)
-		expect(await response.json()).toMatchObject({ success: false, errors: [{ code: 7008, message: "Too Many Requests" }] })
+		expect(await response.json()).toEqual({ success: false, errors: [{ code: 7008, message: "Too Many Requests" }], result: null })
 	})
 
 	it("should answer API v3 requests with a 410 without asking the rate limiter", async () => {
@@ -145,5 +145,26 @@ describe("the rate limit key", () => {
 		const warnings = log.mock.calls.filter(([entry]) => (entry as { message?: string }).message === "requests without a rate limit key are not rate limited")
 		expect(warnings).toHaveLength(1)
 		expect(warnings[0]?.[0]).toMatchObject({ level: "warning" })
+	})
+
+	it("should answer with a 500 that does not describe the error when it throws, and log it", async () => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
+		const failing = createSshCa(env(fakeLimiter(true), { LOG_LEVEL: "error" }), {
+			rateLimitKey: () => {
+				throw new Error("rate limit key unavailable")
+			},
+		})
+
+		const response = await revoke(failing)
+
+		expect(response.status).toBe(500)
+		const body: unknown = await response.json()
+		expect(body).toEqual({ success: false, errors: [{ code: 7009, message: "Internal Error" }], result: null })
+		expect(JSON.stringify(body)).not.toContain("rate limit key unavailable")
+		expect(log).toHaveBeenCalledWith(expect.objectContaining({
+			level: "error",
+			message: "unexpected error from router",
+			error: expect.objectContaining({ message: "rate limit key unavailable" }),
+		}))
 	})
 })

@@ -37,7 +37,7 @@ describe("API v3", () => {
 		expect(await response.json()).toEqual({
 			success: false,
 			errors: [{ code: 410, message: ApiV3RemovedMessage }],
-			result: {},
+			result: null,
 		})
 	})
 })

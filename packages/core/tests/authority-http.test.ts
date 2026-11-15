@@ -33,19 +33,19 @@ const newCa = (overrides: Partial<SshCaBindings> = {}): SshCa => createSshCa(mak
 
 const validationError = (message: string, path: string[]) => ({
 	success: false,
-	result: {},
+	result: null,
 	errors: [{ code: 7001, message, path }],
 })
 
 const unprocessable = (message: string) => ({
 	success: false,
-	result: {},
+	result: null,
 	errors: [{ code: 7007, message }],
 })
 
 const internalError = {
 	success: false,
-	result: {},
+	result: null,
 	errors: [{ code: 7009, message: "Internal Error" }],
 }
 

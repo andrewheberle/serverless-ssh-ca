@@ -77,7 +77,7 @@ describe("createSshCa", () => {
 })
 
 describe("Workers default export", () => {
-	const errorBody = { success: false, errors: [{ code: 7000, message: "Internal Server Error" }] }
+	const errorBody = { success: false, errors: [{ code: 7009, message: "Internal Error" }], result: null }
 
 	it.each(invalid)("should answer every request with 500 for %s of %j", async (key, value) => {
 		const env = makeEnv({ [key]: value })
