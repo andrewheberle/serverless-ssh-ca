@@ -33,6 +33,23 @@
 			"dependencyDashboardApproval": true
 		},
 		{
+			"description": "An update to a dependency core or testing publishes that npm may treat as breaking (a major, or any update of a 0.x version) is out of its caret range, so it changes what npm users install. It is approved on the Dependency Dashboard and released as fix(deps); whoever approves it marks it breaking when it changes core's public types or behaviour (#614)",
+			"matchManagers": [
+				"npm"
+			],
+			"matchFileNames": [
+				"packages/core/package.json",
+				"packages/testing/package.json"
+			],
+			"matchDepTypes": [
+				"dependencies",
+				"peerDependencies"
+			],
+			"matchIsBreaking": true,
+			"semanticCommitType": "fix",
+			"dependencyDashboardApproval": true
+		},
+		{
 			"description": "typescript-eslint only accepts TypeScript below 6.1. While a workspace needs a newer one, npm cannot regenerate the lockfile and lock file maintenance fails (#613). Raise this once typescript-eslint supports a newer TypeScript.",
 			"matchManagers": [
 				"npm"
