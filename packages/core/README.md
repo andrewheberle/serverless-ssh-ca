@@ -341,6 +341,71 @@ refused.
 The public key for a revocation or renewal is taken from the proof and the
 certificate respectively, so it is not sent separately.
 
+### Keys, Certificates and Lifetimes
+
+`public_key` and `certificate`, in requests and responses, are the BASE64
+encoding of the key or certificate in its OpenSSH text form, the single line
+found in an `id_ecdsa.pub` or `id_ecdsa-cert.pub` file (such as
+`ecdsa-sha2-nistp256 AAAA... comment`), not of the binary key or certificate.
+`lifetime` is in seconds.
+
+### Verifying a KRL
+
+`GET /api/v4/user/krl` and `GET /api/v4/host/krl` return the KRL with a
+signature, so a host can check that it came from the CA before using it:
+
+```json
+{ "krl": "U1NIS1JM...", "signature": "-----BEGIN SSH SIGNATURE-----\n..." }
+```
+
+- `krl` is the binary OpenSSH KRL, BASE64 encoded.
+- `signature` is an armored SSHSIG, as produced by `ssh-keygen -Y sign`, made
+  by the CA key over the decoded KRL bytes with the SHA-512 hash and the
+  `krl@com.github.serverless-ssh-ca.andrewheberle` namespace. Unlike in a
+  proof of possession, it is not BASE64 encoded again.
+
+To verify it with `ssh-keygen`, trust the CA public key as the signer of that
+namespace, and verify the decoded KRL against the signature:
+
+```sh
+CA=https://ssh-ca.example.com
+echo "ssh-ca namespaces=\"krl@com.github.serverless-ssh-ca.andrewheberle\" $(curl -sf "$CA/api/v4/ca")" > allowed_signers
+curl -sf "$CA/api/v4/host/krl" > krl.json
+jq -r .krl krl.json | base64 -d > host.krl
+jq -r .signature krl.json > host.krl.sig
+ssh-keygen -Y verify -f allowed_signers -I ssh-ca \
+    -n krl@com.github.serverless-ssh-ca.andrewheberle -s host.krl.sig < host.krl
+```
+
+Fetch the CA public key once and keep it, rather than fetching it with each
+KRL as shown here, or a CA that is impersonated could supply both. Only once
+the signature is good, use `host.krl` as the `RevokedKeys` file of an SSH
+server, or list its contents with `ssh-keygen -Q -l -f host.krl`.
+
+### Error Responses
+
+An error response has the HTTP status of the error and a JSON body such as:
+
+```json
+{
+    "success": false,
+    "errors": [
+        { "code": 7001, "message": "...", "path": ["body", "public_key"] }
+    ],
+    "result": null
+}
+```
+
+Clients can rely on the HTTP status, on the shape declared in
+[openapi.json](openapi.json) (`success` and `errors[]`), and on the text of
+`errors[].message`. The `code` of each error is set by
+[chanfana](https://github.com/cloudflare/chanfana), the library the API is
+built with, and may change when it is upgraded, so clients should act on the
+HTTP status rather than on `code`. `result` is `null` on every error and is
+not promised either. A `500` never explains its cause, which is logged
+instead. See the addendum to
+[ADR 0001](../../docs/adr/0001-authenticate-requesters-outside-request-validation.md).
+
 ## Configuration
 
 ### Validation
