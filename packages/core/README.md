@@ -626,19 +626,27 @@ const ca = createSshCa(bindingsFromEnv({
 }))
 ```
 
-A cached KRL is never served after it is out of date. Each certificate type
-has a revision in the database that is incremented whenever a certificate of
-that type is revoked (including the previous certificate on a host
-renewal), or when expired certificates are removed. The cache key includes
-this revision and the fingerprint of the CA key, so a revocation or a new CA
-key immediately uses a new key rather than relying on cache entries being
-deleted or the cache being consistent. Entries are left to expire after 7
-days.
+A cached KRL never misses a revocation. Each certificate type has a revision
+in the database that is incremented whenever a certificate of that type is
+revoked (including the previous certificate on a host renewal), or when
+cleanup removes any certificates. The cache key includes this revision and
+the fingerprint of the CA key, so a revocation or a new CA key immediately
+uses a new key rather than relying on cache entries being deleted or the
+cache being consistent. Entries are left to expire after 7 days.
+
+A cached KRL can still list certificates that no longer need to be in it. A
+revoked certificate is left out of the KRL 24 hours after it expires, but
+that doesn't change the revision, so a cached KRL keeps listing it until the
+next revocation of that certificate type, the next cleanup that removes
+certificates, or the cache entry expiring after 7 days, whichever comes
+first. With `DB_CERTIFICATE_RETENTION` set to `"infinite"` cleanup never
+removes certificates, so only the other two apply. This has no effect on
+security, as those certificates have expired and are refused anyway.
 
 A KRL keeps the same version and generation date until its contents
-change, so a regenerated KRL is identical to the one that was cached. If the
-cache cannot be read or written the KRL is generated as it is without a
-cache.
+change, so a KRL regenerated with the same contents is identical to the one
+that was cached. If the cache cannot be read or written the KRL is generated
+as it is without a cache.
 
 ### Landing Page
 

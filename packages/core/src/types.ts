@@ -155,8 +155,11 @@ export interface SshCaBindings {
      */
     RATE_LIMITER?: CaRateLimiter
     /**
-     * Caches KRLs until a certificate is revoked, see {@link CaCache}. KRLs
-     * are generated for every request when this is not set.
+     * Caches KRLs, see {@link CaCache}. A cached KRL is used until a
+     * certificate of its type is revoked, cleanup removes certificates, or 7
+     * days have passed, so it may still list certificates that expired more
+     * than 24 hours ago. KRLs are generated for every request when this is not
+     * set.
      */
     CACHE?: CaCache
     /** The extensions included in user certificates by default, and the only ones a requester may ask for; none when not set */
