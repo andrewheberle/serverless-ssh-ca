@@ -104,7 +104,7 @@ export const issueUserCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.min(MinUserCertificateLifetime)
 			.max(caConfig(env).certificateLifetime)
 			.default(caConfig(env).certificateLifetime)
-			.meta({ description: "Lifetime of issued SSH certificate" }),
+			.meta({ description: "Lifetime of the issued SSH certificate, in seconds" }),
 	})
 		.openapi("User Certificate Issue Request")
 )
@@ -144,7 +144,7 @@ export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.min(MinHostCertificateLifetime)
 			.max(caConfig(env).hostCertificateLifetime)
 			.default(caConfig(env).hostCertificateLifetime)
-			.meta({ description: "Lifetime of issued Host SSH certificate" }),
+			.meta({ description: "Lifetime of the issued host SSH certificate, in seconds" }),
 	})
 		.openapi("Host Certificate Issue Request")
 )
@@ -177,12 +177,12 @@ export const renewHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 		certificate: openapiStringByte
 			.transform(transformCertificate)
-			.meta({ description: "SSH certificate to renew, which must have the serial number in the path" }),
+			.meta({ description: "SSH certificate to renew, which must have the serial number in the path, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA...`), not of the binary certificate" }),
 		lifetime: z.int()
 			.min(MinHostCertificateLifetime)
 			.max(caConfig(env).hostCertificateLifetime)
 			.default(caConfig(env).hostCertificateLifetime)
-			.meta({ description: "Lifetime of renewed Host SSH certificate" }),
+			.meta({ description: "Lifetime of the renewed host SSH certificate, in seconds" }),
 	})
 		.openapi("Host Certificate Renewal Request")
 )
@@ -224,7 +224,8 @@ export const createRevokeCertificateEndpointSchema = (env: SshCaBindings, certif
 		"200": {
 			description: `SSH ${certificateTypeName(certificateType)} certificate revoked successfully`,
 			...contentJson(z.object({
-				revoked_at: z.iso.datetime(),
+				revoked_at: z.iso.datetime()
+					.meta({ description: "When the certificate was revoked" }),
 			})
 				.openapi("Revocation Response")
 			),

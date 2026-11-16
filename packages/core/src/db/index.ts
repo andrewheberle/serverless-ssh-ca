@@ -105,8 +105,9 @@ export const dbCleanup = async (env: SshCaBindings): Promise<void> => {
 		}).execute()
 		l.info("completed database cleanup", "changes", res.meta?.changes)
 
-		// revoked certificates may have been removed from the KRLs, so cached
-		// KRLs must not be used again
+		// cleanup only removes revoked certificates the KRL query already leaves
+		// out, so this doesn't change what a KRL contains. It empties the KRL
+		// cache, which drops certificates that left a KRL since it was cached
 		if ((res.meta?.changes ?? 0) > 0) {
 			await env.DB.prepare(BumpAllRevisions).run()
 		}

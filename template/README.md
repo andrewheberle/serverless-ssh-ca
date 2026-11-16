@@ -44,6 +44,19 @@ curl https://<your worker's host name>/api/v4/ca
 This prints the CA public key, which is what hosts and clients are configured
 to trust. A `500` means a setting is not valid: the Worker's logs say which.
 
+### Next steps
+
+To issue a first certificate, follow these sections of the CA's README in
+order:
+
+1. [Identity Provider](https://github.com/andrewheberle/serverless-ssh-ca/blob/main/packages/core/README.md#identity-provider): which values from your
+   identity provider go in which settings, and the claim that gives users
+   their principals.
+2. [Client](https://github.com/andrewheberle/serverless-ssh-ca/blob/main/packages/core/README.md#client): configuring ssh-ca-client to log in and request a
+   certificate.
+3. [Host Configuration](https://github.com/andrewheberle/serverless-ssh-ca/blob/main/packages/core/README.md#host-configuration): making SSH servers trust
+   the CA's certificates and check its KRL.
+
 ## Allowing host certificates and extra principals
 
 The deploy form does not accept empty values, so three optional settings are
@@ -63,6 +76,9 @@ Edit `wrangler.jsonc` and commit, and Workers Builds deploys the change. To
 serve the CA on your own domain (recommended), uncomment `routes` and set
 `workers_dev` to `false`. The landing page and the admin UI are off until
 their settings are set; see the CA's README.
+
+The `triggers` cron schedule runs the daily cleanup of expired certificates.
+Keep it, or the database keeps every certificate it has ever issued.
 
 Setting the build variable `NODE_VERSION` to `24` in the Worker's build
 settings keeps builds on the Node.js version the CA is tested with.

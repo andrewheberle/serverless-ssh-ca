@@ -60,7 +60,7 @@ export const subjectPublicKey = openapiStringByte
 	.transform(transformPublicKey)
 	.superRefine(refineSubjectKey)
 	.meta({
-		description: "SSH public key to sign",
+		description: "SSH public key to sign, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256 AAAA... comment`), not of the binary key",
 		example: "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
 	})
 
@@ -74,15 +74,15 @@ export const identityToken = z.string()
 
 export const accessToken = z.string()
 	.meta({
-		description: "Access Token JWT from OIDC IdP",
+		description: "Bearer access token from the OIDC IdP, as `Bearer <token>`. This is the same header as the `oidcAuth` security scheme, and is also declared here for generated clients",
 		example: "Bearer eyJ..."
 	})
 
 export const krl = openapiStringByte
-	.meta({ description: "Key Revocation List" })
+	.meta({ description: "The OpenSSH Key Revocation List in its binary format, BASE64 encoded" })
 
 export const certificate = openapiStringByte
-	.meta({ description: "Issued Certificate" })
+	.meta({ description: "Issued certificate, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA...`), not of the binary certificate" })
 
 export const CaPublicKeyEndpointSchema = {
 	tags: ["CA"],
@@ -111,6 +111,7 @@ export const createRevocationListEndpointSchema = (certificateType: CertificateT
 			...contentJson(z.object({
 				krl: krl,
 				signature: z.string()
+					.meta({ description: "Armored SSHSIG signature (`-----BEGIN SSH SIGNATURE-----`) made by the CA key over the decoded KRL bytes, with the SHA-512 hash and the `krl@com.github.serverless-ssh-ca.andrewheberle` namespace. It is not BASE64 encoded again" })
 			})
 				.openapi("Key Revocation List Response")
 			)

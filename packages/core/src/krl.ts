@@ -223,9 +223,12 @@ export class KRLBuilder {
      *
      * This must be called after generate()
      *
-     * The returned string can be verified with ssh-keygen:
-     *   echo -n "$KRL_BYTES" | ssh-keygen -Y verify -f allowed_signers \
-     *     -I <identity> -n file -s <sig_file>
+     * The signature is an armored SSHSIG made over the KRL bytes with SHA-512
+     * in the `krl@com.github.serverless-ssh-ca.andrewheberle` namespace. It
+     * can be verified with ssh-keygen, where allowed_signers holds a line of
+     * `<identity> <CA public key>`:
+     *   ssh-keygen -Y verify -f allowed_signers -I <identity> \
+     *     -n krl@com.github.serverless-ssh-ca.andrewheberle -s <sig_file> < <krl_file>
      */
     async signature(): Promise<string> {
         let krl: ArrayBuffer

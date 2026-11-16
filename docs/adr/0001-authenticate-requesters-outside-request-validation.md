@@ -20,3 +20,9 @@ The v4 API keeps the status codes this mapping gives a refused certificate reque
 | An extension that is not allowed, or no principals | 422 |
 
 Changing them to the usual meanings (401 for a token that is not valid, 403 for a requester that is not permitted) was considered for 1.0. They were kept, because the client's end-to-end tests check them and changing them after 1.0 needs a major release, while the usual meanings would give clients nothing they need. `openapi.json` documents only the codes each operation can return: issuing a user certificate has no 401, as any requester may request one, and renewing a host certificate has no 401 or 403, as it is authorized by a proof of possession rather than by tokens. `tests/openapi-paths.test.ts` pins the documented codes of every operation.
+
+## Addendum: what an error response promises
+
+An error response promises its HTTP status, the shape `openapi.json` declares for it (`success` and `errors[]`), and the text of `errors[].message`. The client displays the messages and its end-to-end tests check them, so `tests/requester-http.test.ts` keeps pinning them, and changing one is a breaking change.
+
+The `errors[].code` values are not promised. They come from chanfana's exception classes, not from this project, so a chanfana upgrade can change them without any change here; promising them would mean reviewing every upgrade for changed codes. `result`, which is `null` on every error since chanfana 3.5, is not promised either. Clients act on the HTTP status, and a `500` never carries its cause, which is logged instead.

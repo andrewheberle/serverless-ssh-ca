@@ -127,7 +127,13 @@ export interface CaCache {
  * bindings.
  */
 export interface SshCaBindings {
+	/**
+	 * How far either side of the CA's clock the timestamp of a proof of
+	 * possession may be, and how far in the future the start of a certificate
+	 * presented for renewal may be, as a duration of at most 5 minutes
+	 */
 	CERTIFICATE_REQUEST_TIME_SKEW_MAX: string
+	/** The algorithms the identity token and a JWT access token may be signed with */
 	JWT_ALGORITHMS: string | string[]
 	/** The audience the identity token, and unless {@link SshCaBindings.JWT_ACCESS_TOKEN_AUD} is set the access token, must be issued for */
 	JWT_AUD: string | string[]
@@ -140,13 +146,30 @@ export interface SshCaBindings {
 	 * is not checked, so {@link SshCaBindings.JWT_ACCESS_TOKEN_AUD} is not used.
 	 */
 	OIDC_USERINFO_URL?: string
+	/** The issuer (`iss`) the identity token and the access token must have */
 	JWT_ISSUER: string
+	/**
+	 * The URL of the JWKS the IdP signs its tokens with. Its admin UI
+	 * counterpart is {@link SshCaBindings.ADMIN_JWKS_URL}
+	 */
 	JWT_JWKS_URL: string
+	/**
+	 * The identity token claim that holds the requester's principals, which
+	 * {@link SshCaBindings.SSH_HOST_CERTIFICATE_ALLOWED_ROLES} is also compared with
+	 */
 	JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM: string
+	/** The lowest level that is logged: `none`, `error`, `warning`, `info` or `debug`; `info` when not set */
 	LOG_LEVEL?: string
+    /** How long certificates are kept after they expire: `infinite`, or a period such as `1 year` */
     DB_CERTIFICATE_RETENTION: string
+    /** The database the CA keeps certificates and KRL versions in, see {@link CaDatabase} */
     DB: CaDatabase
+    /**
+     * The comment on the CA public key. Despite its name it is not a
+     * distinguished name, and no certificate contains it
+     */
     ISSUER_DN: string
+    /** The CA private key, see {@link CaSecret} */
     PRIVATE_KEY: CaSecret
     /**
      * Limits requests to issue, renew and revoke certificates, and admin UI
@@ -155,18 +178,31 @@ export interface SshCaBindings {
      */
     RATE_LIMITER?: CaRateLimiter
     /**
-     * Caches KRLs until a certificate is revoked, see {@link CaCache}. KRLs
-     * are generated for every request when this is not set.
+     * Caches KRLs, see {@link CaCache}. A cached KRL is used until a
+     * certificate of its type is revoked, cleanup removes certificates, or 7
+     * days have passed, so it may still list certificates that expired more
+     * than 24 hours ago. KRLs are generated for every request when this is not
+     * set.
      */
     CACHE?: CaCache
     /** The extensions included in user certificates by default, and the only ones a requester may ask for; none when not set */
     SSH_CERTIFICATE_EXTENSIONS?: string | string[]
+    /** Whether user certificates get the requester's whole email address as a principal */
     SSH_CERTIFICATE_INCLUDE_SELF_EMAIL?: string | boolean
+    /** Whether user certificates get the part of the requester's email address before the `@` as a principal */
     SSH_CERTIFICATE_INCLUDE_SELF?: string | boolean
+    /** The longest lifetime of a user certificate, and the lifetime it gets when the request doesn't give one */
     SSH_CERTIFICATE_LIFETIME: string
+    /** Principals added to every user certificate */
     SSH_CERTIFICATE_PRINCIPALS?: string | string[]
+    /** The email addresses of requesters who may request host certificates, compared case-insensitively */
     SSH_HOST_CERTIFICATE_ALLOWED_EMAILS?: string | string[]
+    /**
+     * The roles that may request host certificates, compared with the values of
+     * the {@link SshCaBindings.JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM} claim
+     */
     SSH_HOST_CERTIFICATE_ALLOWED_ROLES?: string | string[]
+    /** The longest lifetime of a host certificate, and the lifetime it gets when the request doesn't give one */
     SSH_HOST_CERTIFICATE_LIFETIME: string
     /**
      * Whether to serve the landing page at `/`, which shows the CA public key,

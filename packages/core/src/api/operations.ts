@@ -150,9 +150,11 @@ export const revocationList = async (c: AppContext, l: Logger, certificateType: 
 
 		// a cached KRL is keyed by the revision it was generated for, which
 		// changes whenever a certificate is revoked, and by the CA key that
-		// signed it, so a cached KRL is never used once it is out of date. The
-		// revision is read before the revoked serials, so the KRL cached for a
-		// revision includes at least every certificate revoked by then
+		// signed it, so a cached KRL never misses a revocation. It can still
+		// list certificates that left the KRL 24 hours after expiring, as that
+		// doesn't change the revision. The revision is read before the revoked
+		// serials, so the KRL cached for a revision includes at least every
+		// certificate revoked by then
 		const cache = c.env.CACHE
 		const cacheKey = cache === undefined
 			? undefined
@@ -216,8 +218,9 @@ const KrlResponseSchema = z.object({
 type KrlResponse = z.infer<typeof KrlResponseSchema>
 
 // how long a cached KRL is kept, in seconds. A cached KRL is only used for
-// the revision it was generated for, so this only removes entries for earlier
-// revisions from the cache
+// the revision it was generated for, so this removes entries for earlier
+// revisions from the cache, and limits how long a cached KRL keeps listing
+// certificates that have left the KRL since it was cached
 const KrlCacheTtl = 7 * 24 * 60 * 60
 
 /**

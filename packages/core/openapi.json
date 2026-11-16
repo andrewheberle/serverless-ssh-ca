@@ -19,7 +19,7 @@
           "certificate": {
             "type": "string",
             "format": "byte",
-            "description": "Issued Certificate"
+            "description": "Issued certificate, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA...`), not of the binary certificate"
           }
         },
         "required": [
@@ -32,7 +32,7 @@
           "public_key": {
             "type": "string",
             "format": "byte",
-            "description": "SSH public key to sign",
+            "description": "SSH public key to sign, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256 AAAA... comment`), not of the binary key",
             "example": "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
           },
           "identity": {
@@ -59,7 +59,7 @@
             "minimum": 300,
             "maximum": 86400,
             "default": 86400,
-            "description": "Lifetime of issued SSH certificate"
+            "description": "Lifetime of the issued SSH certificate, in seconds"
           }
         },
         "required": [
@@ -72,7 +72,8 @@
         "properties": {
           "revoked_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the certificate was revoked"
           }
         },
         "required": [
@@ -85,10 +86,11 @@
           "krl": {
             "type": "string",
             "format": "byte",
-            "description": "Key Revocation List"
+            "description": "The OpenSSH Key Revocation List in its binary format, BASE64 encoded"
           },
           "signature": {
-            "type": "string"
+            "type": "string",
+            "description": "Armored SSHSIG signature (`-----BEGIN SSH SIGNATURE-----`) made by the CA key over the decoded KRL bytes, with the SHA-512 hash and the `krl@com.github.serverless-ssh-ca.andrewheberle` namespace. It is not BASE64 encoded again"
           }
         },
         "required": [
@@ -102,7 +104,7 @@
           "public_key": {
             "type": "string",
             "format": "byte",
-            "description": "SSH public key to sign",
+            "description": "SSH public key to sign, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256 AAAA... comment`), not of the binary key",
             "example": "ZWNkc2Etc2hhMi1uaXN0cDI1NiBBQUFBRTJWalpITmhMWE5vWVRJdGJtbHpkSEF5TlRZQUFBQUlibWx6ZEhBeU5UWUFBQUJCQkdNcFNKdHRmMEl0dE5DVmMyOFR6WEZSMUQweHZPM25wNjdWemVBUXNiZFpza3JEY1lqU2x3SjZIUERtVHBYYVUwbEVhWDlMNFloYy9jQ2YxTWU5RlRrPQo="
           },
           "identity": {
@@ -123,7 +125,7 @@
             "minimum": 86400,
             "maximum": 2592000,
             "default": 2592000,
-            "description": "Lifetime of issued Host SSH certificate"
+            "description": "Lifetime of the issued host SSH certificate, in seconds"
           }
         },
         "required": [
@@ -138,14 +140,14 @@
           "certificate": {
             "type": "string",
             "format": "byte",
-            "description": "SSH certificate to renew, which must have the serial number in the path"
+            "description": "SSH certificate to renew, which must have the serial number in the path, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA...`), not of the binary certificate"
           },
           "lifetime": {
             "type": "integer",
             "minimum": 86400,
             "maximum": 2592000,
             "default": 2592000,
-            "description": "Lifetime of renewed Host SSH certificate"
+            "description": "Lifetime of the renewed host SSH certificate, in seconds"
           }
         },
         "required": [
@@ -235,11 +237,11 @@
           {
             "schema": {
               "type": "string",
-              "description": "Access Token JWT from OIDC IdP",
+              "description": "Bearer access token from the OIDC IdP, as `Bearer <token>`. This is the same header as the `oidcAuth` security scheme, and is also declared here for generated clients",
               "example": "Bearer eyJ..."
             },
             "required": true,
-            "description": "Access Token JWT from OIDC IdP",
+            "description": "Bearer access token from the OIDC IdP, as `Bearer <token>`. This is the same header as the `oidcAuth` security scheme, and is also declared here for generated clients",
             "name": "Authorization",
             "in": "header"
           },
@@ -825,11 +827,11 @@
           {
             "schema": {
               "type": "string",
-              "description": "Access Token JWT from OIDC IdP",
+              "description": "Bearer access token from the OIDC IdP, as `Bearer <token>`. This is the same header as the `oidcAuth` security scheme, and is also declared here for generated clients",
               "example": "Bearer eyJ..."
             },
             "required": true,
-            "description": "Access Token JWT from OIDC IdP",
+            "description": "Bearer access token from the OIDC IdP, as `Bearer <token>`. This is the same header as the `oidcAuth` security scheme, and is also declared here for generated clients",
             "name": "Authorization",
             "in": "header"
           },
