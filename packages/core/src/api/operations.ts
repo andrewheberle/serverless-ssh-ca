@@ -35,18 +35,18 @@ const caKeyError = (l: Logger, err: unknown): ApiException => {
 	switch (true) {
 		case (err instanceof UnsupportedKeyError):
 			l.error(err.message)
-			return new InternalServerErrorException(err.message)
+			return new InternalServerErrorException()
 		case (err instanceof KeyParseError):
 			// the reason is only logged, as it may describe the key
 			l.error(`error parsing private key: ${err.message}`, "error", err)
-			return new InternalServerErrorException("error parsing private key")
+			return new InternalServerErrorException()
 		case (err instanceof ApiException):
 			// re-throw any exisiting chanfana error
 			return err
 		default:
 			// otherwise throw as InternalServerErrorException
 			l.error("unhandled error", "error", err)
-			return new InternalServerErrorException("internal server error")
+			return new InternalServerErrorException()
 	}
 }
 
@@ -110,7 +110,7 @@ export const authenticateRequester = async (c: AppContext, l: Logger, tokens: Re
 		case "misconfigured":
 		case "unavailable":
 			// the reason was logged when the token was verified
-			throw new InternalServerErrorException(result.message)
+			throw new InternalServerErrorException()
 		default: {
 			const unknownResult: never = result
 			throw new Error(`unknown authentication result: ${String(unknownResult)}`)
@@ -276,7 +276,7 @@ export const certificateResponse = async (c: AppContext, l: Logger, result: Prom
 		outcome = await result
 	} catch (err) {
 		l.error("unhandled error", "error", err)
-		throw new InternalServerErrorException("internal server error")
+		throw new InternalServerErrorException()
 	}
 
 	switch (outcome.kind) {
@@ -296,7 +296,7 @@ export const certificateResponse = async (c: AppContext, l: Logger, result: Prom
 		case "keyMisconfigured":
 		case "storeUnavailable":
 			// the reason was logged when the CA key or database was used
-			throw new InternalServerErrorException(outcome.message)
+			throw new InternalServerErrorException()
 		default: {
 			const unknownOutcome: never = outcome
 			throw new Error(`unknown certificate result: ${String(unknownOutcome)}`)
@@ -321,7 +321,7 @@ export const revoke = async (c: AppContext, l: Logger, serial: bigint, publicKey
 		result = await revokeCertificate(c.env, { serial, certificateType, revoker: { kind: "keyHolder", publicKey, clientAddress: c.get("clientAddress") } })
 	} catch (err) {
 		l.error("unhandled error", "error", err)
-		throw new InternalServerErrorException("internal server error")
+		throw new InternalServerErrorException()
 	}
 
 	switch (result.kind) {
@@ -340,7 +340,7 @@ export const revoke = async (c: AppContext, l: Logger, serial: bigint, publicKey
 			// only admins are refused because a certificate has expired, so
 			// this cannot happen for a key holder
 			l.error("revocation by a key holder was refused as the certificate has expired")
-			throw new InternalServerErrorException("internal server error")
+			throw new InternalServerErrorException()
 		default: {
 			const unknownResult: never = result
 			throw new Error(`unknown revocation result: ${String(unknownResult)}`)
