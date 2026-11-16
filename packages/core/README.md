@@ -408,29 +408,81 @@ instead. See the addendum to
 
 ## Configuration
 
+### Settings
+
+Every setting is validated on every runtime before the CA serves anything with
+it (see [Validation](#validation)). Lists, durations and periods are described
+after the tables.
+
+#### Identity provider
+
+| Setting | Required | Value | What it does |
+|---|---|---|---|
+| `JWT_ISSUER` | Yes | Any string | The issuer (`iss`) both the identity token and the access token must have |
+| `JWT_AUD` | Yes | A list with at least one audience | The audiences the identity token may be issued for, usually the client ID. Also those of the access token, unless `JWT_ACCESS_TOKEN_AUD` is set |
+| `JWT_ACCESS_TOKEN_AUD` | No | A list | The audiences the access token may be issued for, when they differ from `JWT_AUD`. Not used with `OIDC_USERINFO_URL` |
+| `JWT_JWKS_URL` | Yes | An `https` URL, or an `http` URL for `localhost`, `127.0.0.0/8` or `[::1]` (such as a test identity provider) | The JWKS the identity provider signs its tokens with. Its admin UI counterpart is `ADMIN_JWKS_URL`, although the other admin token settings are named `ADMIN_JWT_*` |
+| `JWT_ALGORITHMS` | Yes | A list with at least one of `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `ES512`, `EdDSA` or `Ed25519` | The algorithms the tokens may be signed with. Symmetric algorithms and `none` are refused, as the keys come from a public JWKS |
+| `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | Yes | A claim name | The identity token claim, a string or an array of strings, that holds the requester's principals (such as their groups). Also the claim `SSH_HOST_CERTIFICATE_ALLOWED_ROLES` is compared with |
+| `OIDC_USERINFO_URL` | No | As `JWT_JWKS_URL`; an empty string is unset | When set, access tokens are verified by sending them to this userinfo endpoint instead of as JWTs. See [Opaque Access Tokens](#opaque-access-tokens) |
+
+#### User certificates
+
+These settings apply only to user certificates. Host certificates use the
+`SSH_HOST_CERTIFICATE_*` settings.
+
+| Setting | Required | Value | What it does |
+|---|---|---|---|
+| `SSH_CERTIFICATE_LIFETIME` | Yes | A duration of at least 5 minutes, in whole seconds, such as `"24 hours"` | The longest lifetime of a user certificate, and the lifetime given when a request doesn't ask for one |
+| `SSH_CERTIFICATE_EXTENSIONS` | No | A list of extension names, each without whitespace | The extensions user certificates get by default, and the only ones a requester may ask for. When unset, user certificates have no extensions, so no `permit-pty` |
+| `SSH_CERTIFICATE_PRINCIPALS` | No | A list of principals, each without whitespace, control characters or `*`, `?` or `!` | Principals added to every user certificate |
+| `SSH_CERTIFICATE_INCLUDE_SELF` | No | `"true"` or `"false"` (or a boolean); `false` when unset | Adds the part of the requester's email address before the `@` as a principal |
+| `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | No | As `SSH_CERTIFICATE_INCLUDE_SELF` | Adds the requester's whole email address as a principal |
+
+A user certificate needs at least one principal from these settings or from
+the identity token's `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM`, or the request
+is refused with a `422` error (see [User Certificates](#user-certificates)).
+
+#### Host certificates
+
+| Setting | Required | Value | What it does |
+|---|---|---|---|
+| `SSH_HOST_CERTIFICATE_LIFETIME` | Yes | A duration of at least 24 hours, in whole seconds, such as `"30 days"` | The longest lifetime of a host certificate, and the lifetime given when a request doesn't ask for one |
+| `SSH_HOST_CERTIFICATE_ALLOWED_EMAILS` | No | A list; an empty string is an empty list | Requesters, by email address, who may request host certificates |
+| `SSH_HOST_CERTIFICATE_ALLOWED_ROLES` | No | As `SSH_HOST_CERTIFICATE_ALLOWED_EMAILS` | Requesters, by a value of their `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` claim, who may request host certificates |
+
+When neither allowlist is set, nobody may request a host certificate, but
+existing host certificates can still be renewed.
+
+#### General
+
+| Setting | Required | Value | What it does |
+|---|---|---|---|
+| `ISSUER_DN` | Yes | Any string | The comment on the CA public key, as served by `/api/v4/ca` and on the landing page. Despite its name it is not a distinguished name, and no certificate contains it |
+| `CERTIFICATE_REQUEST_TIME_SKEW_MAX` | Yes | A positive duration of at most 5 minutes, such as `"90 seconds"` | How far either side of the CA's clock the timestamp of a proof of possession may be. Also how far in the future the start of a certificate presented for renewal may be |
+| `DB_CERTIFICATE_RETENTION` | Yes | `"infinite"`, or a positive period such as `"1 year"` or `"90 days"` | How long certificates are kept in the database after they expire, see [Database](#database) |
+| `LOG_LEVEL` | No | `none`, `error`, `warning`, `info` or `debug`; `info` when unset | The lowest level that is logged |
+| `LANDING_PAGE` | No | `"true"` or `"false"` (or a boolean); `false` when unset | Whether to serve the [landing page](#landing-page) at `/` |
+| `ADMIN_JWT_HEADER`, `ADMIN_JWKS_URL`, `ADMIN_JWT_ISSUER`, `ADMIN_JWT_AUD`, `ADMIN_JWT_ALGORITHMS`, `ADMIN_ALLOWED_EMAILS`, `ADMIN_ALLOWED_ROLES`, `ADMIN_JWT_ROLES_CLAIM`, `ADMIN_HOSTNAME` | No | See [Admin UI settings](#settings-1). Each may be unset, but must be valid when set | Turn on and configure the [admin UI](#admin-ui) |
+
+#### Bindings
+
+These are provided by the runtime rather than set as strings.
+
+| Binding | Required | What it is |
+|---|---|---|
+| `DB` | Yes | The D1 database, or on Node.js any `CaDatabase`, see [Database](#database) |
+| `PRIVATE_KEY` | Yes | The Secrets Store secret holding the CA private key, or on Node.js any `CaSecret`, see [CA Private Key](#ca-private-key) |
+| `RATE_LIMITER` | No | A rate limit binding, or any `CaRateLimiter`, see [Rate Limiting](#rate-limiting). Requests are not limited without it |
+| `CACHE` | No | A KV namespace, or any `CaCache`, see [KRL Caching](#krl-caching). KRLs are generated for every request without it |
+
+On Workers, the scheduled database cleanup also needs a cron trigger, see
+[Database](#database).
+
 ### Validation
 
 The configuration is validated on every runtime before the CA serves anything
-with it:
-
-| Setting | Accepted values |
-|---|---|
-| `CERTIFICATE_REQUEST_TIME_SKEW_MAX` | A positive duration of at most 5 minutes, such as `"90 seconds"`. A proof of possession is accepted this long either side of the CA's clock |
-| `SSH_CERTIFICATE_LIFETIME` | A duration of at least 5 minutes, in whole seconds, such as `"24 hours"`. The longest lifetime of a user certificate |
-| `SSH_HOST_CERTIFICATE_LIFETIME` | A duration of at least 24 hours, in whole seconds, such as `"30 days"`. The longest lifetime of a host certificate |
-| `DB_CERTIFICATE_RETENTION` | `"infinite"`, or a positive period such as `"1 year"` or `"90 days"` |
-| `JWT_ISSUER`, `ISSUER_DN`, `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | Must be set |
-| `JWT_AUD` | A list with at least one audience. Must be set |
-| `JWT_ALGORITHMS` | A list with at least one of `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `ES512`, `EdDSA` or `Ed25519`. Symmetric algorithms and `none` are refused, as the keys come from a public JWKS |
-| `JWT_JWKS_URL` | An `https` URL, or an `http` URL for `localhost`, `127.0.0.0/8` or `[::1]` (such as a test identity provider) |
-| `OIDC_USERINFO_URL` | As `JWT_JWKS_URL`, or unset (an empty string is treated as unset) |
-| `JWT_ACCESS_TOKEN_AUD`, `SSH_HOST_CERTIFICATE_ALLOWED_EMAILS`, `SSH_HOST_CERTIFICATE_ALLOWED_ROLES` | A list, or unset (an empty string is an empty list) |
-| `SSH_CERTIFICATE_EXTENSIONS` | A list of extension names, each without whitespace, or unset. These are the extensions user certificates get by default and the only ones a requester may ask for; when unset, user certificates have no extensions (so no `permit-pty`) |
-| `SSH_CERTIFICATE_PRINCIPALS` | A list of principals, each of which contains no whitespace, control characters or `*`, `?`, `!`, or unset |
-| `SSH_CERTIFICATE_INCLUDE_SELF`, `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | `"true"` or `"false"` (or a boolean), or unset |
-| `LOG_LEVEL` | `none`, `error`, `warning`, `info` or `debug`, or unset |
-| `LANDING_PAGE` | `"true"` or `"false"` (or a boolean), or unset. See [Landing Page](#landing-page) |
-| `ADMIN_*` | See [Admin UI](#admin-ui). Each may be unset, but must be valid when set |
+with it, against the values in the [settings](#settings) tables.
 
 A list is a comma separated string, or an array of strings where bindings
 can be arrays. Each entry is trimmed, so `"a, b"` is the same as `"a,b"`, and
@@ -472,6 +524,20 @@ a SQLite database: D1 on Cloudflare Workers, or `node:sqlite` (or another
 upgrade any new migrations are applied automatically the first time the
 database is used. Upgrading from any earlier release migrates the database,
 as migrations are never removed.
+
+Certificates that expired longer ago than `DB_CERTIFICATE_RETENTION` are
+removed by a scheduled cleanup. On Workers it runs from a cron trigger in
+`wrangler.jsonc`, which the template sets to once a day:
+
+```jsonc
+"triggers": {
+    "crons": [ "59 23 * * *" ]
+}
+```
+
+Without a cron trigger nothing is removed, and the database keeps every
+certificate. On Node.js, run the `cleanup()` task returned by `createSshCa`
+instead (see [Running on Node.js](#running-on-nodejs)).
 
 The schema is internal to the CA and can change in any release, including a
 minor or patch release, so it is not part of what semver covers. Reading the
