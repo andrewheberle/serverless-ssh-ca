@@ -585,12 +585,26 @@ Transfer the IdP settings as follows:
 
 ![IdP Settings](docs/images/oidc-example_02.png)
 
-Copy the **Client ID** to `JWT_AUD` on the CA and to `client_id` in the
-client, the **Issuer** to `JWT_ISSUER` on the CA and to `issuer` in the
-client, and the **Key endpoint** to `JWT_JWKS_URL` on the CA.
+| IdP value | CA setting | Client setting |
+|---|---|---|
+| Client ID | `JWT_AUD` | `client_id` |
+| Issuer | `JWT_ISSUER` | `issuer` |
+| Key endpoint (JWKS URL) | `JWT_JWKS_URL` | |
+| Signing algorithm of its tokens, such as `RS256` | `JWT_ALGORITHMS` | |
+| Claim that holds the user's groups or roles | `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | |
+| Redirect URL | `JWT_ACCESS_TOKEN_AUD`, for Cloudflare Access (see below) | Must match the client's configured redirect URL |
 
 The `openid` and `email` scopes are required, with enabling of refresh tokens
 (the `offline_access` scope) being optional, but recommended.
+
+The identity token must carry the `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM`
+claim, so configure the IdP to include it, such as with the user's groups.
+Its values become the principals of the user's
+certificates, which the SSH servers then match with the accounts users may
+log in as. If the IdP can't include such a claim, set
+`SSH_CERTIFICATE_PRINCIPALS` or the `SSH_CERTIFICATE_INCLUDE_SELF*` settings
+instead: a user certificate request with no principals from any of them is
+refused with a `422` error (see [User Certificates](#user-certificates)).
 
 `JWT_AUD` must be set to the audience the IdP issues tokens for this
 application with (for Cloudflare Access, the application's client ID). Both
@@ -598,7 +612,7 @@ the access token and the identity token must be issued for this audience, so
 tokens the IdP issues for other applications are not accepted. If the IdP
 issues access tokens with a different audience to identity tokens, set
 `JWT_ACCESS_TOKEN_AUD` to the audience of the access token. Either value may
-be a comma separated list. `JWT_AUD` must be set (see [Validation](#validation)).
+be a comma separated list. `JWT_AUD` must be set (see [Settings](#settings)).
 
 When `JWT_ACCESS_TOKEN_AUD` is not set, both tokens are checked against the
 same audience, issuer and keys, so the access token adds little beyond the
@@ -1062,9 +1076,30 @@ application's settings.
 
 ### Client
 
-Please visit the ssh-ca-client repository for further information:
+Users request certificates with
+[ssh-ca-client](https://github.com/andrewheberle/ssh-ca-client), which must
+be 0.24.0 or later. Its settings come from the CA and the identity provider:
 
-https://github.com/andrewheberle/ssh-ca-client
+| Client setting | Value |
+|---|---|
+| `issuer` | The IdP's issuer, the same as `JWT_ISSUER` |
+| `client_id` | The IdP's client ID, the same as `JWT_AUD` |
+| `ca_url` | The CA's URL, such as `https://ssh-ca.example.com/` |
+| `trusted_ca` | The CA public key, as returned by `GET /api/v4/ca` |
+| `scopes` | Optional. Add `offline_access` if the IdP issues refresh tokens |
+| `redirect_url` | Optional. Must match the redirect URL configured at the IdP |
+
+For example, in `/etc/serverless-ssh-ca/config.yml` on Linux:
+
+```yaml
+issuer: https://idp.example.com/
+client_id: <client ID>
+ca_url: https://ssh-ca.example.com/
+trusted_ca: ecdsa-sha2-nistp256 AAAAE2VjZ...
+```
+
+See the ssh-ca-client README for its other platforms, its defaults, and how
+to log in.
 
 ### SSH Endpoints
 
