@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { verifyJWT } from "../src/verify.js"
+import { caConfig } from "../src/config.js"
 import { makeEnv } from "./env.js"
 import { getIdentityToken } from "./helpers/token.js"
 
@@ -30,10 +31,10 @@ describe("verifyJWT", () => {
 		// a URL no other test uses, so its keys are not already cached
 		const url = `http://127.0.0.1:${port}/jwks`
 		const requests = countRequests(url)
-		const env = makeEnv({ JWT_JWKS_URL: url })
+		const settings = caConfig(makeEnv({ JWT_JWKS_URL: url }))
 
 		for (const sub of ["user1", "user2", "user3"]) {
-			const { payload } = await verifyJWT(env, await getIdentityToken({ sub, email: `${sub}@example.com` }), audience)
+			const { payload } = await verifyJWT(settings, await getIdentityToken({ sub, email: `${sub}@example.com` }), [audience])
 			expect(payload.sub).toBe(sub)
 		}
 

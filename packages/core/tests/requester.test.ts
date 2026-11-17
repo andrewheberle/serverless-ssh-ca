@@ -251,3 +251,19 @@ describe("authenticate", () => {
 		})
 	})
 })
+
+// validation trims each setting and list entry, so tokens must be verified with
+// the validated values rather than the raw strings
+describe("authenticate with settings validation trims", () => {
+	const authenticated = { kind: "authenticated", requester: { email, sub, principals: [] } }
+
+	it.each([
+		["JWT_ALGORITHMS with a space after a comma", { JWT_ALGORITHMS: "ES256, RS256" }],
+		["JWT_ALGORITHMS as an array with spaces", { JWT_ALGORITHMS: [" ES256", "RS256 "] }],
+		["JWT_ISSUER with surrounding spaces", { JWT_ISSUER: ` http://localhost:${port} ` }],
+		["JWT_JWKS_URL with surrounding spaces", { JWT_JWKS_URL: ` http://localhost:${port}/jwks ` }],
+		["JWT_AUD with spaces between entries", { JWT_AUD: "other, audience" }],
+	])("should verify tokens with %s", async (_name, overrides: Partial<RequesterConfig>) => {
+		expect(await run({}, { config: config(overrides) })).toEqual(authenticated)
+	})
+})
