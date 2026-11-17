@@ -436,7 +436,7 @@ These settings apply only to user certificates. Host certificates use the
 | `SSH_CERTIFICATE_LIFETIME` | Yes | A duration of at least 5 minutes, in whole seconds, such as `"24 hours"` | The longest lifetime of a user certificate, and the lifetime given when a request doesn't ask for one |
 | `SSH_CERTIFICATE_EXTENSIONS` | No | A list of extension names, each without whitespace | The extensions user certificates get by default, and the only ones a requester may ask for. When unset, user certificates have no extensions, so no `permit-pty` |
 | `SSH_CERTIFICATE_PRINCIPALS` | No | A list of principals, each without whitespace, control characters or `*`, `?` or `!` | Principals added to every user certificate |
-| `SSH_CERTIFICATE_INCLUDE_SELF` | No | `"true"` or `"false"` (or a boolean); `false` when unset | Adds the part of the requester's email address before the `@` as a principal |
+| `SSH_CERTIFICATE_INCLUDE_SELF` | No | `"true"` or `"false"` (or a boolean); `false` when unset or an empty string | Adds the part of the requester's email address before the `@` as a principal |
 | `SSH_CERTIFICATE_INCLUDE_SELF_EMAIL` | No | As `SSH_CERTIFICATE_INCLUDE_SELF` | Adds the requester's whole email address as a principal |
 
 A user certificate needs at least one principal from these settings or from
@@ -460,9 +460,9 @@ existing host certificates can still be renewed.
 |---|---|---|---|
 | `ISSUER_DN` | Yes | Any string | The comment on the CA public key, as served by `/api/v4/ca` and on the landing page. Despite its name it is not a distinguished name, and no certificate contains it |
 | `CERTIFICATE_REQUEST_TIME_SKEW_MAX` | Yes | A positive duration of at most 5 minutes, such as `"90 seconds"` | How far either side of the CA's clock the timestamp of a proof of possession may be. Also how far in the future the start of a certificate presented for renewal may be |
-| `DB_CERTIFICATE_RETENTION` | Yes | `"infinite"`, or a positive period such as `"1 year"` or `"90 days"` | How long certificates are kept in the database after they expire, see [Database](#database) |
-| `LOG_LEVEL` | No | `none`, `error`, `warning`, `info` or `debug`; `info` when unset | The lowest level that is logged |
-| `LANDING_PAGE` | No | `"true"` or `"false"` (or a boolean); `false` when unset | Whether to serve the [landing page](#landing-page) at `/` |
+| `DB_CERTIFICATE_RETENTION` | Yes | `"infinite"`, or a positive period such as `"1 year"`, `"2 weeks"` or `"90 days"` | How long certificates are kept in the database after they expire, see [Database](#database) |
+| `LOG_LEVEL` | No | `none`, `error`, `warning`, `info` or `debug`; `info` when unset or an empty string | The lowest level that is logged |
+| `LANDING_PAGE` | No | `"true"` or `"false"` (or a boolean); `false` when unset or an empty string | Whether to serve the [landing page](#landing-page) at `/` |
 | `ADMIN_JWT_HEADER`, `ADMIN_JWKS_URL`, `ADMIN_JWT_ISSUER`, `ADMIN_JWT_AUD`, `ADMIN_JWT_ALGORITHMS`, `ADMIN_ALLOWED_EMAILS`, `ADMIN_ALLOWED_ROLES`, `ADMIN_JWT_ROLES_CLAIM`, `ADMIN_HOSTNAME` | No | See [Admin UI settings](#settings-1). Each may be unset, but must be valid when set | Turn on and configure the [admin UI](#admin-ui) |
 
 #### Bindings
@@ -495,10 +495,16 @@ the identity token. Spaces are replaced with underscores in both, so a group
 `ops team` is allowed by the role `ops team` or `ops_team`.
 
 A duration is a number and one of the units `second`, `minute`, `hour`,
-`day`, `week`, `month` or `year` (singular or plural), separated by a space. A
+`day`, `week`, `month` or `year` (singular or plural), separated by spaces. A
 unit is required, so a bare number or an abbreviation such as `"90 secs"` is
-refused. A retention period uses the same format without `week`, as it is
-passed to SQLite as a date modifier.
+refused. In a duration a month is 30 days and a year is 365.25 days.
+
+A retention period has the same format, and may also start with `+`. It is
+passed to SQLite as a date modifier, with weeks converted to days, so its
+months and years are calendar months and years.
+
+An empty string is the same as leaving an optional setting unset, as an unset
+var may be on Workers, except for the lists, where it is an empty list.
 
 How an invalid configuration is reported depends on the runtime:
 

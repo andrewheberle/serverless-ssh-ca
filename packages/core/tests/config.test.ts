@@ -171,12 +171,12 @@ describe("verifyJWT", () => {
 describe("database cleanup", () => {
 	const KrlResponse = z.object({ krl: z.string() })
 
-	const setup = () => {
+	const setup = (retention = "1 hour") => {
 		const sqlite = new DatabaseSync(":memory:")
 		const env = makeEnv({
 			DB: fromNodeSqlite(sqlite),
 			PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey),
-			DB_CERTIFICATE_RETENTION: "1 hour",
+			DB_CERTIFICATE_RETENTION: retention,
 		})
 
 		// records a host certificate that expired some hours ago
@@ -228,5 +228,16 @@ describe("database cleanup", () => {
 		await createSshCa(env).cleanup()
 
 		expect(recorded(certificate.serial)).toBe(false)
+	})
+
+	it.each(["2 weeks", "2  weeks", "+2 weeks"])("should keep certificates for a retention period of %j in weeks", async (retention) => {
+		const { env, expired, recorded } = setup(retention)
+		const kept = await expired(13 * 24, false)
+		const removed = await expired(15 * 24, false)
+
+		await createSshCa(env).cleanup()
+
+		expect(recorded(kept.serial)).toBe(true)
+		expect(recorded(removed.serial)).toBe(false)
 	})
 })
