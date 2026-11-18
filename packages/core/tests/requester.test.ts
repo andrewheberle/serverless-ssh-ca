@@ -267,3 +267,19 @@ describe("authenticate with settings validation trims", () => {
 		expect(await run({}, { config: config(overrides) })).toEqual(authenticated)
 	})
 })
+
+// a JWT without exp would be accepted for ever, so every token must have one
+// (#603). The test IdP leaves out a claim requested as null
+describe("authenticate with tokens without an expiry", () => {
+	it("should not accept an access token without exp", async () => {
+		expect(await run({ access: { sub, email, exp: null } })).toEqual(invalid({ token: "access", message: "claim validation of the JWT failed" }))
+	})
+
+	it("should not accept an identity token without exp", async () => {
+		expect(await run({ identity: { sub, email, exp: null } })).toEqual(invalid({ token: "identity", message: "problem parsing identity token" }))
+	})
+
+	it("should still accept tokens with exp but without iat", async () => {
+		expect(await run({ access: { sub, email, iat: null }, identity: { sub, email, iat: null } })).toMatchObject({ kind: "authenticated" })
+	})
+})

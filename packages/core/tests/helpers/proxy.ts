@@ -21,8 +21,8 @@ export interface SignOptions {
 	key?: "rs256" | "es256" | "unknown"
 	issuer?: string
 	audience?: string
-	/** When the JWT expires, in seconds since the epoch */
-	expires?: number
+	/** When the JWT expires, in seconds since the epoch, or null for a JWT without `exp` */
+	expires?: number | null
 }
 
 type SigningKey = { alg: string, kid: string, privateKey: CryptoKey }
@@ -55,13 +55,15 @@ export const createProxy = async (name: string): Promise<Proxy> => {
 		audience,
 		sign: async (claims, options = {}) => {
 			const key = keys[options.key ?? "rs256"]
-			return await new SignJWT(claims)
+			const jwt = new SignJWT(claims)
 				.setProtectedHeader({ alg: key.alg, kid: key.kid })
 				.setIssuer(options.issuer ?? issuer)
 				.setAudience(options.audience ?? audience)
 				.setIssuedAt()
-				.setExpirationTime(options.expires ?? Math.floor(Date.now() / 1000) + 300)
-				.sign(key.privateKey)
+			if (options.expires !== null) {
+				jwt.setExpirationTime(options.expires ?? Math.floor(Date.now() / 1000) + 300)
+			}
+			return await jwt.sign(key.privateKey)
 		},
 		serveJwks: () => {
 			const original = globalThis.fetch

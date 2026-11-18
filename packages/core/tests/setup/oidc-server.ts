@@ -15,9 +15,14 @@ const aud = process.env.JWT_AUD ?? "audience"
 const publicKeyObj = createPublicKey({ key: publicKey, format: "der", type: "spki" })
 const jwk = publicKeyObj.export({ format: "jwk" })
 
+// a claim requested as null is left out of the token, so a test can ask for a
+// token without one of the claims every token otherwise has, such as exp
+const withoutNulls = (claims: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(claims).filter(([, value]) => value !== null))
+
 const makeJwt = (claims: Record<string, unknown>): string => {
     const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url")
-    const payload = Buffer.from(JSON.stringify({
+    const payload = Buffer.from(JSON.stringify(withoutNulls({
         iss: `http://localhost:${port}`,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + 3600,
@@ -26,7 +31,7 @@ const makeJwt = (claims: Record<string, unknown>): string => {
         jti: randomBytes(16).toString("base64url"),
 		...(aud ? { aud } : {}),
         ...claims,
-    })).toString("base64url")
+    }))).toString("base64url")
 
     const data = `${header}.${payload}`
     const sign = createSign("RSA-SHA256")
