@@ -6,21 +6,27 @@ export type TokenClaims = {
     [key: string]: unknown
 }
 
-export const getAccessToken = async (claims: TokenClaims): Promise<string> => {
+/** Options for a token from the test IdP */
+export type TokenOptions = {
+    /** Claims every token has by default, such as exp or iat, to leave out */
+    omit?: string[]
+}
+
+export const getAccessToken = async (claims: TokenClaims, options: TokenOptions = {}): Promise<string> => {
     const res = await fetch(`${oidcBase}/token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ claims }),
+        body: JSON.stringify({ claims, omit: options.omit }),
     })
     const { token } = await res.json() as { token: string }
     return `Bearer ${token}`
 }
 
-export const getIdentityToken = async (claims: TokenClaims): Promise<string> => {
+export const getIdentityToken = async (claims: TokenClaims, options: TokenOptions = {}): Promise<string> => {
     const res = await fetch(`${oidcBase}/token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ claims }),
+        body: JSON.stringify({ claims, omit: options.omit }),
     })
     const { token } = await res.json() as { token: string }
     return token
