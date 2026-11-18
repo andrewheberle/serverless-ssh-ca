@@ -18,6 +18,7 @@ import {
 } from "chanfana"
 import { caConfig, MinHostCertificateLifetime, MinUserCertificateLifetime } from "../../config.js"
 import { CertificateType } from "../../db/types.js"
+import { PayloadTooLargeException } from "../body.js"
 import { MaxCertificatePrincipals } from "../../principals.js"
 import {
 	CaPublicKeyEndpointSchema,
@@ -132,6 +133,7 @@ export const createIssueUserCertificateEndpointSchema = (env: SshCaBindings) => 
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
 		...TooManyRequestsException.schema(),
+		...PayloadTooLargeException.schema(),
 	}
 })
 
@@ -171,6 +173,7 @@ export const createIssueHostCertificateEndpointSchema = (env: SshCaBindings) => 
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
 		...TooManyRequestsException.schema(),
+		...PayloadTooLargeException.schema(),
 	}
 })
 
@@ -209,6 +212,7 @@ export const createRenewHostCertificateEndpointSchema = (env: SshCaBindings) => 
 		...UnprocessableEntityException.schema(),
 		...InternalServerErrorException.schema(),
 		...TooManyRequestsException.schema(),
+		...PayloadTooLargeException.schema(),
 	}
 })
 

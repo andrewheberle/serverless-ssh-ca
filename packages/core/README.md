@@ -352,6 +352,14 @@ found in an `id_ecdsa.pub` or `id_ecdsa-cert.pub` file (such as
 `ecdsa-sha2-nistp256 AAAA... comment`), not of the binary key or certificate.
 `lifetime` is in seconds.
 
+### Request Bodies
+
+A request body may be at most 64 KiB; a larger one is refused with a `413`
+before anything else is done with the request. A body that is not valid JSON
+is refused with a `400` and the message `request body is not valid JSON`. The
+`Content-Type` header is not checked, and fields a request does not have are
+ignored.
+
 ### Verifying a KRL
 
 `GET /api/v4/user/krl` and `GET /api/v4/host/krl` return the KRL with a

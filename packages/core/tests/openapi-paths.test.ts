@@ -23,11 +23,11 @@ describe("OpenAPI schema", () => {
 	// deliberate
 	it.each([
 		["/api/v4/ca", "get", ["200", "500"]],
-		["/api/v4/user/certificates", "post", ["200", "400", "403", "422", "429", "500"]],
+		["/api/v4/user/certificates", "post", ["200", "400", "403", "413", "422", "429", "500"]],
 		["/api/v4/user/certificates/{serial}", "delete", ["200", "400", "404", "409", "429", "500"]],
 		["/api/v4/user/krl", "get", ["200", "500"]],
-		["/api/v4/host/certificates", "post", ["200", "400", "401", "403", "422", "429", "500"]],
-		["/api/v4/host/certificates/{serial}/renew", "post", ["200", "400", "422", "429", "500"]],
+		["/api/v4/host/certificates", "post", ["200", "400", "401", "403", "413", "422", "429", "500"]],
+		["/api/v4/host/certificates/{serial}/renew", "post", ["200", "400", "413", "422", "429", "500"]],
 		["/api/v4/host/certificates/{serial}", "delete", ["200", "400", "404", "409", "429", "500"]],
 		["/api/v4/host/krl", "get", ["200", "500"]],
 	] as const)("should document exactly the status codes %s %s responds with", (path, method, codes) => {
