@@ -1,4 +1,4 @@
-import { ApiException, fromHono, TooManyRequestsException } from "chanfana"
+import { ApiException, fromHono, NotFoundException, TooManyRequestsException } from "chanfana"
 import { AdminBasePath, createAdminApp } from "./admin/index.js"
 import { createLandingApp } from "./landing/index.js"
 import { Hono, type Context } from "hono"
@@ -171,6 +171,18 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
 
         logger(env).error("unexpected error from router", "error", err)
         return internalServerErrorResponse()
+    })
+
+    // a request under /api/ that matches no route, including a known path with
+    // the wrong method, is answered with the API's JSON error body rather than
+    // Hono's plain text, so a client can tell it from a 404 for a certificate
+    // by its message. Everything else keeps Hono's default
+    hono.notFound((c) => {
+        if (c.req.path.startsWith("/api/")) {
+            return errorResponse(new NotFoundException("not found"))
+        }
+
+        return c.text("404 Not Found", 404)
     })
 
     // the admin UI is a plain Hono app, so is not part of the OpenAPI schema
