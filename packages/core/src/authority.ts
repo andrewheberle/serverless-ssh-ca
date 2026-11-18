@@ -8,7 +8,7 @@ import { KeyParseError, type PrivateKey, type PublicKey } from "./ssh/keys.js"
 import { createSigner } from "./ssh/signer.js"
 import type { SshCaBindings } from "./types.js"
 import { caConfig } from "./config.js"
-import { principalIssue } from "./principals.js"
+import { MaxCertificatePrincipals, principalIssue } from "./principals.js"
 import { getPrivateKey, getPublic, hostPrincipalIssue, subjectKeyIssue, UnsupportedKeyError } from "./utils.js"
 
 /**
@@ -68,11 +68,21 @@ const clampLifetime = (requested: number | undefined, maximum: number): number =
 	return requested === undefined ? maximum : Math.min(requested, maximum)
 }
 
-// signs a certificate valid from the current second for its lifetime in seconds
-const sign = async (key: PrivateKey, fields: Omit<CertificateFields, "validAfter" | "validBefore">, lifetime: number): Promise<SshCertificate> => {
+// signs a certificate valid from the current second for its lifetime in
+// seconds, with its principals de-duplicated. `principalsPath` is the request
+// field the principals came from, which a refusal because of them is about
+const sign = async (key: PrivateKey, fields: Omit<CertificateFields, "validAfter" | "validBefore">, lifetime: number, principalsPath: string[] = ["body"]): Promise<SshCertificate> => {
+	const principals = [...new Set(fields.principals)]
+
 	// OpenSSH accepts a certificate without principals for any user or host
-	if (fields.principals.length === 0) {
+	if (principals.length === 0) {
 		throw new CertificateError("a certificate must have at least one principal")
+	}
+
+	// OpenSSH cannot read a certificate with more principals than this, and
+	// counts duplicates, so they are removed first
+	if (principals.length > MaxCertificatePrincipals) {
+		throw new CertificateError(`a certificate can have at most ${MaxCertificatePrincipals} principals`, principalsPath)
 	}
 
 	// the validity is to the second, so starts at the current second rather
@@ -80,7 +90,7 @@ const sign = async (key: PrivateKey, fields: Omit<CertificateFields, "validAfter
 	const validAfter = new Date(Math.floor(Date.now() / 1000) * 1000)
 	const validBefore = new Date(validAfter.getTime() + lifetime * 1000)
 
-	return await signCertificate({ ...fields, validAfter, validBefore }, await createSigner(key))
+	return await signCertificate({ ...fields, principals, validAfter, validBefore }, await createSigner(key))
 }
 
 type KeyResult =
@@ -219,8 +229,9 @@ export const issueUserCertificate = async (config: AuthorityConfig, requester: R
 	})
 }
 
-// signs a host certificate, whose key ID is named after its first principal
-const signHostCertificate = async (config: AuthorityConfig, key: PrivateKey, publicKey: PublicKey, principals: string[], lifetime: number | undefined): Promise<SshCertificate> => {
+// signs a host certificate, whose key ID is named after its first principal.
+// `principalsPath` is the request field the principals came from
+const signHostCertificate = async (config: AuthorityConfig, key: PrivateKey, publicKey: PublicKey, principals: string[], lifetime: number | undefined, principalsPath: string[]): Promise<SshCertificate> => {
 	return await sign(key, {
 		kind: "host",
 		publicKey,
@@ -228,7 +239,7 @@ const signHostCertificate = async (config: AuthorityConfig, key: PrivateKey, pub
 		keyId: `host_${principals[0]}`,
 		principals,
 		extensions: [],
-	}, clampLifetime(lifetime, caConfig(config).hostCertificateLifetime))
+	}, clampLifetime(lifetime, caConfig(config).hostCertificateLifetime), principalsPath)
 }
 
 /**
@@ -247,7 +258,7 @@ export const issueHostCertificate = async (config: AuthorityConfig, requester: R
 		return key
 	}
 
-	return await issue(config, l, CertificateType.Host, requester, options.clientAddress, async () => await signHostCertificate(config, key.key, publicKey, options.principals, options.lifetime))
+	return await issue(config, l, CertificateType.Host, requester, options.clientAddress, async () => await signHostCertificate(config, key.key, publicKey, options.principals, options.lifetime, ["body", "principals"]))
 }
 
 // returns why a certificate cannot be renewed, or undefined if it can be,
@@ -330,7 +341,7 @@ export const renewHostCertificate = async (config: AuthorityConfig, certificate:
 	}
 
 	const originalLifetime = (certificate.validBefore.getTime() - certificate.validAfter.getTime()) / 1000
-	const result = await trySign(l, async () => await signHostCertificate(config, key.key, certificate.publicKey, certificate.principals, clampLifetime(options.lifetime, originalLifetime)))
+	const result = await trySign(l, async () => await signHostCertificate(config, key.key, certificate.publicKey, certificate.principals, clampLifetime(options.lifetime, originalLifetime), ["body", "certificate"]))
 	if (result.kind !== "signed") {
 		return result
 	}

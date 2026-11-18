@@ -18,6 +18,7 @@ import {
 } from "chanfana"
 import { caConfig, MinHostCertificateLifetime, MinUserCertificateLifetime } from "../../config.js"
 import { CertificateType } from "../../db/types.js"
+import { MaxCertificatePrincipals } from "../../principals.js"
 import {
 	CaPublicKeyEndpointSchema,
 	certificate,
@@ -138,8 +139,8 @@ export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 		public_key: subjectPublicKey,
 		identity: identityToken,
-		principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1)
-			.meta({ description: "List of principals to include on the issued certificate" }),
+		principals: z.array(z.string().superRefine(refineHostPrincipal)).min(1).max(MaxCertificatePrincipals)
+			.meta({ description: `List of principals to include on the issued certificate, at most ${MaxCertificatePrincipals} as OpenSSH cannot read a certificate with more. Duplicates are removed` }),
 		lifetime: z.int()
 			.min(MinHostCertificateLifetime)
 			.max(caConfig(env).hostCertificateLifetime)

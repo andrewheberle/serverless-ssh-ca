@@ -252,3 +252,50 @@ describe("renewHostCertificate", () => {
 			.toEqual({ kind: "storeUnavailable", message: "there was a problem checking whether the certificate presented for renewal is revoked" })
 	})
 })
+
+// OpenSSH refuses to read a certificate with more than 256 principals, and
+// counts duplicates, so the CA removes duplicates and refuses more than that
+describe("the number of principals (#602)", () => {
+	const names = (count: number, prefix: string): string[] => Array.from({ length: count }, (_, i) => `${prefix}${i}`)
+	const tooMany = (path: string[]): IssueResult => ({ kind: "notAllowed", message: "a certificate can have at most 256 principals", path })
+
+	it("should issue a host certificate with 256 principals that OpenSSH can read", async () => {
+		const certificate = certificateOf(await issueHostCertificate(config(), requester, pub(ed25519Key.host()), { principals: names(256, "host") }, l))
+
+		expect(listCertificate(certificate.toString()).principals).toHaveLength(256)
+	})
+
+	it("should refuse a host certificate with 257 principals", async () => {
+		expect(await issueHostCertificate(config(), requester, pub(ed25519Key.host()), { principals: names(257, "host") }, l))
+			.toEqual(tooMany(["body", "principals"]))
+	})
+
+	it("should remove duplicate host principals before counting them", async () => {
+		const principals = [...names(256, "host"), "host0"]
+		const certificate = certificateOf(await issueHostCertificate(config(), requester, pub(ed25519Key.host()), { principals }, l))
+
+		expect(listCertificate(certificate.toString()).principals).toEqual(names(256, "host"))
+		expect(certificate.keyId).toBe("host_host0")
+	})
+
+	it("should issue a user certificate with 256 principals that OpenSSH can read", async () => {
+		// one principal comes from SSH_CERTIFICATE_PRINCIPALS
+		const certificate = certificateOf(await issueUserCertificate(config(), { ...requester, principals: names(255, "group") }, pub(ed25519Key.user()), {}, l))
+
+		expect(listCertificate(certificate.toString()).principals).toHaveLength(256)
+	})
+
+	it("should refuse a user certificate with 257 principals", async () => {
+		expect(await issueUserCertificate(config(), { ...requester, principals: names(256, "group") }, pub(ed25519Key.user()), {}, l))
+			.toEqual(tooMany(["body"]))
+	})
+
+	it("should remove principals that are both in the identity token and the configuration before counting them", async () => {
+		const principals = [...names(255, "group"), "ssh-admin"]
+		const certificate = certificateOf(await issueUserCertificate(config({ SSH_CERTIFICATE_PRINCIPALS: "ssh-admin" }), { ...requester, principals }, pub(ed25519Key.user()), {}, l))
+
+		const listed = listCertificate(certificate.toString()).principals
+		expect(listed).toHaveLength(256)
+		expect(new Set(listed).size).toBe(256)
+	})
+})

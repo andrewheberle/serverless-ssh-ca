@@ -1,6 +1,13 @@
 /** The kind of certificate a principal is for */
 export type PrincipalKind = "user" | "host"
 
+/**
+ * The most principals a certificate can have, as OpenSSH refuses to read a
+ * certificate with more (`SSHKEY_CERT_MAX_PRINCIPALS`). Duplicates count
+ * towards the limit, so the CA removes them before signing.
+ */
+export const MaxCertificatePrincipals = 256
+
 // characters that OpenSSH treats as pattern syntax when matching principals,
 // or that separate the entries of a list of principals, such as the
 // principals="..." option of authorized_keys
