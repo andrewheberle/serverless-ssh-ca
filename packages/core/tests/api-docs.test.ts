@@ -3,7 +3,8 @@ import { createHash } from "node:crypto"
 import { DatabaseSync } from "node:sqlite"
 import { createSshCa } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
-import { inlineScriptHashes } from "../src/web/docs.js"
+import { Hono } from "hono"
+import { docsSecurityHeaders, inlineScriptHashes } from "../src/web/docs.js"
 import { makeEnv } from "./env.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 
@@ -78,5 +79,22 @@ describe("inlineScriptHashes", () => {
 			`'sha256-${createHash("sha256").update("c()").digest("base64")}'`,
 			`'sha256-${createHash("sha256").update("d()").digest("base64")}'`,
 		])
+	})
+})
+
+describe("docsSecurityHeaders", () => {
+	it.each([
+		["an error", (): Response => new Response("<script>x()</script>", { status: 500, headers: { "Content-Type": "text/html" } })],
+		["a response that is not HTML", (): Response => new Response("<script>x()</script>", { headers: { "Content-Type": "text/plain" } })],
+		["a response without a content type", (): Response => new Response(null, { status: 204 })],
+	])("should allow no inline scripts for %s", async (_name, respond) => {
+		const app = new Hono()
+		app.use("/docs", docsSecurityHeaders())
+		app.get("/docs", respond)
+
+		const response = await app.request("/docs")
+
+		expect(directives(response.headers.get("Content-Security-Policy")).get("script-src")).toEqual(["https://cdn.jsdelivr.net"])
+		expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff")
 	})
 })
