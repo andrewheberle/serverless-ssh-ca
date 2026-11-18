@@ -150,6 +150,18 @@ const cases: Case[] = [
 		request: async () => await issueHost(newCa(), { principals: ["*"] }),
 	},
 	{
+		name: "more than 256 user principals",
+		path: "/api/v4/user/certificates", method: "post", status: 422,
+		request: async () => await issueUser(newCa(), {}, { ...claims, groups: Array.from({ length: 256 }, (_, i) => `group${i}`) }),
+		errorPath: ["body"],
+	},
+	{
+		name: "more than 256 host principals",
+		path: "/api/v4/host/certificates", method: "post", status: 400,
+		request: async () => await issueHost(newCa(), { principals: Array.from({ length: 257 }, (_, i) => `host${i}.example.com`) }),
+		errorPath: ["body", "principals"],
+	},
+	{
 		name: "a CA key that cannot be parsed",
 		path: "/api/v4/host/certificates", method: "post", status: 500,
 		request: async () => await issueHost(newCa({ PRIVATE_KEY: secretFromString("not a key") })),

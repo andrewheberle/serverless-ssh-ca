@@ -118,7 +118,8 @@
               "type": "string"
             },
             "minItems": 1,
-            "description": "List of principals to include on the issued certificate"
+            "maxItems": 256,
+            "description": "List of principals to include on the issued certificate, at most 256 as OpenSSH cannot read a certificate with more. Duplicates are removed"
           },
           "lifetime": {
             "type": "integer",
