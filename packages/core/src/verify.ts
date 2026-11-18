@@ -71,7 +71,8 @@ export interface JWTRequirements {
 /**
  * Verifies a JWT against a remote JWKS, which is fetched once and cached
  * between requests, including that it was issued by the required issuer for
- * one of the required audiences. Both requester tokens and the JWTs of the
+ * one of the required audiences, and that it has an expiry (`exp`) that has
+ * not passed. Both requester tokens and the JWTs of the
  * identity-aware proxy in front of the admin UI are verified this way.
  *
  * Callers must ensure the issuer and audience are not empty, as jose does not
@@ -86,6 +87,10 @@ export const verifyJWTWithJWKS = async <T extends JWTPayload>(jwt: string, requi
 		issuer: requirements.issuer,
 		algorithms: requirements.algorithms,
 		audience: requirements.audience,
+		// jose only checks exp when the JWT has one, and a JWT without one would
+		// be accepted for ever. OIDC identity tokens, RFC 9068 access tokens and
+		// the JWTs of identity-aware proxies all have one
+		requiredClaims: ["exp"],
 	})
 }
 

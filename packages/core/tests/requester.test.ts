@@ -267,3 +267,21 @@ describe("authenticate with settings validation trims", () => {
 		expect(await run({}, { config: config(overrides) })).toEqual(authenticated)
 	})
 })
+
+// a JWT without exp would be accepted for ever, so every token must have one (#603)
+describe("authenticate with tokens without an expiry", () => {
+	it("should not accept an access token without exp", async () => {
+		expect(await run({ access: await getAccessToken({ sub, email }, { omit: ["exp"] }) })).toEqual(invalid({ token: "access", message: "claim validation of the JWT failed" }))
+	})
+
+	it("should not accept an identity token without exp", async () => {
+		expect(await run({ identity: await getIdentityToken({ sub, email }, { omit: ["exp"] }) })).toEqual(invalid({ token: "identity", message: "problem parsing identity token" }))
+	})
+
+	it("should still accept tokens with exp but without iat", async () => {
+		expect(await run({
+			access: await getAccessToken({ sub, email }, { omit: ["iat"] }),
+			identity: await getIdentityToken({ sub, email }, { omit: ["iat"] }),
+		})).toMatchObject({ kind: "authenticated" })
+	})
+})

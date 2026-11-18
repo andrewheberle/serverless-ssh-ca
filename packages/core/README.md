@@ -611,7 +611,9 @@ Transfer the IdP settings as follows:
 The CA fetches the IdP's keys from `JWT_JWKS_URL` and caches them. If they
 cannot be fetched or are not a valid JWKS, so the CA cannot tell whether a
 token is valid, the request fails with a `500` error and the cause is logged.
-A token signed with a key the JWKS does not have is refused with a `400`.
+A token signed with a key the JWKS does not have is refused with a `400`, as
+is a token without an expiry (`exp`), which every IdP that issues OIDC
+identity tokens or JWT access tokens includes.
 
 The `openid` and `email` scopes are required, with enabling of refresh tokens
 (the `offline_access` scope) being optional, but recommended.
@@ -1045,6 +1047,8 @@ Only the current name of each file is served. Any other name, such as
 cached. Pages are never cached, so they always link the current names.
 
 #### Settings
+
+The proxy's JWT must have an expiry (`exp`), as Cloudflare Access JWTs do.
 
 | Setting | Meaning |
 |---|---|

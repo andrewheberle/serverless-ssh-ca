@@ -366,6 +366,7 @@ describe("admin authentication", () => {
 		["the wrong audience", async () => await proxy.sign({ email: AdminEmail }, { audience: "other-aud" })],
 		["an algorithm that is not allowed", async () => await proxy.sign({ email: AdminEmail }, { key: "es256" })],
 		["an expired JWT", async () => await proxy.sign({ email: AdminEmail }, { expires: Math.floor(Date.now() / 1000) - 60 })],
+		["a JWT without an expiry", async () => await proxy.sign({ email: AdminEmail }, { expires: null })],
 	]
 
 	it.each(unauthenticated)("should refuse %s with 401", async (_name, jwt) => {
