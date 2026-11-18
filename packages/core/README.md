@@ -283,7 +283,10 @@ sequenceDiagram
 ## API
 
 The CA's API is documented in OpenAPI format at `/docs` and in
-[openapi.json](openapi.json):
+[openapi.json](openapi.json). Its `info.version` is the version of the API,
+which follows semver separately from the package: the major version changes
+only with a breaking change. Operation IDs and schema names don't change
+within a major version, so code generated from them keeps working.
 
 | Action                   | Endpoint                                        |
 |--------------------------|-------------------------------------------------|

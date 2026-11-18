@@ -59,6 +59,22 @@ export const cloudflareClientIp: RateLimitKey = (req) => req.headers.get("CF-Con
  * The message API v3 paths are answered with, as API v3 was removed because
  * its proofs of possession were not bound to the request they were sent with.
  */
+/**
+ * The version of the API, published as `info.version` in `openapi.json`. It is
+ * versioned separately from the package, following semver for what clients
+ * can observe:
+ *
+ * - major: a breaking change, which also needs a major release of the package
+ * - minor: something added, such as an operation, a response or an optional field
+ * - patch: a change to descriptions, or a change oasdiff reports as breaking
+ *   that is compatible on the wire and acknowledged in `.oasdiff-err-ignore`
+ *
+ * Bump it in the same change as `openapi.json`. Operation IDs and component
+ * names are part of the contract, as clients generate code from them, so they
+ * are pinned by `tests/openapi-names.test.ts`.
+ */
+export const ApiVersion = "4.0.1"
+
 export const ApiV3RemovedMessage = "API v3 was removed in serverless-ssh-ca 1.0.0; upgrade ssh-ca-client to 0.24.0 or later"
 
 // thrown for API v3 paths, which are answered with a 410 and the message above
@@ -207,7 +223,7 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
 		schema: {
 			info: {
 				title: "Serverless SSH CA API",
-				version: "4.0.0"
+				version: ApiVersion
 			},
 		}
 	})
