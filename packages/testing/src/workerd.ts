@@ -1,4 +1,6 @@
+import { DatabaseSync } from "node:sqlite"
 import { fileURLToPath } from "node:url"
+import { bindingsFromEnv, fromNodeSqlite, secretFromString } from "@andrewheberle/serverless-ssh-ca/node"
 import { createTestHarness } from "wrangler"
 import type { TestServerConfig } from "./config.js"
 import type { LogFile } from "./log.js"
@@ -35,8 +37,20 @@ export const COMPATIBILITY_DATE = "2026-03-13"
  * @param log The log file for the CA and harness
  * @param root The directory Wrangler's working files are written to
  * @returns The running server
+ * @throws InvalidConfigurationError if `config.bindings` is not a valid CA configuration
  */
 export const startWorkerd = async (config: TestServerConfig, log: LogFile, root: string): Promise<TestServer> => {
+	// the CA under workerd only logs an invalid configuration and answers every
+	// request with a 500, so the configuration is validated here first, as it
+	// is under Node.js, so a mistake fails at start up whichever runtime is used.
+	// The database is only needed to validate the bindings, so is closed at once
+	const db = new DatabaseSync(":memory:")
+	try {
+		bindingsFromEnv({ DB: fromNodeSqlite(db), PRIVATE_KEY: secretFromString(config.private_key) }, config.bindings)
+	} finally {
+		db.close()
+	}
+
 	// use placeholder request.cf data rather than downloading it from
 	// Cloudflare and caching it in the working directory
 	process.env.CLOUDFLARE_CF_FETCH_ENABLED = "false"

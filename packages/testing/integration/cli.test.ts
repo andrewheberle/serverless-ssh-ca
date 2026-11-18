@@ -114,9 +114,9 @@ describe("serverless-ssh-ca-test-server", () => {
 		expect(r.output()).toContain("usage:")
 	})
 
-	it("should exit with an error for an invalid CA configuration", async () => {
+	it.each(["node", "workerd"])("should exit with an error for an invalid CA configuration under %s", async (runtime) => {
 		files = writeConfig({ bindings: { ...bindings, SSH_CERTIFICATE_LIFETIME: "forever" } })
-		const r = run(files.configFile)
+		const r = run("--runtime", runtime, files.configFile)
 
 		expect(await r.exited).toBe(1)
 		expect(r.output()).toContain("SSH_CERTIFICATE_LIFETIME")
