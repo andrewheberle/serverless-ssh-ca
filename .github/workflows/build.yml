@@ -31,13 +31,51 @@ jobs:
         run: |
           git diff --exit-code -- packages/core/openapi.json || (echo "OpenAPI schema is out of date. Run 'npm run schema' and commit the changes." && exit 1)
 
+  # Checks openapi.json for breaking changes against the last release, so a
+  # break is caught here even before a client release syncs the schema the
+  # client end-to-end tests compare against. Approved breaking changes are
+  # listed in packages/core/.oasdiff-err-ignore, and .oasdiff.yaml makes
+  # renaming an operation ID or component an error, as clients generate code
+  # from them. Specs are not uploaded to oasdiff.com and no comment is posted
+  openapi:
+    name: openapi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Get openapi.json from the last release
+        id: base
+        run: |
+          tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          if [ -z "$tag" ]; then
+            echo "no release tag found" >&2
+            exit 1
+          fi
+          echo "Comparing with $tag"
+          git show "$tag:packages/core/openapi.json" > _base-openapi.json
+      - name: Check for breaking changes
+        uses: oasdiff/oasdiff-action/breaking@0b95859a27abaed7445bb05c18a39f1a6610a9a4
+        env:
+          OASDIFF_CONFIG: packages/core/.oasdiff.yaml
+        with:
+          base: _base-openapi.json
+          revision: packages/core/openapi.json
+          fail-on: WARN
+          err-ignore: ${{ hashFiles('packages/core/.oasdiff-err-ignore') != '' && 'packages/core/.oasdiff-err-ignore' || '' }}
+          review: 'false'
+          github-token: ''
+
   # Single required check for branch protection, so the ruleset doesn't need
   # updating when jobs or matrix entries change. Runs even when a needed job
   # fails, as a skipped required check counts as passing
   build-ok:
     name: build-ok
     runs-on: ubuntu-latest
-    needs: [worker]
+    needs: [worker, openapi]
     if: ${{ always() }}
     permissions: {}
     steps:

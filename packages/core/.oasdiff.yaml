@@ -1,0 +1,4 @@
+# Used by the oasdiff check in .github/workflows/build.yml (OASDIFF_CONFIG).
+# Clients generate code from operation IDs and component names, so renaming
+# either is breaking, although oasdiff only reports it as INFO by default.
+severity-levels: .oasdiff-severity-levels
