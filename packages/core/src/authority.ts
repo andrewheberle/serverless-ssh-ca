@@ -20,13 +20,13 @@ export type AuthorityConfig = SshCaBindings
  * The result of issuing a certificate.
  *
  * - `issued`: the certificate was signed and recorded
- * - `notAllowed`: the CA's configuration does not allow the certificate asked for, such as one with an extension that is not permitted or without any principals
+ * - `notAllowed`: the CA's configuration does not allow the certificate asked for, such as one with an extension that is not permitted or without any principals. `path` is the request field it is about, or `["body"]` when it is not about one field, as a principal may come from the identity token or the configuration
  * - `keyMisconfigured`: the CA key could not be parsed or is of a type that is not supported
  * - `storeUnavailable`: the database could not be used, so no certificate was issued
  */
 export type IssueResult =
 	| { kind: "issued", certificate: SshCertificate }
-	| { kind: "notAllowed", message: string }
+	| { kind: "notAllowed", message: string, path: string[] }
 	| { kind: "keyMisconfigured", message: string }
 	| { kind: "storeUnavailable", message: string }
 
@@ -45,9 +45,13 @@ export type RenewResult =
  * Thrown when the CA's configuration does not allow the certificate asked for.
  */
 class CertificateError extends Error {
-	constructor(message: string) {
+	/** The request field the error is about, or `["body"]` when it is not about one field */
+	readonly path: string[]
+
+	constructor(message: string, path: string[] = ["body"]) {
 		super(message)
 		this.name = "CertificateError"
+		this.path = path
 
 		Object.setPrototypeOf(this, CertificateError.prototype)
 	}
@@ -103,7 +107,7 @@ const loadKey = async (config: AuthorityConfig, l: Logger): Promise<KeyResult> =
 
 type SignResult =
 	| { kind: "signed", certificate: SshCertificate }
-	| { kind: "notAllowed", message: string }
+	| { kind: "notAllowed", message: string, path: string[] }
 
 // signs a certificate, unless the CA's configuration does not allow it
 const trySign = async (l: Logger, signed: () => Promise<SshCertificate>): Promise<SignResult> => {
@@ -112,7 +116,7 @@ const trySign = async (l: Logger, signed: () => Promise<SshCertificate>): Promis
 	} catch (err) {
 		if (err instanceof CertificateError) {
 			l.warn("certificate could not be issued", "error", err.message)
-			return { kind: "notAllowed", message: err.message }
+			return { kind: "notAllowed", message: err.message, path: err.path }
 		}
 		throw err
 	}
@@ -201,7 +205,7 @@ export const issueUserCertificate = async (config: AuthorityConfig, requester: R
 		const allowed = settings.extensions
 		const notAllowed = options.extensions?.find((extension) => !allowed.includes(extension))
 		if (notAllowed !== undefined) {
-			throw new CertificateError(`${notAllowed} is not allowed`)
+			throw new CertificateError(`${notAllowed} is not allowed`, ["body", "extensions"])
 		}
 
 		return await sign(key.key, {
