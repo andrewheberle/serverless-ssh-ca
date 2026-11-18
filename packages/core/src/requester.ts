@@ -1,5 +1,5 @@
 import type { Logger } from "@andrewheberle/ts-slog"
-import { JWKInvalid, JWKSInvalid, JWSInvalid, JWSSignatureVerificationFailed, JWTClaimValidationFailed, JWTExpired, JWTInvalid } from "jose/errors"
+import { JOSEError, JWKInvalid, JWKSInvalid, JWKSTimeout, JWSInvalid, JWSSignatureVerificationFailed, JWTClaimValidationFailed, JWTExpired, JWTInvalid } from "jose/errors"
 import z from "zod"
 import { CertificateType } from "./db/types.js"
 import type { CertificateRequestJWTPayload, SshCaBindings } from "./types.js"
@@ -201,6 +201,23 @@ const bearerToken = (authorization: string): string | undefined => {
 	return match?.[1]
 }
 
+/**
+ * Whether verifying a JWT failed because the IdP's JWKS could not be fetched
+ * or used, rather than because of the token. jose reports a JWKS that timed
+ * out as {@link JWKSTimeout}, one that is not a JWKS as {@link JWKSInvalid},
+ * and a response that is not 200 or not JSON as a plain {@link JOSEError}, and
+ * passes on errors from fetch itself, such as a connection that is refused.
+ * Problems with the token are reported as other subclasses of JOSEError, such
+ * as a token signed with a key the JWKS does not have.
+ */
+const jwksUnavailable = (err: unknown): boolean => {
+	if (err instanceof JWKSTimeout || err instanceof JWKSInvalid) {
+		return true
+	}
+
+	return err instanceof JOSEError ? err.code === "ERR_JOSE_GENERIC" : true
+}
+
 const verifyAccessToken = async (config: RequesterConfig, logger: Logger, authorization: string): Promise<TokenResult<AccessToken>> => {
 	const l = logger.with("in", "verifyAccessToken")
 
@@ -237,14 +254,15 @@ const verifyAccessToken = async (config: RequesterConfig, logger: Logger, author
 				return { kind: "misconfigured", message: err.message }
 			case (err instanceof TokenClaimError):
 				return { kind: "invalid", message: err.message }
+			case jwksUnavailable(err):
+				l.error("the access token could not be verified as the IdP's JWKS could not be used", "error", err)
+				return { kind: "unavailable", message: "the access token could not be verified" }
 			case (err instanceof JWSInvalid):
 				return { kind: "invalid", message: "the access token was invalid" }
 			case (err instanceof JWTInvalid):
 				return { kind: "invalid", message: "the access token failed verification" }
 			case (err instanceof JWKInvalid):
 				return { kind: "invalid", message: "the access token JWK was invalid" }
-			case (err instanceof JWKSInvalid):
-				return { kind: "invalid", message: "the access token JWKS was invalid" }
 			case (err instanceof JWTClaimValidationFailed):
 				l.warn("claim validation of the access token failed", ...claimValidationAttributes(err))
 				return { kind: "invalid", message: "claim validation of the JWT failed" }
@@ -277,6 +295,10 @@ const verifyIdentityToken = async (config: RequesterConfig, logger: Logger, toke
 		if (err instanceof MissingAudienceError || err instanceof MissingIssuerError) {
 			l.error(err.message)
 			return { kind: "misconfigured", message: err.message }
+		}
+		if (!(err instanceof TokenClaimError) && jwksUnavailable(err)) {
+			l.error("the identity token could not be verified as the IdP's JWKS could not be used", "error", err)
+			return { kind: "unavailable", message: "the identity token could not be verified" }
 		}
 		if (err instanceof JWTClaimValidationFailed) {
 			l.warn("claim validation of the identity token failed", ...claimValidationAttributes(err))

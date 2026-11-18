@@ -608,6 +608,11 @@ Transfer the IdP settings as follows:
 | Claim that holds the user's groups or roles | `JWT_SSH_CERTIFICATE_PRINCIPALS_CLAIM` | |
 | Redirect URL | `JWT_ACCESS_TOKEN_AUD`, for Cloudflare Access (see below) | Must match the client's configured redirect URL |
 
+The CA fetches the IdP's keys from `JWT_JWKS_URL` and caches them. If they
+cannot be fetched or are not a valid JWKS, so the CA cannot tell whether a
+token is valid, the request fails with a `500` error and the cause is logged.
+A token signed with a key the JWKS does not have is refused with a `400`.
+
 The `openid` and `email` scopes are required, with enabling of refresh tokens
 (the `offline_access` scope) being optional, but recommended.
 
