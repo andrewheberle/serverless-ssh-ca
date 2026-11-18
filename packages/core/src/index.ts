@@ -5,6 +5,7 @@ import { internalServerErrorResponse } from "./errors.js"
 import { logger } from "./logger.js"
 import { cloudflareClientIp, createApp, type SshCaOptions } from "./router.js"
 import type { SshCaBindings } from "./types.js"
+import { warnAboutBindings } from "./bindings.js"
 export type { CaCache, CaDatabase, CaDatabaseQueryResult, CaDatabaseResult, CaPreparedStatement, CaRateLimiter, CaSecret, SshCaBindings } from "./types.js"
 export { cloudflareClientIp, type RateLimitKey, type SshCaOptions } from "./router.js"
 export type { ClientAddressSource } from "./client-address.js"
@@ -49,8 +50,10 @@ export interface SshCa {
  * option
  */
 export const createSshCa = (env: SshCaBindings, options: SshCaOptions = {}): SshCa => {
-    // refuse an invalid configuration before anything is served with it
+    // refuse an invalid configuration before anything is served with it, and
+    // warn about one that is valid but will not fully work
     caConfig(env)
+    warnAboutBindings(env)
 
     // the default key is a header that only Cloudflare sets, which a client
     // can set itself anywhere else, so the key must be chosen explicitly
@@ -106,6 +109,7 @@ export default {
         if (!isValid(env)) {
             return invalidConfigurationResponse()
         }
+        warnAboutBindings(env)
 
         let app = apps.get(env)
         if (app === undefined) {
@@ -121,6 +125,7 @@ export default {
         if (!isValid(env)) {
             return
         }
+        warnAboutBindings(env)
 
         ctx.waitUntil(dbCleanup(env))
     },
