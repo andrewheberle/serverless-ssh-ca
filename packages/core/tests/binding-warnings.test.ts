@@ -90,6 +90,25 @@ describe("warnings about a configuration that will not fully work", () => {
 	})
 })
 
+describe("the Workers scheduled cleanup", () => {
+	it("should warn once and run the cleanup when the configuration is valid", async () => {
+		const sqlite = new DatabaseSync(":memory:")
+		const env = valid({ DB: fromNodeSqlite(sqlite), CACHE: wrong<SshCaBindings["CACHE"]>({}) })
+		const waited: Promise<unknown>[] = []
+		const ctx = { waitUntil: (promise: Promise<unknown>) => { waited.push(promise) }, passThroughOnException: () => undefined, props: {} }
+		const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
+
+		await ca.scheduled(undefined, env, ctx)
+		await ca.scheduled(undefined, env, ctx)
+		await Promise.all(waited)
+
+		expect(log.mock.calls.flatMap(([entry]) => messageAt("warning", entry) ?? [])).toEqual([expect.stringContaining("the CACHE binding is not a cache")])
+		expect(waited).toHaveLength(2)
+		// the cleanup ran, so the database was migrated
+		expect(sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'certificates'").get()).toBeDefined()
+	})
+})
+
 describe("a missing DB binding", () => {
 	// vitest fails the run on an unhandled rejection, which is how a missing
 	// DB used to crash Node.js
