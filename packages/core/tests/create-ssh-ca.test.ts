@@ -11,10 +11,18 @@ const keyBlob = (pub: string): string => pub.trim().split(" ").slice(0, 2).join(
 // a database that records any use of it
 const trackedDatabase = (): { db: CaDatabase, used: PropertyKey[] } => {
 	const used: PropertyKey[] = []
+	// every method is recorded when it is called, rather than when it is read,
+	// as creating the CA checks the binding has the methods of a database.
+	// "then" is left out so the binding is not taken for a promise
 	const db = new Proxy({}, {
 		get(_, prop) {
-			used.push(prop)
-			throw new Error("database should not be used")
+			if (prop === "then") {
+				return undefined
+			}
+			return () => {
+				used.push(prop)
+				throw new Error("database should not be used")
+			}
 		},
 	}) as unknown as CaDatabase
 	return { db, used }

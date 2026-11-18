@@ -138,7 +138,7 @@ describe("admin configuration", () => {
 
 	it("should turn the admin UI off, without a warning, when no admin setting is set", async () => {
 		const log = vi.spyOn(console, "log").mockImplementation(() => undefined)
-		const ca = createSshCa(makeEnv({ PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey), LOG_LEVEL: "debug" }))
+		const ca = createSshCa(makeEnv({ DB: fromNodeSqlite(new DatabaseSync(":memory:")), PRIVATE_KEY: new MockSecretStore(ecdsaKey.ca().privateKey), LOG_LEVEL: "debug" }))
 
 		const response = await ca.fetch(await request("/admin"))
 		expect(response.status).toBe(404)

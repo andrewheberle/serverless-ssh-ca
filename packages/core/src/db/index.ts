@@ -6,6 +6,7 @@ import { caConfig } from "../config.js"
 import { D1QB } from "workers-qb"
 import { z } from "zod"
 import { migrateOnce } from "./migrate.js"
+import { isDatabaseBinding } from "../bindings.js"
 import { migrations } from "./migrations/index.js"
 import { CertificateType, type DatabaseSchema, type KrlRecord } from "./types.js"
 import type { ClientAddress } from "../client-address.js"
@@ -20,6 +21,12 @@ const connect = async (env: StoreBindings): Promise<D1QB<DatabaseSchema>> => {
 
 	try {
 		l.debug("connecting to database")
+
+		// a missing or wrong binding would otherwise fail inside migrateOnce in a
+		// way that leaves a promise rejected without anything awaiting it
+		if (!isDatabaseBinding(env.DB)) {
+			throw new TypeError("the DB binding is missing or is not a database")
+		}
 
 		const appliedMigrations = await migrateOnce(env.DB, migrations)
 

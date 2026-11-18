@@ -533,6 +533,20 @@ How an invalid configuration is reported depends on the runtime:
   from both `@andrewheberle/serverless-ssh-ca` and
   `@andrewheberle/serverless-ssh-ca/node`.
 
+Some configurations are valid but will not fully work. For these the CA logs
+a warning once, when it is created on Node.js or first used on Workers, and
+still serves requests, as they will only be refused in a future major
+release:
+
+- a `DB` or `PRIVATE_KEY` binding that is missing or is not a database or
+  secret, so certificates cannot be issued
+- a `RATE_LIMITER` or `CACHE` binding that is set but is not a rate limiter
+  or cache, so it is not used
+- an `ISSUER_DN` with control characters, such as a line break
+- only one of `ADMIN_ALLOWED_ROLES` and `ADMIN_JWT_ROLES_CLAIM`, so admins are
+  not recognised by role
+- `JWT_ACCESS_TOKEN_AUD` with `OIDC_USERINFO_URL`, which ignores it
+
 The scheduled cleanup removes certificates that expired longer ago than
 `DB_CERTIFICATE_RETENTION`. A revoked certificate stays in the KRL until 24
 hours after it expires, so it is not removed before then, however short the
