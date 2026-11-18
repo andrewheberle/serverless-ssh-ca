@@ -52,7 +52,7 @@ describe("API docs", () => {
 		const html = await response.text()
 
 		// hashed here independently of the CA, from the scripts chanfana serves
-		const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(([, body = ""]) => `'sha256-${createHash("sha256").update(body).digest("base64")}'`)
+		const inline = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)].filter(([, attributes = ""]) => !/\bsrc\s*=/i.test(attributes)).map(([, , body = ""]) => `'sha256-${createHash("sha256").update(body).digest("base64")}'`)
 		expect(inline).toHaveLength(1)
 
 		const scriptSrc = directives(response.headers.get("Content-Security-Policy")).get("script-src")
@@ -69,12 +69,14 @@ describe("API docs", () => {
 })
 
 describe("inlineScriptHashes", () => {
-	it("should hash inline scripts and skip scripts loaded from a URL", async () => {
-		const html = `<script src="https://example.com/a.js"></script><script>alert(1)</script><script type="module">b()</script>`
+	it("should hash inline scripts in any case and skip scripts loaded from a URL", async () => {
+		const html = `<script src="https://example.com/a.js"></script><script>alert(1)</script><script type="module">b()</script><SCRIPT SRC="https://example.com/c.js"></SCRIPT><SCRIPT>c()</SCRIPT ><script>d()</script foo="bar">`
 
 		expect(await inlineScriptHashes(html)).toEqual([
 			`'sha256-${createHash("sha256").update("alert(1)").digest("base64")}'`,
 			`'sha256-${createHash("sha256").update("b()").digest("base64")}'`,
+			`'sha256-${createHash("sha256").update("c()").digest("base64")}'`,
+			`'sha256-${createHash("sha256").update("d()").digest("base64")}'`,
 		])
 	})
 })

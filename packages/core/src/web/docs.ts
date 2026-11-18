@@ -7,8 +7,9 @@ import { SecurityHeaders } from "./headers.js"
  */
 export const DocsAssetOrigin = "https://cdn.jsdelivr.net"
 
-// the inline scripts of a page, those without a src attribute
-const InlineScript = /<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g
+// the scripts of a page, matched as browsers do: tag names in any case, and a
+// closing tag that may have whitespace or attributes before its ">"
+const Script = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi
 
 /**
  * Returns the CSP hash sources (`'sha256-...'`) of the inline scripts of an
@@ -19,9 +20,9 @@ const InlineScript = /<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g
  */
 export const inlineScriptHashes = async (html: string): Promise<string[]> => {
 	const hashes: string[] = []
-	for (const match of html.matchAll(InlineScript)) {
-		const [tag, body] = match
-		if (body === undefined || body === "" || /\ssrc\s*=/.test(tag.slice(0, tag.indexOf(">")))) {
+	for (const [, attributes = "", body = ""] of html.matchAll(Script)) {
+		// a script loaded from a URL is allowed by its origin, not its content
+		if (body === "" || /\bsrc\s*=/i.test(attributes)) {
 			continue
 		}
 
