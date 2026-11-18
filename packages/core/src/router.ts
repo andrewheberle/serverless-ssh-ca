@@ -7,6 +7,7 @@ import { HTTPException } from "hono/http-exception"
 import { logger } from "./logger.js"
 import { errorResponse, internalServerErrorResponse } from "./errors.js"
 import { docsSecurityHeaders, noSniff } from "./web/docs.js"
+import { requestBodyLimit, requireJsonBody } from "./api/body.js"
 import type { SshCaBindings } from "./types.js"
 import { clientAddressOf, type ClientAddress, type ClientAddressSource } from "./client-address.js"
 
@@ -73,7 +74,7 @@ export const cloudflareClientIp: RateLimitKey = (req) => req.headers.get("CF-Con
  * names are part of the contract, as clients generate code from them, so they
  * are pinned by `tests/openapi-names.test.ts`.
  */
-export const ApiVersion = "4.0.1"
+export const ApiVersion = "4.1.0"
 
 export const ApiV3RemovedMessage = "API v3 was removed in serverless-ssh-ca 1.0.0; upgrade ssh-ca-client to 0.24.0 or later"
 
@@ -105,6 +106,12 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
     }
     hono.all("/api/v3", apiV3Removed)
     hono.all("/api/v3/*", apiV3Removed)
+
+    // request bodies are limited in size, and one that is not JSON is refused,
+    // before anything else is done with the request, such as rate limiting it
+    // or verifying its tokens
+    hono.use("/api/*", requestBodyLimit())
+    hono.use("/api/*", requireJsonBody())
 
     // the client address of requests that issue, renew and revoke
     // certificates, which is recorded with them
