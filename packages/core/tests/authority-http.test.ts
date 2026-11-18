@@ -37,10 +37,10 @@ const validationError = (message: string, path: string[]) => ({
 	errors: [{ code: 7001, message, path }],
 })
 
-const unprocessable = (message: string) => ({
+const unprocessable = (message: string, path: string[] = ["body"]) => ({
 	success: false,
 	result: null,
-	errors: [{ code: 7007, message }],
+	errors: [{ code: 7007, message, path }],
 })
 
 const internalError = {
@@ -93,7 +93,7 @@ describe.each(issueEndpoints)("responses to certificates the CA will not issue (
 	it.runIf(user)("should return 422 for an extension that is not allowed", async () => {
 		const response = await request(newCa(), { extensions: ["permit-everything"] })
 		expect(response.status).toBe(422)
-		expect(await response.json()).toEqual(unprocessable("permit-everything is not allowed"))
+		expect(await response.json()).toEqual(unprocessable("permit-everything is not allowed", ["body", "extensions"]))
 	})
 
 	it.runIf(user)("should return 422 for a certificate without principals", async () => {

@@ -83,12 +83,12 @@ describe("issueUserCertificate", () => {
 
 	it("should not issue a certificate with an extension that is not allowed", async () => {
 		expect(await issueUserCertificate(config(), requester, pub(ed25519Key.user()), { extensions: ["no-touch-required"] }, l))
-			.toEqual({ kind: "notAllowed", message: "no-touch-required is not allowed" })
+			.toEqual({ kind: "notAllowed", message: "no-touch-required is not allowed", path: ["body", "extensions"] })
 	})
 
 	it("should not issue a certificate without principals", async () => {
 		expect(await issueUserCertificate(config({ SSH_CERTIFICATE_PRINCIPALS: "" }), { ...requester, principals: [] }, pub(ed25519Key.user()), {}, l))
-			.toEqual({ kind: "notAllowed", message: "a certificate must have at least one principal" })
+			.toEqual({ kind: "notAllowed", message: "a certificate must have at least one principal", path: ["body"] })
 	})
 
 	it("should be valid from the current second for the requested lifetime", async () => {
@@ -143,7 +143,7 @@ describe("issueHostCertificate", () => {
 
 	it("should not issue a certificate without principals", async () => {
 		expect(await issueHostCertificate(config(), requester, pub(ed25519Key.host()), { principals: [] }, l))
-			.toEqual({ kind: "notAllowed", message: "a certificate must have at least one principal" })
+			.toEqual({ kind: "notAllowed", message: "a certificate must have at least one principal", path: ["body"] })
 	})
 
 	it("should not be valid for longer than the configured lifetime", async () => {

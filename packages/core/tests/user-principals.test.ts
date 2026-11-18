@@ -44,10 +44,10 @@ const recorded = (sqlite: DatabaseSync): unknown => sqlite.prepare("SELECT name 
 	? 0
 	: (sqlite.prepare("SELECT count(*) AS n FROM certificates").get() as { n: number }).n
 
-const unprocessable = (message: string) => ({
+const unprocessable = (message: string, path: string[] = ["body"]) => ({
 	success: false,
 	result: null,
-	errors: [{ code: 7007, message }],
+	errors: [{ code: 7007, message, path }],
 })
 
 describe("user certificate principals from the identity token", () => {

@@ -292,7 +292,7 @@ export const certificateResponse = async (c: AppContext, l: Logger, result: Prom
 			// the certificate was revoked, or renewed by another request, since it was checked
 			throw new InputValidationException("the provided certificate is revoked", ["body", "certificate"])
 		case "notAllowed":
-			throw new UnprocessableEntityException(outcome.message)
+			throw new UnprocessableEntityException(outcome.message, outcome.path)
 		case "keyMisconfigured":
 		case "storeUnavailable":
 			// the reason was logged when the CA key or database was used
