@@ -6,6 +6,7 @@ import { BasePath as v4BasePath, createApi as apiv4 } from "./api/v4/index.js"
 import { HTTPException } from "hono/http-exception"
 import { logger } from "./logger.js"
 import { errorResponse, internalServerErrorResponse } from "./errors.js"
+import { docsSecurityHeaders, noSniff } from "./web/docs.js"
 import type { SshCaBindings } from "./types.js"
 import { clientAddressOf, type ClientAddress, type ClientAddressSource } from "./client-address.js"
 
@@ -185,6 +186,15 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
         return c.text("404 Not Found", 404)
     })
 
+    // the API docs: Swagger UI at /docs and the schema at /openapi.json, both
+    // served by chanfana. ReDoc is turned off below, and the YAML schema,
+    // which chanfana serves with the JSON one, is answered with a 404 here,
+    // as neither is documented and every page served shares the admin UI's
+    // origin (#611)
+    hono.use("/docs", docsSecurityHeaders())
+    hono.use("/openapi.json", noSniff())
+    hono.get("/openapi.yaml", (c) => c.notFound())
+
     // the admin UI is a plain Hono app, so is not part of the OpenAPI schema
     hono.route(AdminBasePath, createAdminApp(env))
 
@@ -193,6 +203,7 @@ export const createApp = (env: SshCaBindings, options: SshCaOptions = {}) => {
     hono.route("/", createLandingApp(env))
 
     const app = fromHono(hono, {
+		redoc_url: null,
 		schema: {
 			info: {
 				title: "Serverless SSH CA API",
