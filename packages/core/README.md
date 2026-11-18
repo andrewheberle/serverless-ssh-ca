@@ -406,6 +406,11 @@ not promised either. A `500` never explains its cause, which is logged
 instead. See the addendum to
 [ADR 0001](../../docs/adr/0001-authenticate-requesters-outside-request-validation.md).
 
+A request under `/api/` that matches no endpoint, including one to a known
+path with the wrong method, gets a `404` with this body and the message
+`not found`. Revoking a certificate the CA doesn't know also gets a `404`,
+with the message `certificate not found`, so tell the two apart by message.
+
 ## Configuration
 
 ### Settings
