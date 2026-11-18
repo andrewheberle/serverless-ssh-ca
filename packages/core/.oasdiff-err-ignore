@@ -1,0 +1,2 @@
+# ssh-ca-client v1.0.2: host certificate requests may have at most 256 principals (#602, #648), as OpenSSH cannot read a certificate with more, so no client can use one; compatible on the wire
+POST /api/v4/host/certificates the `principals` request property's maxItems was set to `256`
