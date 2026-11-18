@@ -176,11 +176,28 @@ export function convertPublicKey(publickey: Pubkey): {
   }
 }
 
+/**
+ * The signature algorithms a key of each type may sign with. RSA keys may use
+ * SHA-512 or SHA-256 but not SHA-1 ("ssh-rsa"), as PROTOCOL.sshsig requires;
+ * other keys sign with the algorithm named after their type.
+ *
+ * @param pk_algo The public key's algorithm name
+ * @returns The signature algorithm names allowed for that key
+ */
+export function signatureAlgorithmsFor(pk_algo: string): readonly string[] {
+  return pk_algo === "ssh-rsa" ? ["rsa-sha2-512", "rsa-sha2-256"] : [pk_algo];
+}
+
 export function convertAlgorithm(sig_algo: string) {
   if (sig_algo === "rsa-sha2-512") {
     return {
       name: "RSASSA-PKCS1-v1_5",
       hash: { name: "SHA-512" },
+    };
+  } else if (sig_algo === "rsa-sha2-256") {
+    return {
+      name: "RSASSA-PKCS1-v1_5",
+      hash: { name: "SHA-256" },
     };
   } else if (
     sig_algo === "ssh-ed25519" || sig_algo === "sk-ssh-ed25519@openssh.com"

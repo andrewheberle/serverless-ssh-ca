@@ -26,9 +26,10 @@ export const transformProofOfPossession = (env: SshCaBindings, val: string, ctx:
 
 		return proof
 	} catch (err) {
-		l.error("proof of possession parsing error", "error", err)
 		switch (true) {
 			case (err instanceof PossessionParseError):
+				// a proof the requester sent that is not valid is not a fault of the CA
+				l.warn("proof of possession parsing error", "error", err)
 				ctx.issues.push({
 					code: "custom",
 					message: err.message,
@@ -36,6 +37,7 @@ export const transformProofOfPossession = (env: SshCaBindings, val: string, ctx:
 				})
 				break
 			default:
+				l.error("proof of possession parsing error", "error", err)
 				ctx.issues.push({
 					code: "custom",
 					message: "proof of possession transform unhandled error",

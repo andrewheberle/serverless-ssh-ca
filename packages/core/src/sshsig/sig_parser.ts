@@ -1,6 +1,6 @@
 import { Sig } from "./sig.js";
 import { Reader } from "./reader.js";
-import { parsePubkey } from "./formats.js";
+import { parsePubkey, signatureAlgorithmsFor } from "./formats.js";
 import { dearmor } from "./armor.js";
 
 /**
@@ -104,8 +104,16 @@ export function parse(signature: DataView | string): Sig {
   const namespace = reader.readString().toString();
   const reserved = reader.readString().bytes();
   const hash_algorithm = reader.readString().toString();
+  if (hash_algorithm !== "sha256" && hash_algorithm !== "sha512") {
+    throw new Error(`unsupported hash algorithm: ${hash_algorithm}`);
+  }
   const raw_signature = reader.readString();
   const sig_algo = raw_signature.readString().toString();
+  // the signature must be made with an algorithm the key can sign with, so an
+  // RSA key's SHA-1 signature, or another key type's algorithm, is refused
+  if (!signatureAlgorithmsFor(pk_algo).includes(sig_algo)) {
+    throw new Error(`signature algorithm ${sig_algo} cannot be used with a ${pk_algo} key`);
+  }
   const sig_bytes = raw_signature.readString();
   let bytes;
   if (isEcdsaSigAlgo(sig_algo)) {

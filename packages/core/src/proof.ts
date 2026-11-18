@@ -153,7 +153,14 @@ constructor(proof: string, options?: { from?: number, logger?: Logger, skew?: nu
 	 * @returns true if signature is valid for the request, false otherwise
 	 */
 	async verifyRequest(method: string, path: string): Promise<boolean> {
-		return await verify(this.signature, `${this.data}.${requestBinding(method, path)}`, { namespace: RequestNamespace })
+		try {
+			return await verify(this.signature, `${this.data}.${requestBinding(method, path)}`, { namespace: RequestNamespace })
+		} catch (err) {
+			// the key or signature could be parsed but not used, such as a key
+			// WebCrypto cannot import, which is the requester's fault
+			this.logger.warn("proof of possession signature could not be verified", "error", err)
+			return false
+		}
 	}
 
 	/**
