@@ -85,21 +85,52 @@ const RequestTimeSkew = Duration(
 	"must be a positive duration of at most 5 minutes, such as \"90 seconds\"",
 )
 
-// an SQLite date modifier for a positive period, such as "1 year" or "90 days"
-const RetentionPeriodFormat = /^\+?(\d+(\.\d+)?) (second|minute|hour|day|month|year)s?$/
+// a positive period such as "1 year", "90 days" or "2 weeks", with any
+// whitespace between the number and the unit and an optional leading "+"
+const RetentionPeriodFormat = /^(\+?)(\d+(?:\.\d+)?)\s+(second|minute|hour|day|week|month|year)(s?)$/
+
+/**
+ * Converts a retention period to an SQLite date modifier, which has one space
+ * between the number and the unit and no "week" unit, so weeks become days.
+ *
+ * @param value The retention period, such as "2 weeks"
+ * @returns The date modifier, such as "14 days", or undefined if `value` is
+ * not a positive period
+ */
+const retentionModifier = (value: string): string | undefined => {
+	const match = RetentionPeriodFormat.exec(value)
+	if (match === null) {
+		return undefined
+	}
+
+	const [, sign = "", amount = "", unit = "", plural = ""] = match
+	if (!(Number(amount) > 0)) {
+		return undefined
+	}
+
+	return unit === "week"
+		? `${sign}${Number(amount) * 7} days`
+		: `${sign}${amount} ${unit}${plural}`
+}
 
 /**
  * How long certificates are kept after they expire, either "infinite" or a
- * positive period in the format of an SQLite date modifier such as "1 year".
+ * positive period such as "1 year" or "2 weeks", which is converted to an
+ * SQLite date modifier.
  */
-export const RetentionString = z.string().refine((v) => {
+export const RetentionString = z.string().transform((v, ctx): string => {
 	if (v === "infinite") {
-		return true
+		return v
 	}
 
-	const amount = RetentionPeriodFormat.exec(v)?.[1]
-	return amount !== undefined && Number(amount) > 0
-}, { message: "must be \"infinite\" or a positive period such as \"1 year\"" })
+	const modifier = retentionModifier(v)
+	if (modifier === undefined) {
+		ctx.issues.push({ code: "custom", message: "must be \"infinite\" or a positive period such as \"1 year\"", input: v })
+		return z.NEVER
+	}
+
+	return modifier
+})
 
 // how long certificates are kept, see RetentionString
 const RetentionSetting = RetentionString.transform((v): Retention => v === "infinite" ? { kind: "infinite" } : { kind: "period", modifier: v })
@@ -214,8 +245,12 @@ const checkExtensions = (extensions: string[], ctx: z.RefinementCtx): void => {
 // the extensions included in user certificates by default
 const ExtensionList = List.superRefine(checkExtensions)
 
-// a flag, either as a boolean or as the string "true" or "false"
-const Flag = z.union([z.boolean(), BooleanString]).optional().transform((v): boolean => v === true || v === "true")
+// a flag, either as a boolean or as the string "true" or "false", which is
+// false when it is missing or an empty string (as an unset var may be on Workers)
+const Flag = z.preprocess(
+	(v) => v === "" ? undefined : v,
+	z.union([z.boolean(), BooleanString], { message: "must be \"true\" or \"false\"" }).optional(),
+).transform((v): boolean => v === true || v === "true")
 
 /**
  * An admin setting that may be left unset, which is unset when it is missing
@@ -388,7 +423,7 @@ const ConfigFields = z.object({
 	SSH_HOST_CERTIFICATE_ALLOWED_ROLES: List,
 	SSH_HOST_CERTIFICATE_LIFETIME: Lifetime(MinHostCertificateLifetime, "24 hours"),
 	DB_CERTIFICATE_RETENTION: RetentionSetting,
-	LOG_LEVEL: LogLevelName.optional(),
+	LOG_LEVEL: OptionalSetting(LogLevelName),
 	LANDING_PAGE: Flag,
 	// the admin settings may each be missing, which turns the admin UI off,
 	// but any that are set must be valid

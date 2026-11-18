@@ -195,3 +195,38 @@ describe("durations (#578)", () => {
 		expect(minimum).toBeLessThanOrEqual(maximum)
 	})
 })
+
+describe("empty strings and retention periods (#584)", () => {
+	it.each(["LANDING_PAGE", "SSH_CERTIFICATE_INCLUDE_SELF", "SSH_CERTIFICATE_INCLUDE_SELF_EMAIL", "LOG_LEVEL"])("should treat an empty %s as unset", (name) => {
+		expect(bothRuntimes({ [name]: "" })).toBe("accepted")
+	})
+
+	it("should read an empty flag as false", () => {
+		const config = caConfig(makeEnv({ LANDING_PAGE: "", SSH_CERTIFICATE_INCLUDE_SELF: "", SSH_CERTIFICATE_INCLUDE_SELF_EMAIL: "" }))
+
+		expect([config.landingPage, config.includeSelf, config.includeSelfEmail]).toEqual([false, false, false])
+	})
+
+	it("should say what a flag must be", () => {
+		expect(bothRuntimes({ LANDING_PAGE: "yes" })).toContain("must be \"true\" or \"false\"")
+	})
+
+	it.each([
+		["1 year", "1 year"],
+		["+1 year", "+1 year"],
+		["90 days", "90 days"],
+		["90  days", "90 days"],
+		["90\tdays", "90 days"],
+		["1 week", "7 days"],
+		["2 weeks", "14 days"],
+		["+2 weeks", "+14 days"],
+		["1.5 weeks", "10.5 days"],
+	])("should accept a retention period of %j as the SQLite modifier %j", (value, modifier) => {
+		expect(bothRuntimes({ DB_CERTIFICATE_RETENTION: value })).toBe("accepted")
+		expect(caConfig(makeEnv({ DB_CERTIFICATE_RETENTION: value })).retention).toEqual({ kind: "period", modifier })
+	})
+
+	it.each(["0 weeks", "-1 week", "1 fortnight", "weeks", "1weeks"])("should refuse a retention period of %j", (value) => {
+		expect(bothRuntimes({ DB_CERTIFICATE_RETENTION: value })).toContain("DB_CERTIFICATE_RETENTION")
+	})
+})
