@@ -5,7 +5,8 @@ import ca, { createSshCa, InvalidConfigurationError } from "../src/index.js"
 import { recordCertificate, revokeCertificate } from "../src/db/index.js"
 import { CertificateType } from "../src/db/types.js"
 import { bindingsFromEnv, fromNodeSqlite, InvalidConfigurationError as NodeInvalidConfigurationError, secretFromString } from "../src/node/index.js"
-import { MissingIssuerError, verifyJWT } from "../src/verify.js"
+import { MissingAudienceError, MissingIssuerError, verifyJWT } from "../src/verify.js"
+import { caConfig } from "../src/config.js"
 import type { CaDatabase, SshCaBindings } from "../src/types.js"
 import { makeEnv } from "./env.js"
 import { hostCertificate } from "./helpers/certificate.js"
@@ -154,13 +155,16 @@ describe("bindingsFromEnv", () => {
 })
 
 describe("verifyJWT", () => {
-	it.each([
-		["empty", ""],
-		["whitespace", " "],
-	])("should throw when the issuer is %s", async (_name, issuer) => {
+	it("should throw when the issuer is empty", async () => {
 		const token = await getIdentityToken({ sub: "user123", email: "user@example.com" })
 
-		await expect(verifyJWT(makeEnv({ JWT_ISSUER: issuer }), token, "audience")).rejects.toBeInstanceOf(MissingIssuerError)
+		await expect(verifyJWT({ ...caConfig(makeEnv()), issuer: "" }, token, ["audience"])).rejects.toBeInstanceOf(MissingIssuerError)
+	})
+
+	it("should throw when no audience is given", async () => {
+		const token = await getIdentityToken({ sub: "user123", email: "user@example.com" })
+
+		await expect(verifyJWT(caConfig(makeEnv()), token, [])).rejects.toBeInstanceOf(MissingAudienceError)
 	})
 })
 

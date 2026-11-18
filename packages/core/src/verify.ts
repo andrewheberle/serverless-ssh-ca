@@ -1,7 +1,6 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyResult } from "jose"
 import { CertificateRequestJWTPayload } from "./types.js"
-import type { SshCaBindings } from "./types.js"
-import { split } from "./utils.js"
+import type { CaConfig } from "./config.js"
 
 /**
  * Thrown when no audience is configured for a token, as a token issued for
@@ -94,28 +93,31 @@ export const verifyJWTWithJWKS = async <T extends JWTPayload>(jwt: string, requi
  * Verifies a JWT from the IdP, including that it was issued by the configured
  * issuer for one of the audiences given.
  *
- * @param config The bindings that say where the IdP's keys are and which tokens it issues
+ * The settings come from the validated configuration (see {@link CaConfig}),
+ * so their values are trimmed as the configuration documents.
+ *
+ * @param settings Where the IdP's keys are and which tokens it issues, from the validated configuration
  * @param jwt The JWT to verify
- * @param aud The audiences the JWT may be issued for, which must not be empty
+ * @param audience The audiences the JWT may be issued for, which must not be empty
  * @throws {@link MissingAudienceError} when no audience is given
- * @throws {@link MissingIssuerError} when `JWT_ISSUER` is empty
+ * @throws {@link MissingIssuerError} when the issuer is empty
  */
-export const verifyJWT = async (config: Pick<SshCaBindings, "JWT_JWKS_URL" | "JWT_ISSUER" | "JWT_ALGORITHMS">, jwt: string, aud: string | string[] | undefined) => {
-	const audience = split(aud)
+export const verifyJWT = async (settings: Pick<CaConfig, "jwksUrl" | "issuer" | "algorithms">, jwt: string, audience: string[]) => {
 	if (audience.length === 0) {
 		throw new MissingAudienceError("no audience is configured for verifying tokens, set JWT_AUD")
 	}
 
 	// jose only checks the issuer when one is given, so an empty issuer would
-	// accept tokens from any issuer the keys are trusted for
-	if (typeof config.JWT_ISSUER !== "string" || config.JWT_ISSUER.trim() === "") {
+	// accept tokens from any issuer the keys are trusted for. Validation
+	// refuses an empty JWT_ISSUER, so this only guards against misuse
+	if (settings.issuer === "") {
 		throw new MissingIssuerError("no issuer is configured for verifying tokens, set JWT_ISSUER")
 	}
 
 	return await verifyJWTWithJWKS<CertificateRequestJWTPayload>(jwt, {
-		jwksUrl: config.JWT_JWKS_URL,
-		issuer: config.JWT_ISSUER,
-		algorithms: split(config.JWT_ALGORITHMS),
-		audience: audience,
+		jwksUrl: settings.jwksUrl,
+		issuer: settings.issuer,
+		algorithms: settings.algorithms,
+		audience,
 	})
 }

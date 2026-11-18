@@ -83,6 +83,12 @@ describe("getPublic", () => {
         await expect(getPublic(makeEnv({ PRIVATE_KEY: new MockSecretStore(rsaKey.ca().privateKey) })))
             .rejects.toBeInstanceOf(UnsupportedKeyError)
     })
+
+    it("should use the trimmed ISSUER_DN as the comment", async () => {
+        const pub = await getPublic(makeEnv({ PRIVATE_KEY: new MockSecretStore(ed25519Key.ca().privateKey), ISSUER_DN: "  my ssh ca  " }))
+
+        expect(pub.toString()).toMatch(/ my ssh ca$/)
+    })
 })
 
 describe("hostPrincipalIssue", () => {

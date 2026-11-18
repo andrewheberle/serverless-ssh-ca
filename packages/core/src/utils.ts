@@ -203,12 +203,13 @@ export const getPrivateKey = async (env: Pick<SshCaBindings, "PRIVATE_KEY">): Pr
 }
 
 /**
- * Returns the public key of the CA, with `ISSUER_DN` as its comment
+ * Returns the public key of the CA, with the validated `ISSUER_DN` as its
+ * comment
  */
-export const getPublic = async (env: Pick<SshCaBindings, "PRIVATE_KEY" | "ISSUER_DN">, key?: PrivateKey): Promise<PublicKey> => {
+export const getPublic = async (env: SshCaBindings, key?: PrivateKey): Promise<PublicKey> => {
 	if (key === undefined) {
 		key = await getPrivateKey(env)
 	}
 
-	return key.publicKey.withComment(env.ISSUER_DN)
+	return key.publicKey.withComment(caConfig(env).issuerDn)
 }

@@ -220,7 +220,7 @@ const verifyAccessToken = async (config: RequesterConfig, logger: Logger, author
 	try {
 		// verify jwt, which must be issued for this CA
 		const aud = settings.accessTokenAudience.length > 0 ? settings.accessTokenAudience : settings.audience
-		const { payload } = await verifyJWT(config, token, aud)
+		const { payload } = await verifyJWT(settings, token, aud)
 
 		const email = tokenEmail(payload)
 		if (!email.ok) {
@@ -264,7 +264,7 @@ const verifyIdentityToken = async (config: RequesterConfig, logger: Logger, toke
 
 	try {
 		const settings = caConfig(config)
-		const { payload } = await verifyJWT(config, token, settings.audience)
+		const { payload } = await verifyJWT(settings, token, settings.audience)
 
 		return {
 			kind: "verified",
