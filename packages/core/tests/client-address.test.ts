@@ -6,6 +6,7 @@ import { clientAddressOf } from "../src/client-address.js"
 import { revokeCertificate } from "../src/db/index.js"
 import { applyMigrations } from "../src/db/migrate.js"
 import { migrations } from "../src/db/migrations/index.js"
+import { migrationsBefore, namesFrom } from "./earlier-release.js"
 import { CertificateType } from "../src/db/types.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { SshCertificate } from "../src/ssh/certificate.js"
@@ -268,11 +269,11 @@ describe("recording client addresses", () => {
 describe("migration 0006_client_address", () => {
 	it("should keep existing certificates, leaving their client addresses unknown", async () => {
 		const raw = new DatabaseSync(":memory:")
-		await applyMigrations(fromNodeSqlite(raw), migrations.filter((m) => m.name !== "0006_client_address"))
+		await applyMigrations(fromNodeSqlite(raw), migrationsBefore("0006_client_address"))
 		raw.exec(`INSERT INTO certificates (serial, key_id, principals, extensions, valid_after, valid_before, revoked_at, certificate_type, public_key, requested_by, revoked_by)
 			VALUES ('1234', 'user@example.com', 'UID=user', 'permit-pty', '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-01-01T12:00:00.000Z', 0, 'ssh-ed25519 AAAA', 'user@example.com', 'key-holder')`)
 
-		expect((await applyMigrations(fromNodeSqlite(raw), migrations)).map((m) => m.name)).toEqual(["0006_client_address"])
+		expect((await applyMigrations(fromNodeSqlite(raw), migrations)).map((m) => m.name)).toEqual(namesFrom("0006_client_address"))
 
 		expect(raw.prepare("SELECT serial, requested_by, revoked_by, request_address, revocation_address FROM certificates").all()).toEqual([{
 			serial: "1234",

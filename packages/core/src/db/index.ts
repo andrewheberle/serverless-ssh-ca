@@ -260,8 +260,10 @@ export const getRevocationList = async (env: SshCaBindings, certificateType: Cer
 		tableName: "certificates",
 		fields: ["serial"],
 		where: {
-			conditions: "revoked_at NOTNULL AND certificate_type = ? AND unixepoch('subsec') < unixepoch(valid_before,'subsec',?)",
-			params: [certificateType, KrlGracePeriod]
+			// the same certificates as unixepoch('subsec') < unixepoch(valid_before,'subsec','+24 hours'),
+			// written with valid_before alone on one side so idx_certificates_krl is used
+			conditions: "revoked_at NOTNULL AND certificate_type = ? AND unixepoch(valid_before,'subsec') > unixepoch('subsec',?)",
+			params: [certificateType, `-${KrlGracePeriod}`]
 		}
 	}).execute()
 

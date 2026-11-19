@@ -5,6 +5,7 @@ import { createSshCa, type SshCa } from "../src/index.js"
 import { recordRenewal } from "../src/db/index.js"
 import { applyMigrations } from "../src/db/migrate.js"
 import { migrations } from "../src/db/migrations/index.js"
+import { migrationsBefore, namesFrom } from "./earlier-release.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { SshCertificate } from "../src/ssh/certificate.js"
 import { makeEnv } from "./env.js"
@@ -213,8 +214,7 @@ describe("certificate audit trail", () => {
 })
 
 describe("migration 0004_certificate_audit", () => {
-	const before = migrations.filter((m) => m.name !== "0004_certificate_audit" && m.name !== "0005_renewal_of")
-	const through0004 = migrations.filter((m) => m.name !== "0005_renewal_of")
+	const before = migrationsBefore("0004_certificate_audit")
 
 	// a database migrated to 0003 that already holds a revoked certificate
 	const existing = async (): Promise<DatabaseSync> => {
@@ -228,7 +228,7 @@ describe("migration 0004_certificate_audit", () => {
 	it("should keep existing certificates, leaving who requested and revoked them unknown", async () => {
 		const raw = await existing()
 
-		expect((await applyMigrations(fromNodeSqlite(raw), through0004)).map((m) => m.name)).toEqual(["0004_certificate_audit"])
+		expect((await applyMigrations(fromNodeSqlite(raw), migrations)).map((m) => m.name)).toEqual(namesFrom("0004_certificate_audit"))
 
 		expect(raw.prepare("SELECT serial, key_id, revoked_at, requested_by, revoked_by, revocation_reason FROM certificates").all()).toEqual([{
 			serial: "1234",
@@ -244,15 +244,16 @@ describe("migration 0004_certificate_audit", () => {
 		const raw = await existing()
 		const db = fromNodeSqlite(raw)
 
-		const applied = await Promise.all(Array.from({ length: 5 }, async () => await applyMigrations(db, through0004)))
+		const applied = await Promise.all(Array.from({ length: 5 }, async () => await applyMigrations(db, migrations)))
 
-		expect(applied.flat().map((m) => m.name)).toEqual(["0004_certificate_audit"])
+		// each migration is applied by only one of the callers
+		expect(applied.flat().map((m) => m.name).toSorted()).toEqual(namesFrom("0004_certificate_audit"))
 		expect(raw.prepare("SELECT count(*) AS n FROM migrations WHERE name = '0004_certificate_audit'").get()).toEqual({ n: 1 })
 	})
 })
 
 describe("migration 0005_renewal_of", () => {
-	const before = migrations.filter((m) => m.name !== "0005_renewal_of")
+	const before = migrationsBefore("0005_renewal_of")
 
 	const Host = 1
 	const Requester = "user@example.com"
@@ -292,7 +293,7 @@ describe("migration 0005_renewal_of", () => {
 	}
 
 	const migrate = async (raw: DatabaseSync): Promise<Record<string, { requested_by: unknown, renewal_of: unknown }>> => {
-		expect((await applyMigrations(fromNodeSqlite(raw), migrations)).map((m) => m.name)).toEqual(["0005_renewal_of"])
+		expect((await applyMigrations(fromNodeSqlite(raw), migrations)).map((m) => m.name)).toEqual(namesFrom("0005_renewal_of"))
 		return Object.fromEntries(raw.prepare("SELECT serial, requested_by, renewal_of FROM certificates").all()
 			.map((r) => [String(r.serial), { requested_by: r.requested_by, renewal_of: r.renewal_of }]))
 	}

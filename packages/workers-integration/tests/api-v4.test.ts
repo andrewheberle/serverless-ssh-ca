@@ -91,4 +91,35 @@ describe("GET /api/v4/user/krl", () => {
         expect(response.status).toBe(200)
         expect(response.headers.get("content-type")).toContain("application/json")
     })
+
+    it("should list revoked certificates until 24 hours after they expire", async () => {
+        // apply the migrations, then record revoked user certificates that
+        // expire in an hour, expired 23 hours ago and expired 25 hours ago
+        expect((await fetch(new IncomingRequest("http://example.com/api/v4/user/krl"))).status).toBe(200)
+        const hoursFromNow = (hours: number): string => new Date(Date.now() + hours * 3_600_000).toISOString()
+        const record = env.DB.prepare("INSERT INTO certificates (serial, key_id, principals, valid_after, valid_before, revoked_at, certificate_type) VALUES (?, 'key', 'UID=alice', '2000-01-01T00:00:00.000Z', ?, '2000-01-01T00:00:00.000Z', 0)")
+        await env.DB.batch([
+            record.bind("717171", hoursFromNow(1)),
+            record.bind("727272", hoursFromNow(-23)),
+            record.bind("737373", hoursFromNow(-25)),
+        ])
+
+        const response = await fetch(new IncomingRequest("http://example.com/api/v4/user/krl"))
+        expect(response.status).toBe(200)
+        const body: unknown = await response.json()
+        if (typeof body !== "object" || body === null || !("krl" in body) || typeof body.krl !== "string") {
+            throw new Error("the response has no KRL")
+        }
+        const krl = Buffer.from(body.krl, "base64")
+
+        // serials are listed in the KRL as 64-bit big-endian integers
+        const listed = (serial: bigint): boolean => {
+            const bytes = Buffer.alloc(8)
+            bytes.writeBigUInt64BE(serial)
+            return krl.includes(bytes)
+        }
+        expect(listed(717171n)).toBe(true)
+        expect(listed(727272n)).toBe(true)
+        expect(listed(737373n)).toBe(false)
+    })
 })
