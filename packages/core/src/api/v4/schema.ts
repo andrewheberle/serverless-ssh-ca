@@ -95,18 +95,29 @@ export const createGetRevocationListEndpointSchema = (certificateType: Certifica
 	operationId: `get_${certificateTypeName(certificateType)}_revocation_list`,
 })
 
+// refuses a lifetime over the maximum the CA is configured with, giving the
+// same issue as .max(). It is a refinement, which is not published in the
+// OpenAPI schema, so the schema does not carry the maximum of whichever
+// configuration it was generated with (#608). The default, which is also
+// configured, is applied when the certificate is signed
+const atMostConfigured = (maximum: number) => (value: number, ctx: z.RefinementCtx<number>): void => {
+	if (value > maximum) {
+		ctx.addIssue({ code: "too_big", origin: "number", maximum, inclusive: true, input: value })
+	}
+}
+
 export const issueUserCertificateEndpointBodySchema = (env: SshCaBindings) => (
 	z.object({
 		public_key: subjectPublicKey,
 		identity: identityToken,
 		extensions: z.array(z.string())
-			.default(caConfig(env).extensions)
-			.meta({ description: "Extensions to include in the issued SSH certificate" }),
+			.optional()
+			.meta({ description: "Extensions to include in the issued SSH certificate, which must be among those the CA is configured with (`SSH_CERTIFICATE_EXTENSIONS`). All of those are included when this is not given" }),
 		lifetime: z.int()
 			.min(MinUserCertificateLifetime)
-			.max(caConfig(env).certificateLifetime)
-			.default(caConfig(env).certificateLifetime)
-			.meta({ description: "Lifetime of the issued SSH certificate, in seconds" }),
+			.superRefine(atMostConfigured(caConfig(env).certificateLifetime))
+			.optional()
+			.meta({ description: "Lifetime of the issued SSH certificate, in seconds. Defaults to, and may not exceed, the lifetime the CA is configured with (`SSH_CERTIFICATE_LIFETIME`)" }),
 	})
 		.openapi("User Certificate Issue Request")
 )
@@ -145,9 +156,9 @@ export const issueHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.meta({ description: `List of principals to include on the issued certificate, at most ${MaxCertificatePrincipals} as OpenSSH cannot read a certificate with more. Duplicates are removed` }),
 		lifetime: z.int()
 			.min(MinHostCertificateLifetime)
-			.max(caConfig(env).hostCertificateLifetime)
-			.default(caConfig(env).hostCertificateLifetime)
-			.meta({ description: "Lifetime of the issued host SSH certificate, in seconds" }),
+			.superRefine(atMostConfigured(caConfig(env).hostCertificateLifetime))
+			.optional()
+			.meta({ description: "Lifetime of the issued host SSH certificate, in seconds. Defaults to, and may not exceed, the lifetime the CA is configured with (`SSH_HOST_CERTIFICATE_LIFETIME`)" }),
 	})
 		.openapi("Host Certificate Issue Request")
 )
@@ -184,9 +195,9 @@ export const renewHostCertificateEndpointBodySchema = (env: SshCaBindings) => (
 			.meta({ description: "SSH certificate to renew, which must have the serial number in the path, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA...`), not of the binary certificate" }),
 		lifetime: z.int()
 			.min(MinHostCertificateLifetime)
-			.max(caConfig(env).hostCertificateLifetime)
-			.default(caConfig(env).hostCertificateLifetime)
-			.meta({ description: "Lifetime of the renewed host SSH certificate, in seconds" }),
+			.superRefine(atMostConfigured(caConfig(env).hostCertificateLifetime))
+			.optional()
+			.meta({ description: "Lifetime of the renewed host SSH certificate, in seconds. May not exceed the lifetime the CA is configured with (`SSH_HOST_CERTIFICATE_LIFETIME`). Defaults to the lifetime of the certificate renewed, and is never longer than it or the configured lifetime" }),
 	})
 		.openapi("Host Certificate Renewal Request")
 )

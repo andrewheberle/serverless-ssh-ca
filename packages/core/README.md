@@ -294,6 +294,13 @@ which follows semver separately from the package: the major version changes
 only with a breaking change. Operation IDs and schema names don't change
 within a major version, so code generated from them keeps working.
 
+The schema is the same for every deployment. Limits and defaults that come
+from the CA's configuration, such as the maximum and default certificate
+lifetimes (`SSH_CERTIFICATE_LIFETIME` and `SSH_HOST_CERTIFICATE_LIFETIME`) and
+the default extensions (`SSH_CERTIFICATE_EXTENSIONS`), are described in the
+fields they apply to rather than given as values, and the CA applies them to
+each request.
+
 | Action                   | Endpoint                                        |
 |--------------------------|-------------------------------------------------|
 | Get the CA public key    | `GET /api/v4/ca`                                |

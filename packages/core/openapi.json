@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Serverless SSH CA API",
-    "version": "4.1.0"
+    "version": "4.1.1"
   },
   "components": {
     "securitySchemes": {
@@ -45,21 +45,12 @@
             "items": {
               "type": "string"
             },
-            "default": [
-              "permit-X11-forwarding",
-              "permit-agent-forwarding",
-              "permit-port-forwarding",
-              "permit-pty",
-              "permit-user-rc"
-            ],
-            "description": "Extensions to include in the issued SSH certificate"
+            "description": "Extensions to include in the issued SSH certificate, which must be among those the CA is configured with (`SSH_CERTIFICATE_EXTENSIONS`). All of those are included when this is not given"
           },
           "lifetime": {
             "type": "integer",
             "minimum": 300,
-            "maximum": 86400,
-            "default": 86400,
-            "description": "Lifetime of the issued SSH certificate, in seconds"
+            "description": "Lifetime of the issued SSH certificate, in seconds. Defaults to, and may not exceed, the lifetime the CA is configured with (`SSH_CERTIFICATE_LIFETIME`)"
           }
         },
         "required": [
@@ -124,9 +115,7 @@
           "lifetime": {
             "type": "integer",
             "minimum": 86400,
-            "maximum": 2592000,
-            "default": 2592000,
-            "description": "Lifetime of the issued host SSH certificate, in seconds"
+            "description": "Lifetime of the issued host SSH certificate, in seconds. Defaults to, and may not exceed, the lifetime the CA is configured with (`SSH_HOST_CERTIFICATE_LIFETIME`)"
           }
         },
         "required": [
@@ -146,9 +135,7 @@
           "lifetime": {
             "type": "integer",
             "minimum": 86400,
-            "maximum": 2592000,
-            "default": 2592000,
-            "description": "Lifetime of the renewed host SSH certificate, in seconds"
+            "description": "Lifetime of the renewed host SSH certificate, in seconds. May not exceed the lifetime the CA is configured with (`SSH_HOST_CERTIFICATE_LIFETIME`). Defaults to the lifetime of the certificate renewed, and is never longer than it or the configured lifetime"
           }
         },
         "required": [
