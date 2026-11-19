@@ -52,6 +52,8 @@ const internalError = {
 type IssueEndpoint = {
 	name: string
 	user: boolean
+	/** The setting for the maximum and default lifetime, with a value for it in seconds */
+	lifetime: { setting: "SSH_CERTIFICATE_LIFETIME" | "SSH_HOST_CERTIFICATE_LIFETIME", value: string, seconds: number }
 	request: (ca: SshCa, body?: Record<string, unknown>) => Promise<Response>
 }
 
@@ -59,6 +61,7 @@ const issueEndpoints: IssueEndpoint[] = [
 	{
 		name: "POST /api/v4/user/certificates",
 		user: true,
+		lifetime: { setting: "SSH_CERTIFICATE_LIFETIME", value: "1 hour", seconds: 3600 },
 		request: async (ca, body = {}) => await ca.fetch(new Request("http://example.com/api/v4/user/certificates", {
 			method: "POST",
 			headers: {
@@ -72,6 +75,7 @@ const issueEndpoints: IssueEndpoint[] = [
 	{
 		name: "POST /api/v4/host/certificates",
 		user: false,
+		lifetime: { setting: "SSH_HOST_CERTIFICATE_LIFETIME", value: "2 days", seconds: 172800 },
 		request: async (ca, body = {}) => await ca.fetch(new Request("http://example.com/api/v4/host/certificates", {
 			method: "POST",
 			headers: {
@@ -84,10 +88,38 @@ const issueEndpoints: IssueEndpoint[] = [
 	},
 ]
 
-describe.each(issueEndpoints)("responses to certificates the CA will not issue ($name)", ({ request, user }) => {
+// the certificate in a successful response
+const certificateIn = async (response: Response): Promise<SshCertificate> =>
+	SshCertificate.parse(Buffer.from((await response.json() as { certificate: string }).certificate, "base64").toString())
+
+describe.each(issueEndpoints)("responses to certificates the CA will not issue ($name)", ({ request, user, lifetime }) => {
 	it("should issue a certificate", async () => {
 		const response = await request(newCa())
 		expect(response.status).toBe(200)
+	})
+
+	// the maximum and default lifetime and the default extensions are
+	// configured, so are not in the published schema, but are still applied
+	// as the schema applied them (#608)
+	it("should return 400 for a lifetime over the configured maximum", async () => {
+		const response = await request(newCa({ [lifetime.setting]: lifetime.value }), { lifetime: lifetime.seconds + 1 })
+		expect(response.status).toBe(400)
+		expect(await response.json()).toEqual(validationError(`Too big: expected number to be <=${lifetime.seconds}`, ["body", "lifetime"]))
+	})
+
+	it("should issue a certificate for the configured lifetime when none is requested", async () => {
+		const response = await request(newCa({ [lifetime.setting]: lifetime.value }))
+		expect(response.status).toBe(200)
+
+		const certificate = await certificateIn(response)
+		expect(certificate.validBefore.getTime() - certificate.validAfter.getTime()).toBe(lifetime.seconds * 1000)
+	})
+
+	it.runIf(user)("should include every configured extension when none are requested", async () => {
+		const response = await request(newCa({ SSH_CERTIFICATE_EXTENSIONS: "permit-pty,permit-user-rc" }))
+		expect(response.status).toBe(200)
+
+		expect((await certificateIn(response)).extensions.toSorted()).toEqual(["permit-pty", "permit-user-rc"])
 	})
 
 	it.runIf(user)("should return 422 for an extension that is not allowed", async () => {
@@ -161,6 +193,20 @@ describe.each(renewEndpoints)("responses to certificates the CA will not renew (
 		const original = SshCertificate.parse(certificate)
 		expect(renewed.validBefore.getTime() - renewed.validAfter.getTime()).toBe(original.validBefore.getTime() - original.validAfter.getTime())
 		expect(renewed.principals).toEqual(["test_host"])
+	})
+
+	it("should renew a certificate for no longer than the configured lifetime when none is requested", async () => {
+		const response = await request(newCa({ SSH_HOST_CERTIFICATE_LIFETIME: "2 days" }), hostCertificate({ validity: "-1m:+20d" }), hostKey)
+		expect(response.status).toBe(200)
+
+		const renewed = await certificateIn(response)
+		expect(renewed.validBefore.getTime() - renewed.validAfter.getTime()).toBe(172800 * 1000)
+	})
+
+	it("should return 400 for a lifetime over the configured maximum", async () => {
+		const response = await request(newCa({ SSH_HOST_CERTIFICATE_LIFETIME: "2 days" }), hostCertificate({ validity: "-1m:+20d" }), hostKey, { lifetime: 172801 })
+		expect(response.status).toBe(400)
+		expect(await response.json()).toEqual(validationError("Too big: expected number to be <=172800", ["body", "lifetime"]))
 	})
 
 	it("should renew a certificate for the lifetime requested when it is shorter", async () => {

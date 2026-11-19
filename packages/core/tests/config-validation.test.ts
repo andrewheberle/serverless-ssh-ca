@@ -183,16 +183,17 @@ describe("durations (#578)", () => {
 		expect(caConfig(makeEnv({ CERTIFICATE_REQUEST_TIME_SKEW_MAX: "5 minutes" })).requestTimeSkewMax).toBe(300000)
 	})
 
-	it.each([
-		["/api/v4/user/certificates", "SSH_CERTIFICATE_LIFETIME", "5 minutes"],
-		["/api/v4/host/certificates", "SSH_HOST_CERTIFICATE_LIFETIME", "24 hours"],
-	])("should never publish a lifetime for %s whose minimum is above its maximum", (path, name, value) => {
-		const schema = createApp(makeEnv({ [name]: value })).schema
-		const body = schema.paths?.[path]?.post?.requestBody
-		const lifetime = JSON.parse(JSON.stringify(body)).content["application/json"].schema
-		const properties = lifetime.properties ?? (schema.components?.schemas?.[lifetime.$ref?.split("/").pop()] as { properties: Record<string, unknown> }).properties
-		const { minimum, maximum } = properties.lifetime as { minimum: number, maximum: number }
-		expect(minimum).toBeLessThanOrEqual(maximum)
+	// a configured lifetime could once be published as a maximum below the
+	// fixed minimum, but the published schema no longer depends on the
+	// configuration at all (#608)
+	it("should publish the same schema whatever lifetimes and extensions are configured", () => {
+		const configured = createApp(makeEnv({
+			SSH_CERTIFICATE_LIFETIME: "5 minutes",
+			SSH_HOST_CERTIFICATE_LIFETIME: "24 hours",
+			SSH_CERTIFICATE_EXTENSIONS: "permit-pty",
+		})).schema
+
+		expect(configured).toEqual(createApp(makeEnv()).schema)
 	})
 })
 

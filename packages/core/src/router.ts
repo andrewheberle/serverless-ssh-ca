@@ -74,7 +74,7 @@ export const cloudflareClientIp: RateLimitKey = (req) => req.headers.get("CF-Con
  * names are part of the contract, as clients generate code from them, so they
  * are pinned by `tests/openapi-names.test.ts`.
  */
-export const ApiVersion = "4.1.0"
+export const ApiVersion = "4.1.1"
 
 export const ApiV3RemovedMessage = "API v3 was removed in serverless-ssh-ca 1.0.0; upgrade ssh-ca-client to 0.24.0 or later"
 
