@@ -266,6 +266,12 @@ connection, so present the renewed certificate without a reload. The client's
 `host --renew --reload-command` option reloads `sshd` only when a certificate
 was renewed.
 
+A renewal records the certificate it renewed rather than a requester, as no
+one asked for it, so the database keeps who requested a host's certificate
+only as long as it keeps the first certificate of its chain of renewals (see
+[Who requested a renewed host
+certificate](#who-requested-a-renewed-host-certificate)).
+
 This means the OIDC authentication flow is not required in this case as shown
 below when `ssh-ca-client-cli host --renew` is run:
 
@@ -574,6 +580,28 @@ removed by a scheduled cleanup. On Workers it runs from a cron trigger in
 Without a cron trigger nothing is removed, and the database keeps every
 certificate. On Node.js, run the `cleanup()` task returned by `createSshCa`
 instead (see [Running on Node.js](#running-on-nodejs)).
+
+#### Who requested a renewed host certificate
+
+A renewed host certificate records the certificate it renewed rather than a
+requester, so who requested a host's certificate is recorded only on the first
+certificate of its chain of renewals. That certificate is revoked when it is
+renewed, so cleanup removes it once it has been expired for longer than
+`DB_CERTIFICATE_RETENTION`: with the template's 30 day host certificate
+lifetime and 1 year retention, about 13 months after it was issued. From then
+on the database no longer records who requested the host's certificate, and
+the [admin UI](#admin-ui) shows the first renewal as the renewal of a
+certificate that is no longer recorded.
+
+Who requested it is still in the logs. The info level `completed issuing
+certificate` line for a request includes the requester as `auth_token.email`
+and the certificate's serial as `certificate.serial`, and the line for a
+renewal includes the serial it renewed as `renewed.serial`, so a chain can be
+followed back through the logs to the request it began with. To keep the
+requester in the database instead, set `DB_CERTIFICATE_RETENTION` to a period
+longer than any host will keep renewing for, or to `"infinite"`. Otherwise,
+keep the logs for as long as you need to know who requested a host's
+certificate.
 
 The schema is internal to the CA and can change in any release, including a
 minor or patch release, so it is not part of what semver covers. Reading the
@@ -922,6 +950,14 @@ revoked, and for a revocation by the key holder the client address it was
 revoked from. Values that were not recorded, such as the requester of a
 certificate issued before they were recorded, or the reason for a revocation
 by the key holder, are shown as "unknown".
+
+A renewed host certificate has no requester, which is shown as "none
+(renewal)", and links to the certificate it renewed instead. Only that link is
+shown, not the whole chain back to the request it began with. Once cleanup has
+removed the renewed certificate, its serial is shown as "(no longer
+recorded)", and who requested the chain is only in the logs (see [Who
+requested a renewed host
+certificate](#who-requested-a-renewed-host-certificate)).
 
 #### Times
 
