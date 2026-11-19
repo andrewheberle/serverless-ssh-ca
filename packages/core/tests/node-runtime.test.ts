@@ -262,6 +262,36 @@ describe("running on Node.js with node:sqlite", () => {
 	})
 })
 
+// the two formats timestamps are stored in, see the database types in src/db/types.ts
+const Iso8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+const CurrentTimestamp = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/
+
+describe("timestamps stored in the database", () => {
+	it("should be text in the formats the database types describe", async () => {
+		const sqlite = new DatabaseSync(":memory:")
+		const ca = caFor(sqlite)
+		const key = ecdsaKey.user()
+
+		const serial = await requestUserCertificate(ca, key)
+		// the KRL versions set by the migrations are not yet replaced
+		expect(sqlite.prepare("SELECT updated_at FROM krl").all().map((r) => r.updated_at)).toEqual([expect.stringMatching(CurrentTimestamp), expect.stringMatching(CurrentTimestamp)])
+		expect((await revoke(ca, "user", serial, key)).status).toBe(200)
+		await getKrl(ca)
+
+		expect(sqlite.prepare("SELECT valid_after, valid_before, revoked_at FROM certificates WHERE serial = ?").get(`${serial}`)).toEqual({
+			valid_after: expect.stringMatching(Iso8601),
+			valid_before: expect.stringMatching(Iso8601),
+			revoked_at: expect.stringMatching(Iso8601),
+		})
+		// a new KRL version for user certificates is set by the CA
+		expect(sqlite.prepare("SELECT updated_at FROM krl WHERE certificate_type = 0").get()).toEqual({ updated_at: expect.stringMatching(Iso8601) })
+		for (const { applied_at: appliedAt } of sqlite.prepare("SELECT applied_at FROM migrations").all()) {
+			expect(appliedAt).toMatch(CurrentTimestamp)
+		}
+		sqlite.close()
+	})
+})
+
 describe("running on Node.js with a node:sqlite database file", () => {
 	it("should keep certificates and the schema across restarts", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "ssh-ca-db-"))
