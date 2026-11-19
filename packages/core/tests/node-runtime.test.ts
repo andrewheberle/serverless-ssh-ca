@@ -100,7 +100,7 @@ describe("running on Node.js with node:sqlite", () => {
 		const key = ecdsaKey.user()
 		const serial = await requestUserCertificate(ca, key)
 
-		expect(sqlite.prepare("SELECT name FROM migrations").all()).toEqual([{ name: "0001_initial_schema" }, { name: "0002_krl_version" }, { name: "0003_krl_revision" }, { name: "0004_certificate_audit" }, { name: "0005_renewal_of" }, { name: "0006_client_address" }])
+		expect(sqlite.prepare("SELECT name FROM migrations").all()).toEqual([{ name: "0001_initial_schema" }, { name: "0002_krl_version" }, { name: "0003_krl_revision" }, { name: "0004_certificate_audit" }, { name: "0005_renewal_of" }, { name: "0006_client_address" }, { name: "0007_query_indexes" }])
 		expect(sqlite.prepare("SELECT key_id, principals, certificate_type, public_key, revoked_at FROM certificates WHERE serial = ?").all(`${serial}`)).toEqual([{
 			key_id: email,
 			principals: "UID=ssh-admin",
@@ -113,7 +113,7 @@ describe("running on Node.js with node:sqlite", () => {
 	it("should only apply migrations once", async () => {
 		await requestUserCertificate(ca, ecdsaKey.user())
 
-		expect(sqlite.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: 6 })
+		expect(sqlite.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: 7 })
 	})
 
 	it("should record issued host certificates", async () => {
@@ -275,7 +275,7 @@ describe("running on Node.js with a node:sqlite database file", () => {
 			try {
 				await requestUserCertificate(caFor(second), ecdsaKey.user())
 
-				expect(second.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: 6 })
+				expect(second.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: 7 })
 				expect(second.prepare("SELECT serial FROM certificates WHERE serial = ?").all(`${serial}`)).toHaveLength(1)
 			} finally {
 				second.close()

@@ -102,7 +102,7 @@ describe("applyMigrations", () => {
 		const applied = await applyMigrations(db, migrations)
 
 		// only migrations added since are applied, so the table is not created again
-		expect(applied.map(m => m.name)).toEqual(["0002_krl_version", "0003_krl_revision", "0004_certificate_audit", "0005_renewal_of", "0006_client_address"])
+		expect(applied.map(m => m.name)).toEqual(["0002_krl_version", "0003_krl_revision", "0004_certificate_audit", "0005_renewal_of", "0006_client_address", "0007_query_indexes"])
 		expect(columns(raw, "certificates")).toEqual([
 			"id", "serial", "key_id", "principals", "extensions", "valid_after",
 			"valid_before", "revoked_at", "certificate_type", "public_key",
@@ -116,7 +116,7 @@ describe("applyMigrations", () => {
 
 		await applyMigrations(db, migrations)
 
-		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version", "0003_krl_revision", "0004_certificate_audit", "0005_renewal_of", "0006_client_address"])
+		expect(recorded(raw)).toEqual(["0001_initial_schema", "0002_krl_version", "0003_krl_revision", "0004_certificate_audit", "0005_renewal_of", "0006_client_address", "0007_query_indexes"])
 		expect(columns(raw, "certificates")).toEqual([
 			"id", "serial", "key_id", "principals", "extensions", "valid_after",
 			"valid_before", "revoked_at", "certificate_type", "public_key",

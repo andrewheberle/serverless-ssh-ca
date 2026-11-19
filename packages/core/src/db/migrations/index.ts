@@ -5,6 +5,7 @@ import { migration as krlRevision0003 } from "./0003_krl_revision.js"
 import { migration as certificateAudit0004 } from "./0004_certificate_audit.js"
 import { migration as renewalOf0005 } from "./0005_renewal_of.js"
 import { migration as clientAddress0006 } from "./0006_client_address.js"
+import { migration as queryIndexes0007 } from "./0007_query_indexes.js"
 
 export const migrations: Migration[] = [
 	initialSchema0001,
@@ -13,4 +14,5 @@ export const migrations: Migration[] = [
 	certificateAudit0004,
 	renewalOf0005,
 	clientAddress0006,
+	queryIndexes0007,
 ]

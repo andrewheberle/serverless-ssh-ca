@@ -39,7 +39,7 @@ const reference: Migration = {
 	],
 }
 
-const before = migrations.filter((m) => m.name !== "0005_renewal_of" && m.name !== "0006_client_address")
+const before = migrations.slice(0, migrations.findIndex((m) => m.name === "0005_renewal_of"))
 
 const Host = 1
 const User = 0

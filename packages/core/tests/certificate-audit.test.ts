@@ -213,8 +213,8 @@ describe("certificate audit trail", () => {
 })
 
 describe("migration 0004_certificate_audit", () => {
-	const before = migrations.filter((m) => m.name !== "0004_certificate_audit" && m.name !== "0005_renewal_of")
-	const through0004 = migrations.filter((m) => m.name !== "0005_renewal_of")
+	const before = migrations.slice(0, migrations.findIndex((m) => m.name === "0004_certificate_audit"))
+	const through0004 = migrations.slice(0, migrations.findIndex((m) => m.name === "0005_renewal_of"))
 
 	// a database migrated to 0003 that already holds a revoked certificate
 	const existing = async (): Promise<DatabaseSync> => {
@@ -252,7 +252,8 @@ describe("migration 0004_certificate_audit", () => {
 })
 
 describe("migration 0005_renewal_of", () => {
-	const before = migrations.filter((m) => m.name !== "0005_renewal_of")
+	const before = migrations.slice(0, migrations.findIndex((m) => m.name === "0005_renewal_of"))
+	const through0005 = migrations.slice(0, before.length + 1)
 
 	const Host = 1
 	const Requester = "user@example.com"
@@ -292,7 +293,7 @@ describe("migration 0005_renewal_of", () => {
 	}
 
 	const migrate = async (raw: DatabaseSync): Promise<Record<string, { requested_by: unknown, renewal_of: unknown }>> => {
-		expect((await applyMigrations(fromNodeSqlite(raw), migrations)).map((m) => m.name)).toEqual(["0005_renewal_of"])
+		expect((await applyMigrations(fromNodeSqlite(raw), through0005)).map((m) => m.name)).toEqual(["0005_renewal_of"])
 		return Object.fromEntries(raw.prepare("SELECT serial, requested_by, renewal_of FROM certificates").all()
 			.map((r) => [String(r.serial), { requested_by: r.requested_by, renewal_of: r.renewal_of }]))
 	}

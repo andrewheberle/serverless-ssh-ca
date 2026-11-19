@@ -790,8 +790,8 @@ still issued, renewed or revoked.
 
 ### KRL Caching
 
-Generating and signing a KRL reads every revoked certificate from the
-database, so the KRLs can be cached by adding an optional `CACHE` binding. On
+Generating and signing a KRL reads every revoked certificate it contains
+from the database, so the KRLs can be cached by adding an optional `CACHE` binding. On
 Workers this is a KV namespace:
 
 ```jsonc
