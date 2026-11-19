@@ -25,6 +25,12 @@ jobs:
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # only what release-please needs: to push its branch and tags and
+          # create releases, to open and update the release PR, and to label
+          # it, which uses the issues API
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
       - name: Release Please
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:

@@ -56,7 +56,7 @@ Prefer the scripts in `package.json` over invoking tools directly.
 
 ## Releases
 - Releases are prepared by release-please (`release-please-config.json`, `.release-please-manifest.json`), which keeps a `chore(release): vX.Y.Z` PR open with the version bump of the root, core and testing packages and the `CHANGELOG.md` entry, derived from conventional commit messages on `main`.
-- Merging the release PR creates the `vX.Y.Z` tag and GitHub release; the tag triggers `.github/workflows/release.yml`, which publishes core and testing to npm and adds `openapi.json` and the SBOM to the release.
+- Merging the release PR creates the `vX.Y.Z` tag and GitHub release; the tag triggers `.github/workflows/release.yml`, which publishes core and testing to npm and adds `openapi.json` and the SBOM to the release. It runs in the `release` environment, refuses a tag whose commit is not on `main`, and skips a package version already on npm, so a release that failed part way through can be finished by re-running it.
 - npm trusted publishing is tied to the `release.yml` filename, so don't rename it.
 - Don't edit `CHANGELOG.md`, `.release-please-manifest.json` or package versions by hand; release-please maintains them.
 - PRs are squash merged with the PR title as the commit message, so PR titles must be conventional commits (`feat:`, `fix(scope):`, `feat!:` for breaking changes); the PR title check enforces this. Only `feat`, `fix`, `perf`, `revert` and breaking changes trigger a release.

@@ -14,6 +14,9 @@ jobs:
   publish:
     name: publish
     runs-on: ubuntu-latest
+    # npm's trusted publisher is bound to this environment, whose protection
+    # rules gate every publish
+    environment: release
     permissions:
       contents: write
       id-token: write
@@ -23,6 +26,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # the history of main, to check the tagged commit is on it
+          fetch-depth: 0
+      - name: Check the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_REF_NAME ($GITHUB_SHA) is not on main, so is not released"
+            exit 1
+          fi
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -54,8 +65,13 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: packages/core/openapi.json
-      - name: Publish to npm
-        run: npm publish --workspace packages/core --workspace packages/testing --access public
+      # each package is published in its own step, which skips a version
+      # already on npm, so the workflow can be re-run to finish a release
+      # that failed part way through
+      - name: Publish core to npm
+        run: .github/scripts/publish-once.sh packages/core --access public
+      - name: Publish testing to npm
+        run: .github/scripts/publish-once.sh packages/testing --access public
       - name: Add assets to GitHub release
         run: gh release upload "$GITHUB_REF_NAME" packages/core/openapi.json sbom.spdx.json --clobber --repo "$GITHUB_REPOSITORY"
         env:
