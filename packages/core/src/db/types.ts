@@ -3,6 +3,11 @@
  *
  * These must match the schema created by the migrations in `./migrations`, so
  * update them with any change to the database.
+ *
+ * Timestamps are stored as text, so are typed as strings. The CA writes them as
+ * ISO 8601 in UTC, such as `2026-11-16T00:06:00.453Z`, while those set by
+ * SQLite's `CURRENT_TIMESTAMP` are `YYYY-MM-DD HH:MM:SS` in UTC, such as
+ * `2026-11-16 00:06:00`.
  */
 
 /** The type of certificate, as stored in the `certificate_type` column */
@@ -18,9 +23,12 @@ export type CertificateRecord = {
 	key_id: string
 	principals: string
 	extensions: string | null
-	valid_after: Date
-	valid_before: Date
-	revoked_at: Date | null
+	/** When the certificate became valid, as ISO 8601 */
+	valid_after: string
+	/** When the certificate stops being valid, as ISO 8601 */
+	valid_before: string
+	/** When the certificate was revoked, as ISO 8601, or null if it is not revoked */
+	revoked_at: string | null
 	certificate_type: CertificateType
 	public_key: string | null
 	/** The email address of the requester who asked for the certificate, or null if it is a renewal or not known */
@@ -42,13 +50,31 @@ export type KrlRecord = {
 	certificate_type: CertificateType
 	version: number
 	digest: string | null
-	updated_at: Date
+	/**
+	 * When the current version was first generated, as ISO 8601 when the CA set
+	 * it or `YYYY-MM-DD HH:MM:SS` when it was set by `CURRENT_TIMESTAMP` in a
+	 * migration and has not changed since
+	 */
+	updated_at: string
 	/** Incremented whenever a certificate of this type is revoked */
 	revision: number
+}
+
+/** A row in the `migrations` table, recording a migration that has been applied */
+export type MigrationRecord = {
+	id: number
+	/**
+	 * The name of the migration. The CA always records one, but the column
+	 * does not forbid NULL, as it matches the table workers-qb created
+	 */
+	name: string | null
+	/** When the migration was applied, as `YYYY-MM-DD HH:MM:SS` set by `CURRENT_TIMESTAMP` */
+	applied_at: string
 }
 
 /** The tables in the database, used to type queries made with workers-qb */
 export type DatabaseSchema = {
 	certificates: CertificateRecord
 	krl: KrlRecord
+	migrations: MigrationRecord
 }

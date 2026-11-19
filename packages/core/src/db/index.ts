@@ -536,6 +536,8 @@ export const getKrlVersion = async (env: SshCaBindings, certificateType: Certifi
 		// recording the time to the second as that is all a KRL records
 		const next = current.version + 1
 		const generatedAt = new Date(Math.floor(Date.now() / 1000) * 1000)
+		// the type of the rows returned, which is only the version, as workers-qb
+		// does not infer it from `returning`
 		const updated = await qb.update<Pick<KrlRecord, "version">>({
 			tableName: "krl",
 			data: {
