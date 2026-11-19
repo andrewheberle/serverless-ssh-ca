@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import { applyMigrations, type Migration } from "../src/db/migrate.js"
 import { migrations } from "../src/db/migrations/index.js"
+import { migrationsBefore, namesFrom } from "./earlier-release.js"
 import { migration } from "../src/db/migrations/0005_renewal_of.js"
 import { fromNodeSqlite } from "../src/node/index.js"
 
@@ -39,7 +40,7 @@ const reference: Migration = {
 	],
 }
 
-const before = migrations.slice(0, migrations.findIndex((m) => m.name === "0005_renewal_of"))
+const before = migrationsBefore("0005_renewal_of")
 
 const Host = 1
 const User = 0
@@ -75,7 +76,9 @@ const existing = async (rows: Row[]): Promise<DatabaseSync> => {
 // the rows that migration 0005 sets, once it has been applied
 const migrated = async (rows: Row[], migration0005: Migration): Promise<Result> => {
 	const raw = await existing(rows)
-	expect((await applyMigrations(fromNodeSqlite(raw), [migration0005])).map((m) => m.name)).toEqual(["0005_renewal_of"])
+	// upgraded as the CA would, with this version of 0005 in place of the released one
+	const upgrade = migrations.map((m) => m.name === migration0005.name ? migration0005 : m)
+	expect((await applyMigrations(fromNodeSqlite(raw), upgrade)).map((m) => m.name)).toEqual(namesFrom("0005_renewal_of"))
 	const result = raw.prepare("SELECT serial, requested_by, renewal_of FROM certificates ORDER BY id").all() as Result
 	raw.close()
 	return result

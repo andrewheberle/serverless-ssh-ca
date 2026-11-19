@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import { DatabaseSync } from "node:sqlite"
 import { applyMigrations } from "../src/db/migrate.js"
 import { migrations } from "../src/db/migrations/index.js"
+import { migrationsBefore, namesFrom } from "./earlier-release.js"
 import { migration } from "../src/db/migrations/0007_query_indexes.js"
 import { getRenewalLinks, getRevocationList } from "../src/db/index.js"
 import { fromNodeSqlite } from "../src/node/sqlite.js"
@@ -61,12 +62,12 @@ describe("migration 0007_query_indexes", () => {
 
 	it("should upgrade a database recorded by an earlier release without changing its certificates", async () => {
 		const raw = new DatabaseSync(":memory:")
-		await applyMigrations(fromNodeSqlite(raw), migrations.filter((m) => m.name !== migration.name))
+		await applyMigrations(fromNodeSqlite(raw), migrationsBefore(migration.name))
 		insert(raw, "1", CertificateType.Host, hoursFromNow(1), true)
 		insert(raw, "2", CertificateType.Host, hoursFromNow(1), false, "1")
 		const before = raw.prepare("SELECT * FROM certificates ORDER BY id").all()
 
-		expect(await applyMigrations(fromNodeSqlite(raw), migrations)).toEqual([migration])
+		expect((await applyMigrations(fromNodeSqlite(raw), migrations)).map((m) => m.name)).toEqual(namesFrom(migration.name))
 
 		expect(raw.prepare("SELECT * FROM certificates ORDER BY id").all()).toEqual(before)
 		expect(indexes(raw)).toContain("idx_certificates_krl")

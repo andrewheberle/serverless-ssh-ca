@@ -7,6 +7,7 @@ import { z } from "zod"
 import { createSshCa, type SshCa } from "../src/index.js"
 import { fromNodeSqlite, secretFromString } from "../src/node/index.js"
 import { KRLBuilder } from "../src/krl.js"
+import { migrations } from "../src/db/migrations/index.js"
 import { makeEnv } from "./env.js"
 import { getAccessToken, getIdentityToken } from "./helpers/token.js"
 import { generateRequestProof } from "./helpers/proof.js"
@@ -100,7 +101,7 @@ describe("running on Node.js with node:sqlite", () => {
 		const key = ecdsaKey.user()
 		const serial = await requestUserCertificate(ca, key)
 
-		expect(sqlite.prepare("SELECT name FROM migrations").all()).toEqual([{ name: "0001_initial_schema" }, { name: "0002_krl_version" }, { name: "0003_krl_revision" }, { name: "0004_certificate_audit" }, { name: "0005_renewal_of" }, { name: "0006_client_address" }, { name: "0007_query_indexes" }])
+		expect(sqlite.prepare("SELECT name FROM migrations ORDER BY id").all().map((r) => r.name)).toEqual(migrations.map((m) => m.name))
 		expect(sqlite.prepare("SELECT key_id, principals, certificate_type, public_key, revoked_at FROM certificates WHERE serial = ?").all(`${serial}`)).toEqual([{
 			key_id: email,
 			principals: "UID=ssh-admin",
@@ -113,7 +114,7 @@ describe("running on Node.js with node:sqlite", () => {
 	it("should only apply migrations once", async () => {
 		await requestUserCertificate(ca, ecdsaKey.user())
 
-		expect(sqlite.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: 7 })
+		expect(sqlite.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: migrations.length })
 	})
 
 	it("should record issued host certificates", async () => {
@@ -275,7 +276,7 @@ describe("running on Node.js with a node:sqlite database file", () => {
 			try {
 				await requestUserCertificate(caFor(second), ecdsaKey.user())
 
-				expect(second.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: 7 })
+				expect(second.prepare("SELECT count(*) AS n FROM migrations").get()).toEqual({ n: migrations.length })
 				expect(second.prepare("SELECT serial FROM certificates WHERE serial = ?").all(`${serial}`)).toHaveLength(1)
 			} finally {
 				second.close()

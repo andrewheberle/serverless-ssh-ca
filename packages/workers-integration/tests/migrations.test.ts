@@ -6,6 +6,8 @@ import { privateKeyString } from "./keys/ecdsa"
 // the backfill is not part of the package's exports, but its SQL must be run
 // on D1 to know that D1 accepts it
 import { migration as renewalOf } from "../../core/src/db/migrations/0005_renewal_of"
+// the migrations the CA applies, which a fresh database must have recorded in order
+import { migrations } from "../../core/src/db/migrations/index"
 
 const admin = adminSecretsStore(env.PRIVATE_KEY)
 await admin.create(privateKeyString)
@@ -16,8 +18,8 @@ describe("database migrations", () => {
 
 		expect(responses.map(r => r.status)).toEqual(Array.from({ length: 10 }, () => 200))
 
-		const { results } = await env.DB.prepare("SELECT name FROM migrations").all()
-		expect(results).toEqual([{ name: "0001_initial_schema" }, { name: "0002_krl_version" }, { name: "0003_krl_revision" }, { name: "0004_certificate_audit" }, { name: "0005_renewal_of" }, { name: "0006_client_address" }, { name: "0007_query_indexes" }])
+		const { results } = await env.DB.prepare("SELECT name FROM migrations ORDER BY id").all()
+		expect(results.map((r) => r.name)).toEqual(migrations.map((m) => m.name))
 	})
 
 	it("link renewals recorded before 0005_renewal_of on D1", async () => {
