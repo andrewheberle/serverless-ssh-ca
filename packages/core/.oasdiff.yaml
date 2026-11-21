@@ -1,4 +1,16 @@
-# Used by the oasdiff check in .github/workflows/build.yml (OASDIFF_CONFIG).
-# Clients generate code from operation IDs and component names, so renaming
-# either is breaking, although oasdiff only reports it as INFO by default.
+# Used by the oasdiff check in .github/workflows/build.yml (its config input).
+# oasdiff reports only ERR and WARN changes, and leaves several changes that
+# break clients at INFO, so .oasdiff-severity-levels raises them to ERR. That
+# file can't hold comments, so the reasons are here:
+# - api-operation-id-removed, api-schema-removed: clients generate code from
+#   operation IDs and component names, so renaming either is breaking
+# - *-default-value-changed and *-default-value-removed: a client that leaves
+#   the value out silently gets a different result, such as other
+#   certificate extensions
+# - response-non-success-status-added and -removed: an existing operation
+#   answering with a new error status, or no longer with an old one
+# - response-optional-property-removed: a value clients read disappears
+# The client end-to-end tests raise the same checks, in the "Write oasdiff
+# config" step of ssh-ca-client's .github/workflows/e2e.yml, so change both
+# lists together.
 severity-levels: .oasdiff-severity-levels

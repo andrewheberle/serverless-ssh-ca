@@ -1,2 +1,15 @@
 api-operation-id-removed ERR
 api-schema-removed ERR
+request-body-default-value-changed ERR
+request-body-default-value-removed ERR
+request-parameter-default-value-changed ERR
+request-parameter-default-value-removed ERR
+request-property-default-value-changed ERR
+request-property-default-value-removed ERR
+response-body-default-value-changed ERR
+response-body-default-value-removed ERR
+response-property-default-value-changed ERR
+response-property-default-value-removed ERR
+response-non-success-status-added ERR
+response-non-success-status-removed ERR
+response-optional-property-removed ERR
