@@ -233,6 +233,8 @@ export const verifySignature = (publicKey: string, namespace: string, data: Uint
  */
 export type ListedKrl = {
 	version: bigint
+	/** The comment in the header, undefined when it is empty */
+	comment: string | undefined
 	/** The fingerprint of the CA key the certificate sections are for */
 	ca: string | undefined
 	serials: bigint[]
@@ -260,6 +262,7 @@ export const listKrl = (krl: Uint8Array): ListedKrl => {
 
 	return {
 		version: BigInt(version[1]!),
+		comment: /^# Comment: (.*)$/m.exec(output)?.[1],
 		ca: /^# CA key \S+ (\S+)$/m.exec(output)?.[1],
 		serials: lines.filter((l) => l.startsWith("serial: ")).map((l) => BigInt(l.slice("serial: ".length))),
 		keyIds: lines.filter((l) => l.startsWith("id: ")).map((l) => l.slice("id: ".length)),

@@ -154,11 +154,13 @@ export const revocationList = async (c: AppContext, l: Logger, certificateType: 
 		// list certificates that left the KRL 24 hours after expiring, as that
 		// doesn't change the revision. The revision is read before the revoked
 		// serials, so the KRL cached for a revision includes at least every
-		// certificate revoked by then
+		// certificate revoked by then. The key starts with the format of the
+		// KRL, so a KRL cached before the certificate type was signed into it
+		// (v1) isn't served after an upgrade
 		const cache = c.env.CACHE
 		const cacheKey = cache === undefined
 			? undefined
-			: `krl:${certificateTypeName(certificateType)}:${key.publicKey.fingerprint()}:${await getKrlRevision(c.env, certificateType)}`
+			: `krl:v2:${certificateTypeName(certificateType)}:${key.publicKey.fingerprint()}:${await getKrlRevision(c.env, certificateType)}`
 
 		if (cache !== undefined && cacheKey !== undefined) {
 			const cached = await readCachedKrl(cache, cacheKey, l)
@@ -178,7 +180,11 @@ export const revocationList = async (c: AppContext, l: Logger, certificateType: 
 		// KRL with the same version has the same generation date
 		const { version, generatedAt } = await getKrlVersion(c.env, certificateType, await krl.digest())
 
-		const krlBytes = krl.generate(version, "", generatedAt)
+		// both KRLs are signed with the same key in the same namespace, so the
+		// certificate type is signed into the comment, exactly "user" or
+		// "host", for clients to check they got the KRL they asked for. The
+		// header isn't part of the digest, so this doesn't change the version
+		const krlBytes = krl.generate(version, certificateTypeName(certificateType), generatedAt)
 
 		// convert to base64
 		const bytes = new Uint8Array(krlBytes)

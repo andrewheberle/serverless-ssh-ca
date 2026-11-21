@@ -195,6 +195,24 @@ describe("cached KRLs", () => {
 		expect(await getKrl(ca)).toEqual(first)
 	})
 
+	// KRLs cached before the certificate type was signed into them have an
+	// empty comment, so they are not served once the CA names the type
+	it("should not serve a KRL cached in the format before the type was named", async () => {
+		const first = recordingCache()
+		await getKrl(setup(first).ca)
+		const key = first.puts[0] ?? ""
+		const before = key.replace(/^krl:v2:/, "krl:")
+		expect(before).not.toBe(key)
+
+		const cache = cacheInMemory()
+		const untyped = { krl: "U1NIS1JM", signature: "untyped" }
+		await cache.put(before, JSON.stringify(untyped))
+
+		const got = await getKrl(setup(cache).ca)
+		expect(got).not.toEqual(untyped)
+		expect(got).toMatchObject({ signature: expect.stringContaining("BEGIN SSH SIGNATURE") })
+	})
+
 	it("should still serve the KRL when the cache fails", async () => {
 		const failing: CaCache = {
 			get: async () => { throw new Error("cache unavailable") },

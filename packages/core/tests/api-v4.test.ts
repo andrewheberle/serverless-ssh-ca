@@ -9,7 +9,7 @@ import { generateUnboundProof, generateRequestProof } from "./helpers/proof.js"
 import { key as ed25519Key } from "./keys/ed25519.js"
 import { key as ecdsaKey } from "./keys/ecdsa.js"
 import type { TestKey } from "./keys/types.js"
-import { fingerprint, isRevoked, listCertificate, type ListedCertificate } from "./helpers/ssh-keygen.js"
+import { fingerprint, isRevoked, listCertificate, listKrl, type ListedCertificate } from "./helpers/ssh-keygen.js"
 
 const email = "user@example.com"
 const claims = { sub: "user123", email }
@@ -282,6 +282,15 @@ describe("v4 API", () => {
 		])("should reject a serial with %s", async (_, serial) => {
 			const response = await revokeCertificate("user", serial, revokeProof(userKey, "user", serial))
 			expect(response.status).toBe(400)
+		})
+	})
+
+	// both KRLs are signed with the same key in the same namespace, so the
+	// certificate type is signed into the comment for clients to check
+	// (#629). Checked with ssh-keygen, which reads the KRL independently
+	describe("GET /api/v4/{certificateType}/krl", () => {
+		it.each(["user", "host"] as const)("should name the certificate type in the %s KRL", async (type) => {
+			expect(listKrl(await getKrl(ca, type)).comment).toBe(type)
 		})
 	})
 

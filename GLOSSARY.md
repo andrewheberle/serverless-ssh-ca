@@ -44,6 +44,10 @@ _Avoid_: Source IP, remote address, requester IP
 A person allowed to see every certificate the CA has issued and to revoke any of them, as established by an identity-aware proxy in front of the CA rather than by the tokens a requester presents.
 _Avoid_: Administrator, operator, superuser
 
+**KRL**:
+A key revocation list signed by the CA, listing the revoked certificates of one type (user or host), and naming that type.
+_Avoid_: Revocation list, CRL, blocklist
+
 **Revocation**:
 Marking an issued certificate as no longer trusted, so it appears in the KRL for its type until 24 hours after it expires. A certificate can be revoked by the holder of its key or by an admin. A revocation is never undone; access is restored by issuing a new certificate.
 _Avoid_: Cancellation, deletion

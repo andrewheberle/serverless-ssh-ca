@@ -123,6 +123,7 @@ describe("KRLBuilder generate", () => {
 
 		expect(listKrl(krl)).toEqual({
 			version: 7n,
+			comment: undefined,
 			ca: fingerprint(ca.publicKey),
 			serials: [1n, 18446744073709551615n],
 			keyIds: ["revoked key"],
@@ -146,6 +147,12 @@ describe("KRLBuilder generate", () => {
 		const certificate = signCertificate(ed25519Key.ca(), ed25519Key.user().publicKey, { kind: "user", keyId: "key", principals: ["user"], serial: 1n })
 
 		expect(isRevoked(krl, certificate)).toBe(false)
+	})
+
+	it("should put the comment in the header", async () => {
+		const krl = new Uint8Array(new KRLBuilder(await priv(ecdsaKey.ca())).addSerials([1n]).generate(1n, "user"))
+
+		expect(listKrl(krl).comment).toBe("user")
 	})
 
 	it("should default to version 1", async () => {
