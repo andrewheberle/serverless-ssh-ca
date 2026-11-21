@@ -33,10 +33,13 @@ jobs:
 
   # Checks openapi.json for breaking changes against the last release, so a
   # break is caught here even before a client release syncs the schema the
-  # client end-to-end tests compare against. Approved breaking changes are
-  # listed in packages/core/.oasdiff-err-ignore, and .oasdiff.yaml makes
-  # renaming an operation ID or component an error, as clients generate code
-  # from them. Specs are not uploaded to oasdiff.com and no comment is posted
+  # client end-to-end tests compare against. It fails on warnings as well as
+  # errors. Approved breaking changes of either level are listed in
+  # packages/core/.oasdiff-err-ignore, and .oasdiff.yaml raises changes that
+  # oasdiff leaves at INFO but that break clients, such as renaming an
+  # operation ID or changing a default, to errors. The action is pinned as in
+  # ssh-ca-client's e2e.yml, so both run the same oasdiff. Specs are not
+  # uploaded to oasdiff.com and no comment is posted
   openapi:
     name: openapi
     runs-on: ubuntu-latest
@@ -58,14 +61,14 @@ jobs:
           echo "Comparing with $tag"
           git show "$tag:packages/core/openapi.json" > _base-openapi.json
       - name: Check for breaking changes
-        uses: oasdiff/oasdiff-action/breaking@0b95859a27abaed7445bb05c18a39f1a6610a9a4
-        env:
-          OASDIFF_CONFIG: packages/core/.oasdiff.yaml
+        uses: oasdiff/oasdiff-action/breaking@14ca7009a63c417dfe27b7c44359c4bcccaf8eee # v0.2.1
         with:
           base: _base-openapi.json
           revision: packages/core/openapi.json
+          config: packages/core/.oasdiff.yaml
           fail-on: WARN
           err-ignore: ${{ hashFiles('packages/core/.oasdiff-err-ignore') != '' && 'packages/core/.oasdiff-err-ignore' || '' }}
+          warn-ignore: ${{ hashFiles('packages/core/.oasdiff-err-ignore') != '' && 'packages/core/.oasdiff-err-ignore' || '' }}
           review: 'false'
           github-token: ''
 
