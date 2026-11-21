@@ -8,13 +8,13 @@ A v4 proof can still be replayed to the same request, with the same method and p
 - **Revoking again**: does nothing, because the certificate is already revoked.
 - **Renewing again**: fails, because a renewal revokes the certificate it renews in the same transaction as it records the new one.
 
-Making proofs single-use is tracked separately, in #554.
+Making proofs single-use was evaluated in #554 and rejected, see ADR 0007.
 
 ## Considered Options
 
 - **Deprecating v3 for a release before removing it**: kept a known replay open for no benefit, as the only known client had already moved to v4.
-- **Signing a digest of the request body as well**: would stop a replay from changing `lifetime`, `extensions` or `principals`. Rejected for 1.0 because the tokens are what authorize an issuance, a replayed issuance is for a key the attacker does not hold, and adding it would change the wire format of every client. It can be looked at again with #554.
-- **A nonce from the CA, or remembering each proof until the window ends**: makes proofs single-use, but needs an extra round trip or server state on every request. Left to #554.
+- **Signing a digest of the request body as well**: would stop a replay from changing `lifetime`, `extensions` or `principals`. Rejected for 1.0 because the tokens are what authorize an issuance, a replayed issuance is for a key the attacker does not hold, and adding it would change the wire format of every client. Also rejected in ADR 0007.
+- **A nonce from the CA, or remembering each proof until the window ends**: makes proofs single-use, but needs an extra round trip or server state on every request. Rejected in ADR 0007.
 - **A tighter limit on timestamps from the future**: the window is the same on both sides of the CA's clock, so a proof from a client whose clock is ahead stays usable for up to twice the setting. Tightening it would make more requests fail because of client clock drift, for little gain.
 
 ## Consequences

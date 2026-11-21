@@ -357,6 +357,18 @@ refused.
 The public key for a revocation or renewal is taken from the proof and the
 certificate respectively, so it is not sent separately.
 
+A proof can be used again for the same request until its timestamp is outside
+`CERTIFICATE_REQUEST_TIME_SKEW_MAX`. That gains nothing: a certificate issued
+again is for a key only the requester holds, a renewal revokes the
+certificate it renews so it can't be repeated, and a revoked certificate
+can't be revoked again. Anyone who can read a request to issue a certificate
+can also read its access token and identity token, which are worth far more,
+as they can be used to request a certificate for any key until they expire
+(see [ADR 0007](../../docs/adr/0007-proofs-of-possession-are-not-single-use.md)).
+So a proxy or log in front of the CA must not record the `Authorization`
+header, the `identity` field of the request body, or the `Proof-Of-Possession`
+header.
+
 ### Keys, Certificates and Lifetimes
 
 `public_key` and `certificate`, in requests and responses, are the BASE64
