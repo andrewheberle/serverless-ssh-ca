@@ -1,8 +1,10 @@
 name: Release
 
-# The tag and GitHub release are created by release-please when the release
-# PR is merged. This workflow name is registered as the trusted publisher on
-# npm, so don't rename it
+# The tag and a draft GitHub release are created by release-please when the
+# release PR is merged. The release is a draft as an immutable release can't
+# have assets added once published, so this workflow attaches the assets and
+# then publishes it. This workflow name is registered as the trusted publisher
+# on npm, so don't rename it
 on:
   push:
     tags:
@@ -72,7 +74,45 @@ jobs:
         run: .github/scripts/publish-once.sh packages/core --access public
       - name: Publish testing to npm
         run: .github/scripts/publish-once.sh packages/testing --access public
-      - name: Add assets to GitHub release
-        run: gh release upload "$GITHUB_REF_NAME" packages/core/openapi.json sbom.spdx.json --clobber --repo "$GITHUB_REPOSITORY"
+      # the assets are attached and the release published only once both
+      # packages are on npm, so a published release always has both. A re-run
+      # after the release was published skips both steps, but still fails if
+      # an asset is missing, as a published release can't be changed
+      - name: Check whether the release is a draft
+        id: release
+        run: echo "draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+      - name: Add assets to GitHub release
+        if: steps.release.outputs.draft == 'true'
+        run: gh release upload "$GITHUB_REF_NAME" packages/core/openapi.json sbom.spdx.json --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+      # a prerelease can't be marked as latest, as in ssh-ca-client
+      - name: Publish release
+        if: steps.release.outputs.draft == 'true'
+        run: |
+          if [ "$(gh release view "$GITHUB_REF_NAME" --json isPrerelease --jq .isPrerelease)" = "true" ]; then
+            gh release edit "$GITHUB_REF_NAME" --draft=false --latest=false
+          else
+            gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+      - name: Check the published release has its assets
+        if: steps.release.outputs.draft != 'true'
+        run: |
+          assets="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')"
+          for asset in openapi.json sbom.spdx.json; do
+            if ! grep -qxF "$asset" <<< "$assets"; then
+              echo "::error::$GITHUB_REF_NAME was published without $asset, and a published release can't be changed, so release a new patch version"
+              exit 1
+            fi
+          done
+          echo "$GITHUB_REF_NAME is already published with its assets"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
