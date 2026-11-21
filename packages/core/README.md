@@ -382,7 +382,13 @@ signature, so a host can check that it came from the CA before using it:
 { "krl": "U1NIS1JM...", "signature": "-----BEGIN SSH SIGNATURE-----\n..." }
 ```
 
-- `krl` is the binary OpenSSH KRL, BASE64 encoded.
+- `krl` is the binary OpenSSH KRL, BASE64 encoded. Its comment is the
+  certificate type it revokes, exactly `user` or `host`. Both KRLs are signed
+  with the same key in the same namespace, so check the comment matches the
+  type requested, or a KRL for one type could be used as the other and
+  un-revoke certificates. CAs before API version 4.2.0 (`info.version` in
+  `openapi.json`) leave the comment empty. `ssh-keygen -Q -l -f <krl>` shows
+  it as `# Comment: user`.
 - `signature` is an armored SSHSIG, as produced by `ssh-keygen -Y sign`, made
   by the CA key over the decoded KRL bytes with the SHA-512 hash and the
   `krl@com.github.serverless-ssh-ca.andrewheberle` namespace. Unlike in a
@@ -855,7 +861,9 @@ revoked (including the previous certificate on a host renewal), or when
 cleanup removes any certificates. The cache key includes this revision and
 the fingerprint of the CA key, so a revocation or a new CA key immediately
 uses a new key rather than relying on cache entries being deleted or the
-cache being consistent. Entries are left to expire after 7 days.
+cache being consistent. Entries are left to expire after 7 days. The key also
+starts with the format of the KRL, so KRLs cached by an earlier release, before
+the certificate type was signed into them, are not served after an upgrade.
 
 A cached KRL can still list certificates that no longer need to be in it. A
 revoked certificate is left out of the KRL 24 hours after it expires, but

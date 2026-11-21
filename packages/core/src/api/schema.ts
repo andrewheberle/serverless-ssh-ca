@@ -79,7 +79,7 @@ export const accessToken = z.string()
 	})
 
 export const krl = openapiStringByte
-	.meta({ description: "The OpenSSH Key Revocation List in its binary format, BASE64 encoded" })
+	.meta({ description: "The OpenSSH Key Revocation List in its binary format, BASE64 encoded. Its comment is the certificate type it revokes, exactly `user` or `host`, and is covered by the signature, so check it matches the type requested. CAs before API version 4.2.0 leave the comment empty" })
 
 export const certificate = openapiStringByte
 	.meta({ description: "Issued certificate, as the BASE64 encoding of its OpenSSH text form (such as `ecdsa-sha2-nistp256-cert-v01@openssh.com AAAA...`), not of the binary certificate" })
