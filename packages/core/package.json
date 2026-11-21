@@ -1,6 +1,6 @@
 {
 	"name": "@andrewheberle/serverless-ssh-ca",
-	"version": "1.0.2",
+	"version": "1.1.0",
 	"description": "A serverless SSH CA built for Cloudflare Workers that can also run on Node.js",
 	"type": "module",
 	"types": "./dist/index.d.ts",
