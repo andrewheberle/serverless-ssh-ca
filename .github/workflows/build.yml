@@ -61,7 +61,7 @@ jobs:
           echo "Comparing with $tag"
           git show "$tag:packages/core/openapi.json" > _base-openapi.json
       - name: Check for breaking changes
-        uses: oasdiff/oasdiff-action/breaking@14ca7009a63c417dfe27b7c44359c4bcccaf8eee # v0.2.1
+        uses: oasdiff/oasdiff-action/breaking@533dbf3adf9462a3f4fe58bd61231c977d837342 # v0.2.3
         with:
           base: _base-openapi.json
           revision: packages/core/openapi.json
